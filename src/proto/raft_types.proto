@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+import "raft_core_messages.proto";
+
+package raft_core;
+
+message RaftMessage {
+    RCMsgBase   base    = 1;
+    oneof req_resp {
+        RCRequest   rc_request  = 2;
+        RCResponse  rc_response = 3;
+    }
+}
