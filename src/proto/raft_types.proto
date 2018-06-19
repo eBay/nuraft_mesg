@@ -1,8 +1,41 @@
 syntax = "proto3";
 
-import "raft_core_messages.proto";
-
 package raft_core;
+
+enum LogType {
+    UNKNOWN     = 0;
+    APP         = 1;
+    CONFIG      = 2;
+    CLUSTER     = 3;
+    PACK        = 4;
+    SNAPSYNC    = 5;
+}
+
+message LogEntry {
+    uint64  term    = 1;
+    LogType type    = 2;
+    bytes   buffer  = 3;
+}
+
+message RCMsgBase {
+    uint64  term    = 1;
+    uint32  type    = 2;
+    int32   src     = 3;
+    int32   dest    = 4;
+}
+
+message RCRequest {
+    uint64              last_log_term   = 1;
+    uint64              last_log_index  = 2;
+    uint64              commit_index    = 3;
+    repeated LogEntry   log_entries     = 4;
+}
+
+message RCResponse {
+    uint64              next_index      = 1;
+    bool                accepted        = 2;
+    bytes               context         = 3;
+}
 
 message RaftMessage {
     RCMsgBase   base    = 1;

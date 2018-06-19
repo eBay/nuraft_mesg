@@ -61,11 +61,11 @@ fromRCResponse(resp_msg& rcmsg) {
 }
 
 inline
-raft_core::RaftMessage*
+raft_core::RaftMessage
 fromRequest(req_msg& rcreq) {
-   auto message = new raft_core::RaftMessage;
-   message->set_allocated_base(fromBaseRequest(rcreq));
-   message->set_allocated_rc_request(fromRCRequest(rcreq));
+   raft_core::RaftMessage message;
+   message.set_allocated_base(fromBaseRequest(rcreq));
+   message.set_allocated_rc_request(fromRCRequest(rcreq));
    return message;
 }
 
@@ -130,10 +130,8 @@ struct raft_client final : public rpc_client {
       ptr<resp_msg> resp;
 
       ::grpc::ClientContext context;
-      raft_core::StepRequest step_request;
-      step_request.set_allocated_msg(fromRequest(*req));
       raft_core::RaftMessage response;
-      auto status = stub_->Step(&context, step_request, &response);
+      auto status = stub_->Step(&context, fromRequest(*req), &response);
 
       if (status.ok()) {
          resp = toResponse(response);
@@ -152,7 +150,7 @@ struct grpc_service :
       public raft_core::RaftMemberSvc::Service
 {
    ::grpc::Status Step(::grpc::ServerContext *context,
-                       ::raft_core::StepRequest const *request,
+                       ::raft_core::RaftMessage const *request,
                        ::raft_core::RaftMessage *response) override;
 
    ptr<rpc_client> create_client(const std::string &endpoint) override {
@@ -169,9 +167,9 @@ struct grpc_service :
 
 ::grpc::Status
 grpc_service::Step(::grpc::ServerContext *,
-                   ::raft_core::StepRequest const *request,
+                   ::raft_core::RaftMessage const *request,
                    ::raft_core::RaftMessage *response) {
-   auto rcreq = toRequest(request->msg());
+   auto rcreq = toRequest(*request);
    auto resp = _raft_server->process_req(*rcreq);
    assert(resp);
    response->CopyFrom(fromResponse(*resp));

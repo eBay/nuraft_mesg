@@ -1,11 +1,10 @@
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
-        proto/raft_service.proto
+                            proto/raft_service.proto
                             proto/raft_types.proto
-                            proto/raft_core_messages.proto
                         )
 
 PROTOBUF_GENERATE_GRPC_CPP(GRPC_SRCS GRPC_HDRS
-        proto/raft_service.proto
+                            proto/raft_service.proto
                         )
 
 list(GET PROTO_HDRS 0 FIRST_PROTO)

@@ -4,11 +4,6 @@ import "raft_types.proto";
 
 package raft_core;
 
-message StepRequest {
-    string      group_id    = 1;
-    RaftMessage msg         = 2;
-}
-
 service RaftMemberSvc {
-  rpc Step (StepRequest)  returns (RaftMessage);
+  rpc Step (RaftMessage)  returns (RaftMessage);
 }
