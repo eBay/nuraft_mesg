@@ -119,8 +119,8 @@ toResponse(raft_core::RaftMessage const& raft_msg) {
    return message;
 }
 
-struct raft_client final : public rpc_client {
-   explicit raft_client(std::shared_ptr<::grpc::ChannelInterface> channel) :
+struct grpc_client final : public rpc_client {
+   explicit grpc_client(std::shared_ptr<::grpc::ChannelInterface> channel) :
          stub_(raft_core::RaftMemberSvc::NewStub(channel))
    {
    }
@@ -154,7 +154,7 @@ struct grpc_service :
                        ::raft_core::RaftMessage *response) override;
 
    ptr<rpc_client> create_client(const std::string &endpoint) override {
-      return std::make_shared<raft_client>(::grpc::CreateChannel(endpoint, grpc::InsecureChannelCredentials()));
+      return std::make_shared<grpc_client>(::grpc::CreateChannel(endpoint, grpc::InsecureChannelCredentials()));
    }
 
    void registerRaftCore(ptr<raft_server> raft_server) {
