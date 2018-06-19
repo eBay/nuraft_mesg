@@ -1,5 +1,6 @@
 //
 // Copyright eBay 2018
+// Author: Brian Szmyd <bszmyd@ebay.com>
 //
 
 #pragma once
