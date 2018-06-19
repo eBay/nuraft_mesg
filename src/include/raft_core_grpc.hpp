@@ -121,9 +121,10 @@ toResponse(raft_core::RaftMessage const& raft_msg) {
    return message;
 }
 
+template<typename GRPCService>
 struct grpc_client final : public rpc_client {
    explicit grpc_client(std::shared_ptr<::grpc::ChannelInterface> channel) :
-         stub_(raft_core::RaftMemberSvc::NewStub(channel))
+         stub_(GRPCService::NewStub(channel))
    {
    }
 
@@ -144,19 +145,37 @@ struct grpc_client final : public rpc_client {
    }
 
  private:
-   std::unique_ptr<raft_core::RaftMemberSvc::Stub> stub_;
+   std::unique_ptr<typename GRPCService::Stub> stub_;
 };
 
+template<typename GRPCService>
 struct grpc_service :
       public rpc_client_factory,
-      public raft_core::RaftMemberSvc::Service
-{
+ public GRPCService::Service {
+   /// gRPC Service Override
+   /// \param context
+   /// \param request
+   /// \param response
+   /// \return
    ::grpc::Status Step(::grpc::ServerContext *context,
                        ::raft_core::RaftMessage const *request,
-                       ::raft_core::RaftMessage *response) override;
+                       ::raft_core::RaftMessage *response) override {
+      auto rcreq = toRequest(*request);
+      auto resp = _raft_server->process_req(*rcreq);
+      assert(resp);
+      response->
 
+      CopyFrom (fromResponse(
+
+      *resp));
+      return ::grpc::Status();
+   }
+
+   /// rpc_client_factory Override
+   /// \param endpoint
+   /// \return
    ptr<rpc_client> create_client(const std::string &endpoint) override {
-      return std::make_shared<grpc_client>(::grpc::CreateChannel(endpoint, grpc::InsecureChannelCredentials()));
+      return std::make_shared<grpc_client<GRPCService>>(::grpc::CreateChannel(endpoint, grpc::InsecureChannelCredentials()));
    }
 
    void registerRaftCore(ptr<raft_server> raft_server) {
@@ -166,16 +185,5 @@ struct grpc_service :
  private:
    ptr<raft_server> _raft_server;
 };
-
-::grpc::Status
-grpc_service::Step(::grpc::ServerContext *,
-                   ::raft_core::RaftMessage const *request,
-                   ::raft_core::RaftMessage *response) {
-   auto rcreq = toRequest(*request);
-   auto resp = _raft_server->process_req(*rcreq);
-   assert(resp);
-   response->CopyFrom(fromResponse(*resp));
-   return ::grpc::Status();
-}
 
 }

@@ -154,7 +154,7 @@ void run_echo_server(int srv_id) {
              .with_rpc_failure_backoff(50);
 
     // gRPC service.
-    ptr<grpc_service> grpc_svc_(cs_new<grpc_service>());
+    ptr<grpc_service<raft_core::ExampleSvc>> grpc_svc_(cs_new<grpc_service<raft_core::ExampleSvc>>());
     sds_logging::SetLogger(spdlog::stdout_color_mt("raft_member"));
     ptr<logger> l = std::make_shared<sds_logger>();
     ptr<rpc_client_factory> rpc_cli_factory = grpc_svc_;

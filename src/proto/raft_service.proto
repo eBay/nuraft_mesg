@@ -8,6 +8,9 @@ import "raft_types.proto";
 
 package raft_core;
 
-service RaftMemberSvc {
+/// This is a VERY basic service. A typical service will simple include this as
+/// one of the rpc's in a greater service. Simply copy this example into your
+/// gRPC service and have the ServiceImpl inherit cornerstone::grpc_service
+service ExampleSvc {
   rpc Step (RaftMessage)  returns (RaftMessage);
 }
