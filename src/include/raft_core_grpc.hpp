@@ -112,10 +112,11 @@ toResponse(raft_core::RaftMessage const& raft_msg) {
                                              base.dest(),
                                              resp.next_index(),
                                              resp.accepted());
-   auto ctx_buffer = buffer::alloc(resp.context().length());
-   memcpy(ctx_buffer->data(), resp.context().data(), resp.context().length());
-
-   message->set_ctx(ctx_buffer);
+   if (0 < resp.context().length()) {
+      auto ctx_buffer = buffer::alloc(resp.context().length());
+      memcpy(ctx_buffer->data(), resp.context().data(), resp.context().length());
+      message->set_ctx(ctx_buffer);
+   }
    return message;
 }
 
