@@ -163,11 +163,7 @@ struct grpc_service :
       auto rcreq = toRequest(*request);
       auto resp = _raft_server->process_req(*rcreq);
       assert(resp);
-      response->
-
-      CopyFrom (fromResponse(
-
-      *resp));
+      response->CopyFrom(fromResponse(*resp));
       return ::grpc::Status();
    }
 
