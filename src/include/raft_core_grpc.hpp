@@ -6,7 +6,7 @@
 #pragma once
 
 #include <cornerstone.hxx>
-#include "raft_service.grpc.pb.h"
+#include "raft_types.pb.h"
 #include <grpcpp/create_channel.h>
 #include <grpcpp/server_builder.h>
 
@@ -121,12 +121,10 @@ toResponse(raft_core::RaftMessage const& raft_msg) {
    return message;
 }
 
-template<typename GRPCService>
-struct grpc_client final : public rpc_client {
-   explicit grpc_client(std::shared_ptr<::grpc::ChannelInterface> channel) :
-         stub_(GRPCService::NewStub(channel))
-   {
-   }
+struct grpc_client : public rpc_client {
+   virtual ::grpc::Status send(::grpc::ClientContext* ctx,
+                               raft_core::RaftMessage const& message,
+                               raft_core::RaftMessage* response) = 0;
 
    void send(ptr<req_msg>& req, rpc_handler& complete) override {
       ptr<rpc_exception> err;
@@ -134,7 +132,7 @@ struct grpc_client final : public rpc_client {
 
       ::grpc::ClientContext context;
       raft_core::RaftMessage response;
-      auto status = stub_->Step(&context, fromRequest(*req), &response);
+      auto status = send(&context, fromRequest(*req), &response);
 
       if (status.ok()) {
          resp = toResponse(response);
@@ -143,35 +141,17 @@ struct grpc_client final : public rpc_client {
       }
       complete(resp, err);
    }
-
- private:
-   std::unique_ptr<typename GRPCService::Stub> stub_;
 };
 
-template<typename GRPCService>
-struct grpc_service :
-      public rpc_client_factory,
- public GRPCService::Service {
-   /// gRPC Service Override
-   /// \param context
-   /// \param request
-   /// \param response
-   /// \return
-   ::grpc::Status Step(::grpc::ServerContext *context,
+struct grpc_service {
+   ::grpc::Status step(::grpc::ServerContext *context,
                        ::raft_core::RaftMessage const *request,
-                       ::raft_core::RaftMessage *response) override {
+                       ::raft_core::RaftMessage *response) {
       auto rcreq = toRequest(*request);
       auto resp = _raft_server->process_req(*rcreq);
       assert(resp);
       response->CopyFrom(fromResponse(*resp));
       return ::grpc::Status();
-   }
-
-   /// rpc_client_factory Override
-   /// \param endpoint
-   /// \return
-   ptr<rpc_client> create_client(const std::string &endpoint) override {
-      return std::make_shared<grpc_client<GRPCService>>(::grpc::CreateChannel(endpoint, grpc::InsecureChannelCredentials()));
    }
 
    void registerRaftCore(ptr<raft_server> raft_server) {

@@ -16,12 +16,14 @@
 */
 
 #include "cornerstone/raft_core_grpc.hpp"
+#include "example_service.grpc.pb.h"
 #include <sds_logging/logging.h>
 #include <iostream>
 #include <cassert>
 #include <chrono>
 
 #include <stdlib.h>
+#include "example_factory.h"
 
 SDS_LOGGING_INIT
 
@@ -29,7 +31,7 @@ using namespace cornerstone;
 
 extern void cleanup(const std::string& folder);
 
-ptr<grpc_service<raft_core::ExampleSvc>> grpc_svc_;
+ptr<example_factory> grpc_svc_;
 bool message_complete {false};
 std::mutex stop_test_lock1;
 std::condition_variable stop_test_cv1;
@@ -103,7 +105,7 @@ void resp_handler(ptr<resp_msg>& rsp, ptr<rpc_exception>& err) {
 }
 
 void test_raft_server_with_grpc(int srv_id, char* args) {
-    grpc_svc_ = cs_new<grpc_service<raft_core::ExampleSvc>>();
+    grpc_svc_ = cs_new<example_factory>();
     ptr<rpc_client> client(grpc_svc_->create_client(
             sstrfmt("127.0.0.1:900%d").fmt(srv_id) ));
     ptr<req_msg> msg = cs_new<req_msg>(0, msg_type::client_request, 0, 1, 0, 0, 0);
@@ -133,7 +135,7 @@ void test_raft_server_with_grpc(int srv_id, char* args) {
 }
 
 void add_new_server(int leader_id, int srv_id) {
-    grpc_svc_ = cs_new<grpc_service<raft_core::ExampleSvc>>();
+    grpc_svc_ = cs_new<example_factory>();
     ptr<rpc_client> client(grpc_svc_->create_client(
             sstrfmt("127.0.0.1:900%d").fmt(leader_id) ));
 
@@ -166,7 +168,7 @@ void add_new_server(int leader_id, int srv_id) {
 }
 
 void remove_server(int leader_id, int srv_id) {
-    grpc_svc_ = cs_new<grpc_service<raft_core::ExampleSvc>>();
+    grpc_svc_ = cs_new<example_factory>();
     ptr<rpc_client> client(grpc_svc_->create_client(
             sstrfmt("127.0.0.1:900%d").fmt(leader_id) ));
 

@@ -24,6 +24,5 @@ if(CCACHE_FOUND)
 endif ()
 
 find_package(Protobuf REQUIRED)
-include(cmake/grpc.cmake)
 
 add_subdirectory(src)

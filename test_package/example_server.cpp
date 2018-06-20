@@ -16,12 +16,14 @@
 */
 
 #include "cornerstone/raft_core_grpc.hpp"
+#include "example_service.grpc.pb.h"
 #include <iostream>
 #include <cassert>
 #include <stdlib.h>
 #include <grpcpp/server.h>
 #include <grpcpp/security/server_credentials.h>
 #include <sds_logging/logging.h>
+#include "example_factory.h"
 
 using namespace cornerstone;
 
@@ -29,6 +31,16 @@ SDS_LOGGING_INIT
 
 std::condition_variable stop_cv;
 std::mutex stop_cv_lock;
+
+struct example_service :
+      public cornerstone::grpc_service,
+      public raft_core::ExampleSvc::Service {
+   ::grpc::Status Step(::grpc::ServerContext *context,
+                       ::raft_core::RaftMessage const *request,
+                       ::raft_core::RaftMessage *response) override {
+      return step(context, request, response);
+   }
+};
 
 struct sds_logger : ::cornerstone::logger {
     void debug(const std::string& log_line) override {
@@ -154,10 +166,10 @@ void run_echo_server(int srv_id) {
              .with_rpc_failure_backoff(50);
 
     // gRPC service.
-    ptr<grpc_service<raft_core::ExampleSvc>> grpc_svc_(cs_new<grpc_service<raft_core::ExampleSvc>>());
+    ptr<example_service> grpc_svc_(cs_new<example_service>());
     sds_logging::SetLogger(spdlog::stdout_color_mt("raft_member"));
     ptr<logger> l = std::make_shared<sds_logger>();
-    ptr<rpc_client_factory> rpc_cli_factory = grpc_svc_;
+    ptr<rpc_client_factory> rpc_cli_factory = std::make_shared<example_factory>();
 
     ptr<asio_service> asio_svc_(cs_new<asio_service>());
     ptr<delayed_task_scheduler> scheduler = asio_svc_;
