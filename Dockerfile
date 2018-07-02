@@ -8,12 +8,11 @@ ENV CONAN_USER=${CONAN_USER:-sds}
 ENV CONAN_CHANNEL=${CONAN_CHANNEL:-testing}
 
 COPY conanfile.py /tmp/source/
-
-RUN conan install -u /tmp/source
-
 COPY CMakeLists.txt /tmp/source/
+COPY LICENSE.md /tmp/source/
 COPY cmake/ /tmp/source/cmake
 COPY src/ /tmp/source/src
+COPY test_package/ /tmp/source/test_package
 
 RUN conan create /tmp/source "${CONAN_USER}"/"${CONAN_CHANNEL}";
 RUN conan create -pr debug /tmp/source "${CONAN_USER}"/"${CONAN_CHANNEL}";

@@ -32,7 +32,7 @@ pipeline {
 
         stage('Deploy') {
             when {
-                branch 'master'
+                branch 'testing/*'
             }
             steps {
                 sh "docker run ecr.vip.ebayc3.com/${ORG}/${PROJECT}:${TAG}"
