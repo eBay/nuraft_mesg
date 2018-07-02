@@ -24,6 +24,6 @@ CMD set -eux; \
     PKG_VERSION=$(grep 'version =' /tmp/source/conanfile.py | awk '{print $3}'); \
     PKG_VERSION="${PKG_VERSION%\"}"; \
     PKG_VERSION="${PKG_VERSION#\"}"; \
-    conan upload homestore/${PKG_VERSION}@"${CONAN_USER}"/"${CONAN_CHANNEL}" --all -r origin;
+    conan upload raft_core_grpc/${PKG_VERSION}@"${CONAN_USER}"/"${CONAN_CHANNEL}" --all -r origin;
 # ##########   #######   ############
 
