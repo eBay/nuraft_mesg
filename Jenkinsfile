@@ -20,7 +20,7 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh "docker build --build-arg CONAN_USER=${CONAN_USER} --build-arg CONAN_PASS=${CONAN_PASS} --build-arg CONAN_CHANNEL=${CONAN_CHANNEL} -t ecr.vip.ebayc3.com/${ORG}/${PROJECT}:${TAG} ."
+                sh "docker build --rm --build-arg CONAN_USER=${CONAN_USER} --build-arg CONAN_PASS=${CONAN_PASS} --build-arg CONAN_CHANNEL=${CONAN_CHANNEL} -t ${PROJECT} ."
             }
         }
 
@@ -35,8 +35,14 @@ pipeline {
                 branch 'testing/*'
             }
             steps {
-                sh "docker run ecr.vip.ebayc3.com/${ORG}/${PROJECT}:${TAG}"
+                sh "docker run --rm ${PROJECT}"
             }
+        }
+    }
+
+    post {
+        always {
+            sh "docker rmi ${PROJECT}"
         }
     }
 }
