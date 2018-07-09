@@ -1,0 +1,14 @@
+//
+// Copyright 2018 eBay Corporation
+// Author: Brian Szmyd <bszmyd@ebay.com>
+
+syntax = "proto3";
+
+import "raft_types.proto";
+
+package sds.messaging;
+
+message RaftGroupMsg {
+    string                  group_id    = 1;
+    raft_core.RaftMessage   message     = 2;
+}

@@ -1,0 +1,15 @@
+//
+// Copyright 2018 eBay Corporation
+// Author: Brian Szmyd <bszmyd@ebay.com>
+
+syntax = "proto3";
+
+import "raft_messages.proto";
+import "sds_messages.proto";
+
+package sds.messaging;
+
+service Messaging {
+    rpc JoinRaftGroup (JoinGroupMsg) returns (JoinGroupResult);
+    rpc RaftStep (RaftGroupMsg) returns (RaftGroupMsg);
+}
