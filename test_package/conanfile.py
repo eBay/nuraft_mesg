@@ -9,7 +9,8 @@ class TestPackageConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "cmake"
 
-    requires = (("sds_logging/1.0.0@sds/stable"))
+    requires = (("cxxopts/1.4.4@oss/stable"),
+                ("sds_logging/2.0.0@sds/testing"))
 
     def build(self):
         cmake = CMake(self)

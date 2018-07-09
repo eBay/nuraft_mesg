@@ -15,17 +15,14 @@
 * limitations under the License.
 */
 
-#include "cornerstone/raft_core_grpc.hpp"
-#include "example_service.grpc.pb.h"
-#include <sds_logging/logging.h>
 #include <iostream>
 #include <cassert>
 #include <chrono>
+#include <cxxopts/cxxopts.hpp>
 
-#include <stdlib.h>
+#include <cornerstone/raft_core_grpc.hpp>
+#include <example_service.grpc.pb.h>
 #include "example_factory.h"
-
-SDS_LOGGING_INIT
 
 using namespace cornerstone;
 
@@ -104,7 +101,7 @@ void resp_handler(ptr<resp_msg>& rsp, ptr<rpc_exception>& err) {
     return;
 }
 
-void test_raft_server_with_grpc(int srv_id, char* args) {
+void test_raft_server_with_grpc(int srv_id, std::string const& args) {
     grpc_svc_ = cs_new<example_factory>();
     ptr<rpc_client> client(grpc_svc_->create_client(
             sstrfmt("127.0.0.1:900%d").fmt(srv_id) ));
@@ -112,8 +109,8 @@ void test_raft_server_with_grpc(int srv_id, char* args) {
 
     leader_id_global = srv_id;
 
-    ptr<buffer> buf = buffer::alloc(strlen(args)+1);
-    buf->put(args);
+    ptr<buffer> buf = buffer::alloc(args.length()+1);
+    buf->put(args.data());
     buf->pos(0);
     msg->log_entries().push_back(cs_new<log_entry>(0, buf));
     msg_global = msg;
@@ -201,48 +198,41 @@ void remove_server(int leader_id, int srv_id) {
 }
 
 int main(int argc, char** argv) {
-    sds_logging::SetLogger(spdlog::stdout_color_mt("raft_client"));
-    if (argc == 5 &&
-        !strcmp(argv[1], "-l") &&
-        !strcmp(argv[3], "-m")) {
-        int srv_id = atoi(argv[2]);
-        test_raft_server_with_grpc(srv_id, argv[4]);
-        return 0;
+    cxxopts::Options options(argv[0], "Raft Client");
+    options.add_options()
+          ("h,help", "Help message")
+          ("a,add", "Add a server to the cluster", cxxopts::value<uint32_t>(), "id")
+          ("c,clean", "Reset all persistence")
+          ("l,server", "Server to send message to", cxxopts::value<uint32_t>(), "id")
+          ("m,echo", "Send message to echo service", cxxopts::value<std::string>(), "message")
+          ("r,remove", "Remove server from cluster", cxxopts::value<uint32_t>(), "id");
+    options.parse(argc, argv);
 
-    } else if (argc == 3 && !strcmp(argv[1], "-m")) {
-        test_raft_server_with_grpc(1, argv[2]);
+    if (options.count("help")) {
+        std::cout << options.help({}) << std::endl;
         return 0;
+    }
 
-    } else if (argc == 2 && !strcmp(argv[1], "-c")) {
+    if (options.count("clean")) {
         cleanup("store*");
         cleanup("log*.log");
         return 0;
-
-    } else if (argc == 3 && !strcmp(argv[1], "-a")) {
-        int srv_id = atoi(argv[2]);
-        add_new_server(1, srv_id);
-        return 0;
-
-    } else if (argc == 3 && !strcmp(argv[1], "-r")) {
-        int srv_id = atoi(argv[2]);
-        remove_server(1, srv_id);
-        return 0;
-
     }
 
-    printf("usage: client [-l <ID>] [-m <message>] [-c] [-a <ID>]\n");
-    printf("    -l      ID of server to send message (default: 1).\n");
-    printf("    -m      Send message to echo server.\n");
-    printf("    -c      Cleanup all logs and data.\n");
-    printf("    -a      Add new server to the cluster.\n");
-    printf("    -r      Remove existing server from the cluster.\n");
-    printf("\n");
-    printf("examples:\n");
-    printf("    $ ./client -c               Cleanup.\n");
-    printf("    $ ./client -m test          Send a message 'test'.\n");
-    printf("    $ ./client -l 2 -m test     Send a message 'test' to server 2.\n");
-    printf("    $ ./client -a 4             Add a new server 4 to the existing cluster.\n");
-    printf("    $ ./client -r 4             Remove server 4 from the cluster.\n");
+    auto server_id = 1u;
+    if (options.count("server")) {
+        server_id = options["server"].as<uint32_t>();
+    }
 
+    if (options.count("echo")) {
+       test_raft_server_with_grpc(server_id, options["echo"].as<std::string>());
+    } else if (options.count("add")) {
+        add_new_server(server_id, options["add"].as<uint32_t>());
+
+    } else if (options.count("remove")) {
+        remove_server(server_id, options["remove"].as<uint32_t>());
+    } else {
+        std::cout << options.help({}) << std::endl;
+    }
     return 0;
 }

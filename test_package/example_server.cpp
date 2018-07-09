@@ -15,19 +15,21 @@
 * limitations under the License.
 */
 
-#include "cornerstone/raft_core_grpc.hpp"
-#include "example_service.grpc.pb.h"
 #include <iostream>
 #include <cassert>
-#include <stdlib.h>
+#include <cxxopts/cxxopts.hpp>
 #include <grpcpp/server.h>
 #include <grpcpp/security/server_credentials.h>
 #include <sds_logging/logging.h>
+
+#include "cornerstone/raft_core_grpc.hpp"
+#include "example_service.grpc.pb.h"
+
 #include "example_factory.h"
 
 using namespace cornerstone;
 
-SDS_LOGGING_INIT
+SDS_LOGGING_INIT(base)
 
 std::condition_variable stop_cv;
 std::mutex stop_cv_lock;
@@ -200,15 +202,40 @@ void run_echo_server(int srv_id) {
 }
 
 int main(int argc, char** argv) {
-    if (argc == 2) {
-        int srv_id = atoi(argv[1]);
-        if (srv_id >=1 && srv_id <= 3) {
-            run_echo_server(srv_id);
-            return 0;
-        }
-    }
-    printf("usage: server <ID>\n");
-    printf("    ID          server ID, 1 -- 3.\n");
+    auto server_id {0u};
 
+    cxxopts::Options options(argv[0], "Raft Server");
+    options.add_options()
+          ("h,help", "Help message")
+          ("log_level", "Log level (0-5) def:1", cxxopts::value<uint32_t>(), "level")
+          ("server_id", "Servers ID (1-3)", cxxopts::value<uint32_t>(server_id));
+    options.parse_positional("server_id");
+
+    options.parse(argc, argv);
+
+    if (options.count("help")) {
+        std::cout << options.help({}) << std::endl;
+        return 0;
+    }
+
+    auto log_level = spdlog::level::level_enum::debug;
+    if (options.count("log_level")) {
+        log_level = (spdlog::level::level_enum)options["log_level"].as<uint32_t>();
+    }
+    if (spdlog::level::level_enum::off < log_level) {
+        std::cout << "LogLevel must be between 0 and 5." << std::endl;
+        std::cout << options.help({}) << std::endl;
+        return -1;
+    }
+
+    // Can start using LOG from this point onward.
+    sds_logging::SetLogger(spdlog::stdout_color_mt("raft_client"), log_level);
+    spdlog::set_pattern("[%D %H:%M:%S] [%l] [%t] %v");
+
+    if (0 < server_id && 4 > server_id) {
+         run_echo_server(server_id);
+    } else {
+        LOGERROR("Server ID must be between 1 and 3");
+    }
     return 0;
 }
