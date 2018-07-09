@@ -67,18 +67,21 @@ struct grpc_factory : public cstn::rpc_client_factory {
          group_id(grp_id)
    { }
 
-   cstn::ptr<cstn::rpc_client> create_client(const std::string &endpoint) override {
-      LOGDEBUGMOD(sds_msg, "Creating client for [{}] at: [{}]", group_id, endpoint);
+   cstn::ptr<cstn::rpc_client> create_client(const std::string &client) override {
+      LOGDEBUGMOD(sds_msg, "Creating client for [{}] on group: [{}]", client, group_id);
+      auto endpoint = lookupEndpoint(client);
       return std::make_shared<sds_messaging>(::grpc::CreateChannel(endpoint,
                                                                  grpc::InsecureChannelCredentials()),
                                            group_id);
    }
 
+   virtual std::string lookupEndpoint(std::string const& client) = 0;
+
  private:
    group_id_t const group_id;
 };
 
-template<class StateMachine, class StateMgr>
+template<class Factory, class StateMachine, class StateMgr>
 struct grpc_service :
       public sdsmsg::Messaging::Service
 {
@@ -141,7 +144,7 @@ struct grpc_service :
    }
 
    void joinRaftGroup(uint32_t const srv_id, group_id_t const& group_id) {
-      cstn::ptr<cstn::rpc_client_factory> rpc_cli_factory(cstn::cs_new<grpc_factory>(group_id));
+      cstn::ptr<cstn::rpc_client_factory> rpc_cli_factory(cstn::cs_new<Factory>(group_id));
       // State manager (RAFT log store, config).
       cstn::ptr<cstn::state_mgr> smgr(cstn::cs_new<StateMgr>(srv_id, group_id));
 
