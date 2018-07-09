@@ -6,7 +6,6 @@
 #include <string>
 
 #include <cornerstone/raft_core_grpc.hpp>
-#include <raft_core_grpc.hpp>
 #include <sds_logging/logging.h>
 
 #include "messaging_service.grpc.pb.h"
