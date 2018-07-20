@@ -84,7 +84,7 @@ template<class Factory, class StateMachine, class StateMgr>
 struct grpc_service :
       public sdsmsg::Messaging::Service
 {
-   grpc_service(std::string const& unique_id, cstn::ptr<cstn::logger>&& logger) :
+   grpc_service(uint32_t const unique_id, cstn::ptr<cstn::logger>&& logger) :
          sdsmsg::Messaging::Service(),
          uuid(unique_id),
          logger(std::move(logger)),
@@ -95,16 +95,14 @@ struct grpc_service :
                                 sdsmsg::JoinGroupMsg const *request,
                                 sdsmsg::JoinGroupResult *response) override
    {
+      auto const uuid_str = std::to_string(uuid);
       auto const& members = request->service_group().members();
-      // FIXME: do not use offset for this id...something else
-      auto server_id {1};
       for (auto i = members.begin(); members.end() != i; ++i) {
          auto const& member = i->node();
-         if (uuid == member.uuid()) {
-            joinRaftGroup(server_id, request->group_id());
+         if (uuid_str == member.uuid()) {
+            joinRaftGroup(uuid, request->group_id());
             return ::grpc::Status();
          }
-         ++server_id;
       }
       return ::grpc::Status(::grpc::StatusCode::NOT_FOUND, "Not a member");
    }
@@ -172,7 +170,7 @@ struct grpc_service :
    }
 
  private:
-   std::string const                                  uuid;
+   uint32_t const                                     uuid;
    cstn::ptr<cstn::logger>                            logger;
    lock_type                                          raft_servers_lock;
    std::map<group_id_t, shared<cstn::grpc_service>>   raft_servers;
