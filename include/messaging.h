@@ -68,13 +68,13 @@ struct grpc_factory : public cstn::rpc_client_factory {
 
    cstn::ptr<cstn::rpc_client> create_client(const std::string &client) override {
       LOGDEBUGMOD(sds_msg, "Creating client for [{}] on group: [{}]", client, group_id);
-      auto endpoint = lookupEndpoint(client);
+      auto endpoint = lookupEndpoint(client, group_id);
       return std::make_shared<sds_messaging>(::grpc::CreateChannel(endpoint,
                                                                  grpc::InsecureChannelCredentials()),
                                            group_id);
    }
 
-   virtual std::string lookupEndpoint(std::string const& client) = 0;
+   virtual std::string lookupEndpoint(std::string const& client, group_id_t const& group_id) = 0;
 
  private:
    group_id_t const group_id;
