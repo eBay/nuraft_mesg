@@ -3,15 +3,11 @@ set(CPP_WARNINGS "-Wall -Wextra -Werror -Wno-unused-parameter")
 set(CMAKE_CXX_FLAGS "${CPP_WARNINGS} ${CMAKE_CXX_FLAGS}")
 
 list(APPEND PROTOBUF_IMPORT_DIRS
-          "${CONAN_OM-SVCLAYER_ROOT}/idl"
           "${CONAN_RAFT_CORE_GRPC_ROOT}/proto"
         )
-include_directories("${CONAN_INCLUDE_DIRS_OM-SVCLAYER}/om-svclayer")
 include_directories("${CONAN_INCLUDE_DIRS_RAFT_CORE}/cornerstone")
 include_directories("${CONAN_INCLUDE_DIRS_RAFT_CORE_GRPC}/cornerstone")
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
-                            proto/raft_messages.proto
-                            proto/sds_messages.proto
                             proto/messaging_service.proto)
 PROTOBUF_GENERATE_GRPC_CPP(GRPC_SRCS GRPC_HDRS
                             proto/messaging_service.proto)

@@ -95,16 +95,13 @@ struct grpc_service :
                                 sdsmsg::JoinGroupMsg const *request,
                                 sdsmsg::JoinGroupResult *response) override
    {
-      auto const uuid_str = std::to_string(uuid);
-      auto const& members = request->service_group().members();
-      for (auto i = members.begin(); members.end() != i; ++i) {
-         auto const& member = i->node();
-         if (uuid_str == member.uuid()) {
-            joinRaftGroup(uuid, request->group_id());
-            return ::grpc::Status();
-         }
-      }
-      return ::grpc::Status(::grpc::StatusCode::NOT_FOUND, "Not a member");
+      joinRaftGroup(request->group_id());
+      return ::grpc::Status();
+   }
+
+   ::grpc::Status PartRaftGroup(::grpc::ServerContext *context,
+                                sdsmsg::PartGroupMsg const *request,
+                                sdsmsg::PartGroupResult *response) override {
    }
 
    ::grpc::Status RaftStep(::grpc::ServerContext *context,
@@ -140,10 +137,10 @@ struct grpc_service :
       return status;
    }
 
-   void joinRaftGroup(uint32_t const srv_id, group_id_t const& group_id) {
+   void joinRaftGroup(group_id_t const& group_id) {
       cstn::ptr<cstn::rpc_client_factory> rpc_cli_factory(cstn::cs_new<Factory>(group_id));
       // State manager (RAFT log store, config).
-      cstn::ptr<cstn::state_mgr> smgr(cstn::cs_new<StateMgr>(srv_id, group_id));
+      cstn::ptr<cstn::state_mgr> smgr(cstn::cs_new<StateMgr>(uuid, group_id));
 
       // Parameters.
       auto params = new cstn::raft_params();
