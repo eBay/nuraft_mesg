@@ -144,6 +144,12 @@ struct grpc_client : public rpc_client {
 };
 
 struct grpc_service {
+   explicit grpc_service(ptr<raft_server>&& raft_server) :
+      _raft_server(std::move(raft_server))
+   { }
+
+   ~grpc_service() { if (_raft_server) _raft_server->shutdown(); }
+
    ::grpc::Status step(::grpc::ServerContext *context,
                        ::raft_core::RaftMessage const *request,
                        ::raft_core::RaftMessage *response) {
@@ -152,10 +158,6 @@ struct grpc_service {
       assert(resp);
       response->CopyFrom(fromResponse(*resp));
       return ::grpc::Status();
-   }
-
-   void registerRaftCore(ptr<raft_server> raft_server) {
-      _raft_server = raft_server;
    }
 
  private:

@@ -36,6 +36,11 @@ std::mutex stop_cv_lock;
 struct example_service :
       public cornerstone::grpc_service,
       public raft_core::ExampleSvc::Service {
+
+   example_service(ptr<raft_server>&& raft_server) :
+       cornerstone::grpc_service(std::move(raft_server))
+   {}
+
    ::grpc::Status Step(::grpc::ServerContext *context,
                        ::raft_core::RaftMessage const *request,
                        ::raft_core::RaftMessage *response) override {
@@ -59,19 +64,13 @@ void run_echo_server(int srv_id) {
              .with_rpc_failure_backoff(50);
 
     // gRPC service.
-    ptr<example_service> grpc_svc_(cs_new<example_service>());
     sds_logging::SetLogger(spdlog::stdout_color_mt("raft_member"));
+
     ptr<logger> l = std::make_shared<sds_logger>();
     ptr<rpc_client_factory> rpc_cli_factory = std::make_shared<example_factory>();
-
     ptr<asio_service> asio_svc_(cs_new<asio_service>());
     ptr<delayed_task_scheduler> scheduler = asio_svc_;
-
     ptr<rpc_listener> listener;
-    ::grpc::ServerBuilder builder;
-    std::string server_address = std::string("0.0.0.0:") + std::to_string(9000 + srv_id);
-    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-    builder.RegisterService(grpc_svc_.get());
 
     // Run server.
     context* ctx(new context(smgr,
@@ -81,8 +80,13 @@ void run_echo_server(int srv_id) {
                              rpc_cli_factory,
                              scheduler,
                              params));
-    ptr<raft_server> server(cs_new<raft_server>(ctx));
-    grpc_svc_->registerRaftCore(server);
+    auto server = cs_new<raft_server>(ctx);
+    ptr<example_service> grpc_svc_(cs_new<example_service>(std::move(server)));
+
+    ::grpc::ServerBuilder builder;
+    std::string server_address = std::string("0.0.0.0:") + std::to_string(9000 + srv_id);
+    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+    builder.RegisterService(grpc_svc_.get());
     std::unique_ptr<::grpc::Server> grpc_server(builder.BuildAndStart());
 
     {
