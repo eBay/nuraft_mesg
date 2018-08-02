@@ -91,17 +91,19 @@ struct grpc_service :
          scheduler(cstn::cs_new<cstn::asio_service>())
    { }
 
-   ::grpc::Status JoinRaftGroup(::grpc::ServerContext *context,
+   ::grpc::Status JoinRaftGroup(::grpc::ServerContext *,
                                 sdsmsg::JoinGroupMsg const *request,
-                                sdsmsg::JoinGroupResult *response) override
+                                sdsmsg::JoinGroupResult *) override
    {
       joinRaftGroup(request->group_id());
       return ::grpc::Status();
    }
 
-   ::grpc::Status PartRaftGroup(::grpc::ServerContext *context,
+   ::grpc::Status PartRaftGroup(::grpc::ServerContext *,
                                 sdsmsg::PartGroupMsg const *request,
-                                sdsmsg::PartGroupResult *response) override {
+                                sdsmsg::PartGroupResult *) override {
+      partRaftGroup(request->group_id());
+      return ::grpc::Status();
    }
 
    ::grpc::Status RaftStep(::grpc::ServerContext *context,
@@ -159,11 +161,17 @@ struct grpc_service :
                                    rpc_cli_factory,
                                    scheduler,
                                    params);
-      auto service = std::make_shared<cstn::grpc_service>();
-      service->registerRaftCore(cstn::cs_new<cstn::raft_server>(ctx));
+      auto service = cstn::cs_new<cstn::grpc_service>(cstn::cs_new<cstn::raft_server>(ctx));
 
       std::unique_lock<lock_type> lck(raft_servers_lock);
       raft_servers.emplace(std::make_pair(group_id, service));
+   }
+
+   void partRaftGroup(group_id_t const& group_id) {
+      std::unique_lock<lock_type> lck(raft_servers_lock);
+      if (auto it = raft_servers.find(group_id); raft_servers.end() != it) {
+         raft_servers.erase(it);
+      }
    }
 
  private:
