@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        ORG = 'sds'
         PROJECT = 'raft_core_grpc'
         CONAN_CHANNEL = 'testing'
         CONAN_USER = 'sds'
@@ -32,7 +31,7 @@ pipeline {
 
         stage('Deploy') {
             when {
-                branch 'testing/*'
+                branch "${CONAN_CHANNEL}/*"
             }
             steps {
                 sh "docker run --rm ${PROJECT}"
