@@ -41,7 +41,7 @@ pipeline {
 
     post {
         always {
-            sh "docker rmi ${PROJECT}"
+            sh "docker rmi -f ${PROJECT}"
         }
     }
 }
