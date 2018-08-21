@@ -35,9 +35,10 @@ class RaftCoreGRPCConan(ConanFile):
                        'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON'}
         test_target = None
 
-        if self.options.coverage == 'True':
-            definitions['CONAN_BUILD_COVERAGE'] = 'ON'
-            test_target = 'coverage'
+        if self.settings.compiler == "gcc":
+            if self.options.coverage == 'True':
+                definitions['CONAN_BUILD_COVERAGE'] = 'ON'
+                test_target = 'coverage'
 
         cmake.configure(defs=definitions)
         cmake.build()
@@ -55,5 +56,6 @@ class RaftCoreGRPCConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = tools.collect_libs(self)
-        if self.options.coverage == 'True':
-            self.cpp_info.libs.append('gcov')
+        if self.settings.compiler == "gcc":
+            if self.options.coverage == 'True':
+                self.cpp_info.libs.append('gcov')
