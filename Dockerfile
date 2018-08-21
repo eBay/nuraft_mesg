@@ -1,5 +1,5 @@
 # ##########   #######   ############
-FROM ecr.vip.ebayc3.com/sds/sds_cpp_base:1.7
+FROM ecr.vip.ebayc3.com/sds/sds_cpp_base:1.8
 LABEL description="Automated SDS compilation"
 
 ARG CONAN_CHANNEL
@@ -12,7 +12,7 @@ ENV SOURCE_PATH=/tmp/source/
 
 COPY conanfile.py ${SOURCE_PATH}
 COPY src/ ${SOURCE_PATH}src
-COPY cmake/ /tmp/source/cmake
+COPY cmake/ ${SOURCE_PATH}cmake
 COPY CMakeLists.txt ${SOURCE_PATH}
 COPY test_package/ ${SOURCE_PATH}test_package
 COPY LICENSE.md ${SOURCE_PATH}
