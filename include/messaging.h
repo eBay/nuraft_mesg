@@ -36,7 +36,7 @@ struct sds_messaging : public cstn::grpc_client {
                        raft_core::RaftMessage *response) override {
       sdsmsg::RaftGroupMsg group_msg;
 
-      LOGTRACEMOD(sds_msg, "Sending [{}] from: [{}] to: [{}] Group: [{}]",
+      LOGDEBUGMOD(sds_msg, "Sending [{}] from: [{}] to: [{}] Group: [{}]",
                   message.base().type(),
                   message.base().src(),
                   message.base().dest(),
@@ -48,7 +48,7 @@ struct sds_messaging : public cstn::grpc_client {
       auto status = stub_->RaftStep(ctx, group_msg, &group_rsp);
 
       if (!status.ok()) {
-         LOGERRORMOD(sds_msg, "Send Status: {}", status.error_message());
+         LOGWARNMOD(sds_msg, "Response: [{}]: {}", status.error_code(), status.error_message());
       }
       response->CopyFrom(group_rsp.message());
 
@@ -113,11 +113,15 @@ struct grpc_service :
       response->set_group_id(group_id);
 
       auto const& base = request->message().base();
-      LOGTRACEMOD(sds_msg, "Stepping [{}] from: [{}] to: [{}] Group: [{}]",
+      LOGDEBUGMOD(sds_msg, "Stepping [{}] from: [{}] to: [{}] Group: [{}]",
                   base.type(),
                   base.src(),
                   base.dest(),
                   group_id);
+
+      if (cstn::join_cluster_request == base.type()) {
+        joinRaftGroup(group_id);
+      }
 
       shared<cstn::grpc_service> server;
       {
@@ -131,7 +135,9 @@ struct grpc_service :
       if (server) {
          auto raft_response = response->mutable_message();
          status = server->step(context, &request->message(), raft_response);
-         LOGTRACEMOD(sds_msg, "Response: {}", status.error_message());
+         if (!status.ok()) {
+           LOGWARNMOD(sds_msg, "Response: [{}]: {}", status.error_code(), status.error_message());
+         }
       } else {
          status = ::grpc::Status(::grpc::StatusCode::NOT_FOUND, "RaftGroup missing");
          LOGERRORMOD(sds_msg, "Missing RAFT group: {}", group_id);
@@ -140,15 +146,18 @@ struct grpc_service :
    }
 
    void joinRaftGroup(group_id_t const& group_id) {
+      if (0 < raft_servers.count(group_id))
+        return;
+      LOGDEBUGMOD(sds_msg, "Joining RAFT group: {}", group_id);
       cstn::ptr<cstn::rpc_client_factory> rpc_cli_factory(cstn::cs_new<Factory>(group_id));
       // State manager (RAFT log store, config).
       cstn::ptr<cstn::state_mgr> smgr(cstn::cs_new<StateMgr>(uuid, group_id));
 
       // Parameters.
       auto params = new cstn::raft_params();
-      (*params).with_election_timeout_lower(200)
-            .with_election_timeout_upper(400)
-            .with_hb_interval(100)
+      (*params).with_election_timeout_lower(500)
+            .with_election_timeout_upper(2000)
+            .with_hb_interval(500)
             .with_max_append_size(100)
             .with_rpc_failure_backoff(50);
 
