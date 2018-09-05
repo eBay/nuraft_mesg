@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         PROJECT = 'raft_core_grpc'
-        CONAN_CHANNEL = 'testing'
+        CONAN_CHANNEL = 'stable'
         CONAN_USER = 'sds'
         CONAN_PASS = credentials('CONAN_PASS')
     }
