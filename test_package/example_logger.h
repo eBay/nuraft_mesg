@@ -3,8 +3,6 @@
 #include "cornerstone/raft_core_grpc.hpp"
 #include <sds_logging/logging.h>
 
-SDS_LOGGING_INIT(base)
-
 struct sds_logger : ::cornerstone::logger {
     void debug(const std::string& log_line) override {
         LOGDEBUG("{}", log_line);

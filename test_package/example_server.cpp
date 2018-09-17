@@ -63,9 +63,6 @@ void run_echo_server(int srv_id) {
              .with_max_append_size(100)
              .with_rpc_failure_backoff(50);
 
-    // gRPC service.
-    sds_logging::SetLogger(spdlog::stdout_color_mt("raft_member"));
-
     ptr<logger> l = std::make_shared<sds_logger>();
     ptr<rpc_client_factory> rpc_cli_factory = std::make_shared<example_factory>();
     ptr<asio_service> asio_svc_(cs_new<asio_service>());
@@ -96,36 +93,18 @@ void run_echo_server(int srv_id) {
     }
 }
 
+SDS_OPTION_GROUP(raft_server, (id, "", "server_id", "Server ID", cxxopts::value<uint32_t>()->default_value("0"), ""))
+
+SDS_OPTIONS_ENABLE(logging, raft_server)
+SDS_LOGGING_INIT()
+
 int main(int argc, char** argv) {
-    auto server_id {0u};
+   SDS_OPTIONS_LOAD(argc, argv, logging, raft_server)
+   sds_logging::SetLogger("raft_server");
 
-    cxxopts::Options options(argv[0], "Raft Server");
-    options.add_options()
-          ("h,help", "Help message")
-          ("log_level", "Log level (0-5) def:1", cxxopts::value<uint32_t>(), "level")
-          ("server_id", "Servers ID (1-3)", cxxopts::value<uint32_t>(server_id));
-    options.parse_positional("server_id");
-
-    options.parse(argc, argv);
-
-    if (options.count("help")) {
-        std::cout << options.help({}) << std::endl;
-        return 0;
-    }
+    auto server_id = SDS_OPTIONS["server_id"].as<uint32_t>();
 
     auto log_level = spdlog::level::level_enum::debug;
-    if (options.count("log_level")) {
-        log_level = (spdlog::level::level_enum)options["log_level"].as<uint32_t>();
-    }
-    if (spdlog::level::level_enum::off < log_level) {
-        std::cout << "LogLevel must be between 0 and 5." << std::endl;
-        std::cout << options.help({}) << std::endl;
-        return -1;
-    }
-
-    // Can start using LOG from this point onward.
-    sds_logging::SetLogger(spdlog::stdout_color_mt("raft_client"), log_level);
-    spdlog::set_pattern("[%D %H:%M:%S] [%l] [%t] %v");
 
     if (0 < server_id && 4 > server_id) {
          run_echo_server(server_id);

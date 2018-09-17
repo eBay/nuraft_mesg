@@ -13,7 +13,7 @@ echo """
 for i in $(seq 1 ${SERVER_COUNT})
 do
   echo "[          ] Starting server"
-  ./bin/raft_server $i &
+  ./bin/raft_server -c --server_id $i &
   SERVER_PIDS+=($!)
 done
 

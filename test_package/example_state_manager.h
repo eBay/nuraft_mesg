@@ -8,7 +8,7 @@ class simple_state_mgr: public state_mgr{
 public:
     simple_state_mgr(int32 srv_id)
         : srv_id_(srv_id) {
-        store_path_ = sstrfmt("store%d").fmt(srv_id_);
+        store_path_ = format(fmt("store{}"), srv_id_);
     }
 
 public:
