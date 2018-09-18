@@ -24,10 +24,11 @@ using lock_type = std::shared_mutex;
 template<typename T>
 using shared = std::shared_ptr<T>;
 
+template<typename MSG_SVC>
 struct sds_messaging : public cstn::grpc_client {
    sds_messaging(shared<::grpc::ChannelInterface> channel,
                group_id_t const& grp_id) :
-         stub_(sdsmsg::Messaging::NewStub(channel)),
+         stub_(MSG_SVC::NewStub(channel)),
          group_id(grp_id)
    {}
 
@@ -56,10 +57,11 @@ struct sds_messaging : public cstn::grpc_client {
    }
 
  private:
-   std::unique_ptr<typename sdsmsg::Messaging::Stub> stub_;
+   std::unique_ptr<typename MSG_SVC::Stub> stub_;
    group_id_t const group_id;
 };
 
+template<class MSG_SVC>
 struct grpc_factory : public cstn::rpc_client_factory {
    explicit grpc_factory(group_id_t const& grp_id) :
          cstn::rpc_client_factory(),
@@ -69,7 +71,7 @@ struct grpc_factory : public cstn::rpc_client_factory {
    cstn::ptr<cstn::rpc_client> create_client(const std::string &client) override {
       LOGDEBUGMOD(sds_msg, "Creating client for [{}] on group: [{}]", client, group_id);
       auto endpoint = lookupEndpoint(client, group_id);
-      return std::make_shared<sds_messaging>(::grpc::CreateChannel(endpoint,
+      return std::make_shared<sds_messaging<MSG_SVC>>(::grpc::CreateChannel(endpoint,
                                                                  grpc::InsecureChannelCredentials()),
                                            group_id);
    }
@@ -80,12 +82,12 @@ struct grpc_factory : public cstn::rpc_client_factory {
    group_id_t const group_id;
 };
 
-template<class Factory, class StateMachine, class StateMgr>
+template<class MSG_SVC, class Factory, class StateMachine, class StateMgr>
 struct grpc_service :
-      public sdsmsg::Messaging::Service
+      public MSG_SVC::Service
 {
    grpc_service(uint32_t const unique_id, cstn::ptr<cstn::logger>&& logger) :
-         sdsmsg::Messaging::Service(),
+         MSG_SVC::Service(),
          uuid(unique_id),
          logger(std::move(logger)),
          scheduler(cstn::cs_new<cstn::asio_service>())
