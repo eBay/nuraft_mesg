@@ -154,11 +154,11 @@ struct grpc_service : public sds::messaging::Messaging::Service
 
       // Parameters.
       auto params = new cstn::raft_params();
-      (*params).with_election_timeout_lower(500)
-            .with_election_timeout_upper(2000)
-            .with_hb_interval(500)
-            .with_max_append_size(100)
-            .with_rpc_failure_backoff(50);
+      (*params).with_election_timeout_lower(200)
+               .with_election_timeout_upper(400)
+               .with_hb_interval(100)
+               .with_max_append_size(100)
+               .with_rpc_failure_backoff(50);
 
       cstn::ptr<cstn::rpc_listener> listener;
       cstn::ptr<cstn::state_machine> sm(cstn::cs_new<StateMachine>());

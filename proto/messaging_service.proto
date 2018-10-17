@@ -4,34 +4,18 @@
 
 syntax = "proto3";
 
-import "google/protobuf/any.proto";
+import "common.proto";
+import "node.proto";
 import "raft_types.proto";
 
 package sds.messaging;
-
-enum ErrorCode {
-    OK                      = 0;
-    BAD_REQUEST             = 1;
-    INTERNAL_SERVER_ERROR   = 2;
-    GROUP_MISSING           = 3;
-    GROUP_ALREADY_EXISTS    = 4;
-    SERVICE_NOT_READY       = 5;
-    SERVICE_SHUTTING_DOWN   = 6;
-    TIMEOUT                 = 7;
-}
-
-message ErrorStatus {
-    ErrorCode                     code    = 1;
-    string                        msg     = 2;
-    repeated google.protobuf.Any  details = 3;
-}
 
 message JoinGroupMsg {
     string                  group_id        = 1;
 }
 
 message JoinGroupResult {
-    ErrorStatus  status  = 1;
+    RPCStatus  status  = 1;
 }
 
 message PartGroupMsg {
@@ -39,7 +23,7 @@ message PartGroupMsg {
 }
 
 message PartGroupResult {
-    ErrorStatus  status  = 1;
+    RPCStatus  status  = 1;
 }
 
 message RaftGroupMsg {
