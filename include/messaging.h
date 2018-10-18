@@ -133,9 +133,14 @@ struct grpc_service : public sds::messaging::Messaging::Service
       ::grpc::Status status;
       if (server) {
          auto raft_response = response->mutable_message();
-         status = server->step(context, &request->message(), raft_response);
+         try {
+           status = server->step(context, &request->message(), raft_response);
          if (!status.ok()) {
            LOGWARNMOD(sds_msg, "Response: [{}]: {}", status.error_code(), status.error_message());
+         }
+         } catch (std::runtime_error& rte) {
+           LOGERRORMOD(sds_msg, "Caught exception during step(): {}", rte.what());
+           status = ::grpc::Status(::grpc::StatusCode::ABORTED, rte.what());
          }
       } else {
          status = ::grpc::Status(::grpc::StatusCode::NOT_FOUND, "RaftGroup missing");
