@@ -5,7 +5,6 @@
 syntax = "proto3";
 
 import "common.proto";
-import "node.proto";
 import "raft_types.proto";
 
 package sds.messaging;

@@ -24,12 +24,15 @@ using lock_type = std::shared_mutex;
 template<typename T>
 using shared = std::shared_ptr<T>;
 
-struct sds_messaging : public cstn::grpc_client {
-   sds_messaging(shared<::grpc::ChannelInterface> channel,
+struct sds_messaging_client : public cstn::grpc_client {
+   sds_messaging_client(shared<::grpc::ChannelInterface> channel,
                group_id_t const& grp_id) :
+         cstn::grpc_client(),
          stub_(sds::messaging::Messaging::NewStub(channel)),
          group_id(grp_id)
    {}
+
+   ~sds_messaging_client() override = default;
 
    ::grpc::Status send(::grpc::ClientContext *ctx,
                        raft_core::RaftMessage const &message,
@@ -69,9 +72,8 @@ struct grpc_factory : public cstn::rpc_client_factory {
    cstn::ptr<cstn::rpc_client> create_client(const std::string &client) override {
       LOGDEBUGMOD(sds_msg, "Creating client for [{}] on group: [{}]", client, group_id);
       auto endpoint = lookupEndpoint(client, group_id);
-      return std::make_shared<sds_messaging>(::grpc::CreateChannel(endpoint,
-                                                                   ::grpc::InsecureChannelCredentials()),
-                                             group_id);
+      return std::make_shared<sds_messaging_client>(::grpc::CreateChannel(endpoint,
+         ::grpc::InsecureChannelCredentials()), group_id);
    }
 
    virtual std::string lookupEndpoint(std::string const& client, group_id_t const& group_id) = 0;
@@ -80,13 +82,17 @@ struct grpc_factory : public cstn::rpc_client_factory {
    group_id_t const group_id;
 };
 
-template<class Factory, class StateMachine, class StateMgr>
+template<class Factory, class StateMgr>
 struct grpc_service : public sds::messaging::Messaging::Service
 {
-   grpc_service(uint32_t const unique_id, cstn::ptr<cstn::logger>&& logger) :
+   using get_state_machine_cb = std::function<std::error_condition(group_id_t const&, cstn::ptr<cstn::state_machine>&)>;
+   grpc_service(uint32_t const unique_id,
+                cstn::ptr<cstn::logger>&& logger,
+                get_state_machine_cb get_state_machine) :
          sds::messaging::Messaging::Service(),
          uuid(unique_id),
          logger(std::move(logger)),
+         get_sm(get_state_machine),
          scheduler(cstn::cs_new<cstn::asio_service>())
    { }
 
@@ -153,27 +159,28 @@ struct grpc_service : public sds::messaging::Messaging::Service
       if (0 < raft_servers.count(group_id))
         return;
       LOGDEBUGMOD(sds_msg, "Joining RAFT group: {}", group_id);
-      cstn::ptr<cstn::rpc_client_factory> rpc_cli_factory(cstn::cs_new<Factory>(group_id));
+
+      cstn::ptr<cstn::state_machine> sm;
+      if (auto err = get_sm(group_id, sm); err) {
+         LOGERRORMOD(sds_msg, "Could not create StateMachine for Group[{}]: {}", group_id, err.message());
+         return;
+      }
+
       // State manager (RAFT log store, config).
       cstn::ptr<cstn::state_mgr> smgr(cstn::cs_new<StateMgr>(uuid, group_id));
 
       // Parameters.
       auto params = new cstn::raft_params();
       (*params).with_election_timeout_lower(200)
-               .with_election_timeout_upper(400)
-               .with_hb_interval(100)
-               .with_max_append_size(100)
-               .with_rpc_failure_backoff(50);
+                .with_election_timeout_upper(400)
+                .with_hb_interval(100)
+                .with_max_append_size(100)
+                .with_rpc_failure_backoff(50);
+
+      cstn::ptr<cstn::rpc_client_factory> rpc_cli_factory(cstn::cs_new<Factory>(group_id));
 
       cstn::ptr<cstn::rpc_listener> listener;
-      cstn::ptr<cstn::state_machine> sm(cstn::cs_new<StateMachine>());
-      auto ctx = new cstn::context(smgr,
-                                   sm,
-                                   listener,
-                                   logger,
-                                   rpc_cli_factory,
-                                   scheduler,
-                                   params);
+      auto ctx = new cstn::context(smgr, sm, listener, logger, rpc_cli_factory, scheduler, params);
       auto service = cstn::cs_new<cstn::grpc_service>(cstn::cs_new<cstn::raft_server>(ctx));
 
       std::unique_lock<lock_type> lck(raft_servers_lock);
@@ -190,6 +197,7 @@ struct grpc_service : public sds::messaging::Messaging::Service
  private:
    uint32_t const                                     uuid;
    cstn::ptr<cstn::logger>                            logger;
+   get_state_machine_cb                               get_sm;
    lock_type                                          raft_servers_lock;
    std::map<group_id_t, shared<cstn::grpc_service>>   raft_servers;
    cstn::ptr<cstn::delayed_task_scheduler>            scheduler;
