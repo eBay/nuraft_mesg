@@ -15,7 +15,7 @@ echo "[ RUN      ] Echo_Server.Members${SERVER_COUNT}"
 for i in $(seq 0 $((${SERVER_COUNT} - 1)))
 do
   echo "[          ] Starting server_${i}"
-  ./bin/raft_server --synclog -v 0 --log_mods sds_msg:0 --server_id $i 2>&1 >/dev/null &
+  ./bin/raft_server --synclog -v 0 --server_id $i 2>&1 >/dev/null &
   SERVER_PIDS+=($!)
 done
 
@@ -25,7 +25,7 @@ sleep 3
 for i in $(seq 1 $((${SERVER_COUNT} - 1)))
 do
   echo "[          ] Adding Server $i"
-  valgrind --track-origins=yes --tool=memcheck --xml=yes --xml-file=/tmp/memcheck ./bin/raft_client -v 3 -c --add $i --server 0
+  ./bin/raft_client -v 3 -c --add $i --server 0
 done
 
 echo "[          ] Settling group"
