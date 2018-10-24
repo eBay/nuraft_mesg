@@ -22,7 +22,8 @@ struct example_client :
 struct example_factory :
       public rpc_client_factory {
    ptr<rpc_client> create_client(const std::string &endpoint) override {
-      return std::make_shared<example_client>(::grpc::CreateChannel(endpoint, grpc::InsecureChannelCredentials()));
+      auto client = format(fmt("127.0.0.1:900{}"), endpoint);
+      return std::make_shared<example_client>(::grpc::CreateChannel(client, grpc::InsecureChannelCredentials()));
    }
 };
 

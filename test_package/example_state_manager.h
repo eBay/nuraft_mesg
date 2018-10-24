@@ -1,45 +1,29 @@
 #pragma once
 
-#include "cornerstone/raft_core_grpc.hpp"
+#include <cornerstone/raft_core_grpc.hpp>
+#include <jungle_log_store.h>
+#include <picojson/picojson.h>
+#include <sds_logging/logging.h>
 
-using namespace cornerstone;
+namespace cs = ::cornerstone;
 
-class simple_state_mgr: public state_mgr{
-public:
-    simple_state_mgr(int32 srv_id)
-        : srv_id_(srv_id) {
-        store_path_ = format(fmt("store{}"), srv_id_);
-    }
+class simple_state_mgr : public cs::state_mgr {
+ public:
+   explicit simple_state_mgr(int32_t srv_id);
 
-public:
-    virtual ptr<cluster_config> load_config() {
-        ptr<cluster_config> conf = cs_new<cluster_config>();
-        conf->get_servers().push_back(cs_new<srv_config>(1, "127.0.0.1:9001"));
-        conf->get_servers().push_back(cs_new<srv_config>(2, "127.0.0.1:9002"));
-        conf->get_servers().push_back(cs_new<srv_config>(3, "127.0.0.1:9003"));
-        return conf;
-    }
+   cs::ptr<cs::cluster_config> load_config() override;
 
-    virtual void save_config(const cluster_config& config) {}
-    virtual void save_state(const srv_state& state) {}
-    virtual ptr<srv_state> read_state() {
-        return cs_new<srv_state>();
-    }
+   void save_config(const cs::cluster_config& config) override;
+   void save_state(const cs::srv_state& state) override;
+   cs::ptr<cs::srv_state> read_state() override;
+   cs::ptr<cs::log_store> load_log_store() override {
+       return cs::cs_new<cs::jungle_log_store>(format(fmt("store{}"), _srv_id));
+   }
+   int32_t server_id() override { return _srv_id; }
 
-    virtual ptr<log_store> load_log_store() {
-        return cs_new<fs_log_store>(store_path_);
-    }
+   void system_exit(const int exit_code) override
+   { LOGINFO("System exiting with code [{}]", exit_code); }
 
-    virtual int32 server_id() {
-        return srv_id_;
-    }
-
-    virtual void system_exit(const int exit_code) {
-        std::cout << "system exiting with code " << exit_code << std::endl;
-    }
-
-private:
-    int32 srv_id_;
-    std::string store_path_;
+ private:
+   int32_t const _srv_id;
 };
-

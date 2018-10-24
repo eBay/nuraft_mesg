@@ -9,11 +9,17 @@ class TestPackageConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "cmake"
 
-    requires = (("sds_logging/3.2.6@sds/stable"))
+    fail_timeout = '30s'
+    abort_timeout = '35s'
+
+    requires = ("jungle_logstore/0.1.1@sds/testing",
+                "picojson/1.3.0@oss/stable",
+                "sds_logging/3.2.6@sds/stable")
 
     def build(self):
         cmake = CMake(self)
-        cmake.configure()
+        definitions = {'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON'}
+        cmake.configure(defs=definitions)
         cmake.build()
 
     def test(self):
@@ -25,4 +31,5 @@ class TestPackageConan(ConanFile):
             elif self.settings.os == "Macos":
                 self.run("DYLD_LIBRARY_PATH=%s %s" % (os.environ.get('DYLD_LIBRARY_PATH', ''), bin_path))
             else:
+                bin_path = "timeout -k {} {} {}".format(self.abort_timeout, self.fail_timeout, bin_path)
                 self.run("LD_LIBRARY_PATH=%s %s" % (os.environ.get('LD_LIBRARY_PATH', ''), bin_path))
