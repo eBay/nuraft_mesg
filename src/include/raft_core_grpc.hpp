@@ -29,8 +29,9 @@ fromLogEntry(log_entry const& log_entry,
              raft_core::LogEntry* log) {
    log->set_term(log_entry.get_term());
    log->set_type((raft_core::LogType)log_entry.get_val_type());
-   auto const& buffer = log_entry.get_buf();
-   log->set_buffer(buffer.data(), buffer.length());
+   auto& buffer = log_entry.get_buf();
+   buffer.pos(0);
+   log->set_buffer(buffer.data(), buffer.size());
    return log;
 }
 
@@ -94,8 +95,8 @@ toRequest(raft_core::RaftMessage const& raft_msg) {
                                             req.commit_index());
    auto &log_entries = message->log_entries();
    for (auto const& log : req.log_entries()) {
-      auto log_buffer = buffer::alloc(log.buffer().length());
-      memcpy(log_buffer->data(), log.buffer().data(), log.buffer().length());
+      auto log_buffer = buffer::alloc(log.buffer().size());
+      memcpy(log_buffer->data(), log.buffer().data(), log.buffer().size());
       log_entries.push_back(std::make_shared<log_entry>(log.term(), log_buffer, (log_val_type)log.type()));
    }
    return message;
