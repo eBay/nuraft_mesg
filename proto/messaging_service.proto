@@ -4,33 +4,14 @@
 
 syntax = "proto3";
 
-import "common.proto";
 import "raft_types.proto";
 
 package sds.messaging;
 
-message JoinGroupMsg {
-    string                  group_id        = 1;
-}
-
-message JoinGroupResult {
-    RPCStatus  status  = 1;
-}
-
-message PartGroupMsg {
-    string                  group_id        = 1;
-}
-
-message PartGroupResult {
-    RPCStatus  status  = 1;
-}
-
 message RaftGroupMsg {
-    string                  group_id    = 1;
+    string                  group_name  = 1;
     raft_core.RaftMessage   message     = 2;
 }
 service Messaging {
-    rpc JoinRaftGroup (JoinGroupMsg) returns (JoinGroupResult);
-    rpc PartRaftGroup (PartGroupMsg) returns (PartGroupResult);
     rpc RaftStep (RaftGroupMsg) returns (RaftGroupMsg);
 }
