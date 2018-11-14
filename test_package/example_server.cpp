@@ -19,9 +19,8 @@
 #include <grpcpp/server.h>
 #include <grpcpp/security/server_credentials.h>
 
-#include <cornerstone/raft_core_grpc.hpp>
+#include <cornerstone/grpc_service.hpp>
 #include <sds_logging/logging.h>
-#include "example_service.grpc.pb.h"
 
 #include "example_factory.h"
 #include "example_logger.h"
@@ -33,11 +32,11 @@ using namespace cornerstone;
 SDS_OPTION_GROUP(server, (server_id, "", "server_id", "Servers ID (0-9)", cxxopts::value<uint32_t>(), ""))
 
 SDS_OPTIONS_ENABLE(logging, server)
-SDS_LOGGING_INIT()
+SDS_LOGGING_INIT(raft_core)
 
 struct example_service :
       public cornerstone::grpc_service,
-      public raft_core::ExampleSvc::Service {
+      public raft_core::RaftSvc::Service {
 
    example_service(ptr<raft_server>&& raft_server) :
        cornerstone::grpc_service(std::move(raft_server))
@@ -74,7 +73,7 @@ int main(int argc, char** argv) {
                 .with_rpc_failure_backoff(50);
 
        ptr<logger> l = std::make_shared<sds_logger>();
-       ptr<rpc_client_factory> rpc_cli_factory = std::make_shared<example_factory>();
+       ptr<rpc_client_factory> rpc_cli_factory = std::make_shared<example_factory>(server_id);
        ptr<asio_service> asio_svc_ = cs_new<asio_service>();
        ptr<delayed_task_scheduler> scheduler = std::static_pointer_cast<delayed_task_scheduler>(asio_svc_);
        ptr<rpc_listener> listener;

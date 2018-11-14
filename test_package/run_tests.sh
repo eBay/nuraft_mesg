@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set -eu
-echo $(pwd)
+export ASAN_OPTIONS=detect_leaks=0
 SERVER_COUNT=3
 
 SERVER_PIDS=()
