@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cornerstone/raft_core_grpc.hpp>
+#include <cornerstone.hxx>
 #include <jungle_log_store.h>
 #include <picojson/picojson.h>
 #include <sds_logging/logging.h>

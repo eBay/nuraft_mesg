@@ -5,10 +5,9 @@
 
 #pragma once
 
-#include <cornerstone.hxx>
-#include "raft_types.pb.h"
-#include <grpcpp/create_channel.h>
 #include <grpcpp/server_builder.h>
+
+#include "grpc_factory.hpp"
 
 namespace cornerstone {
 
@@ -121,28 +120,6 @@ toResponse(raft_core::RaftMessage const& raft_msg) {
    }
    return message;
 }
-
-struct grpc_client : public rpc_client {
-   virtual ::grpc::Status send(::grpc::ClientContext* ctx,
-                               raft_core::RaftMessage const& message,
-                               raft_core::RaftMessage* response) = 0;
-
-   void send(ptr<req_msg>& req, rpc_handler& complete) override {
-      ptr<rpc_exception> err;
-      ptr<resp_msg> resp;
-
-      ::grpc::ClientContext context;
-      raft_core::RaftMessage response;
-      auto status = send(&context, fromRequest(*req), &response);
-
-      if (status.ok()) {
-         resp = toResponse(response);
-      } else {
-         err = std::make_shared<rpc_exception>(status.error_message(), req);
-      }
-      complete(resp, err);
-   }
-};
 
 struct grpc_service {
    explicit grpc_service(ptr<raft_server>&& raft_server) :

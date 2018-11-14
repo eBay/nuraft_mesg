@@ -1,6 +1,6 @@
 #pragma once
 
-#include "cornerstone/raft_core_grpc.hpp"
+#include <cornerstone.hxx>
 #include <sds_logging/logging.h>
 
 struct sds_logger : ::cornerstone::logger {
