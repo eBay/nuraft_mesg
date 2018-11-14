@@ -12,9 +12,11 @@ class TestPackageConan(ConanFile):
     fail_timeout = '30s'
     abort_timeout = '35s'
 
-    requires = ("jungle_logstore/0.1.2@sds/testing",
-                "picojson/1.3.0@oss/stable",
-                "sds_logging/3.2.6@sds/stable")
+    requires = (
+            "jungle_logstore/0.1.2@sds/testing",
+            "picojson/1.3.0@oss/stable",
+            "sds_logging/3.3.0@sds/testing",
+        )
 
     def build(self):
         cmake = CMake(self)
