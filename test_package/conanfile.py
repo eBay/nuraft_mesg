@@ -13,7 +13,7 @@ class TestPackageConan(ConanFile):
     abort_timeout = '35s'
 
     requires = (
-            "jungle_logstore/0.1.2@sds/testing",
+            "jungle_logstore/0.1.3@sds/testing",
             "picojson/1.3.0@oss/stable",
             "sds_logging/3.3.0@sds/testing",
         )
