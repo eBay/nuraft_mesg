@@ -10,9 +10,9 @@
 
 SDS_LOGGING_DECL(sds_msg)
 
-namespace sds_messaging {
-
 namespace cstn = ::cornerstone;
+
+namespace sds_messaging {
 
 using group_name_t = std::string;
 

@@ -2,6 +2,7 @@
 
 #include <map>
 #include <shared_mutex>
+#include <cornerstone/grpc_service.hpp>
 
 #include "factory.h"
 #include "messaging_service.grpc.pb.h"
