@@ -12,7 +12,8 @@ to the internal ASIO implementation.
 This library only provides the RPC service for raft_core. It provides the following:
 
 * `raft_core::grpc_client : public raft_core::rpc_client`: Initiates RPC calls to remote members.
-* `raft_core::grpc_service : public raft_core::rpc_client_factory`: Member listening service.
+* `raft_core::grpc_factory : public raft_core::rpc_client_factory`: Client creation factory.
+* `raft_core::grpc_server`: RPC handler
 
 You must still provide the following:
 

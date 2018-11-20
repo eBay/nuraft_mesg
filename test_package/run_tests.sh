@@ -15,7 +15,7 @@ echo "[ RUN      ] Echo_Server.Members${SERVER_COUNT}"
 for i in $(seq 0 $((${SERVER_COUNT} - 1)))
 do
   echo "[          ] Starting server_${i}"
-  ./bin/raft_server --synclog -v 0 --server_id $i 2>&1 >/dev/null &
+  ./bin/raft_server -v 0 --log_mods raft_core:0 --server_id $i >/dev/null &
   SERVER_PIDS+=($!)
 done
 
