@@ -20,8 +20,7 @@ class TestPackageConan(ConanFile):
 
     def build(self):
         cmake = CMake(self)
-        definitions = {'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON'}
-        cmake.configure(defs=definitions)
+        cmake.configure()
         cmake.build()
 
     def test(self):
