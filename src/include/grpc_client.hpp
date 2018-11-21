@@ -56,6 +56,9 @@ class grpc_client :
 
               if (status.ok()) {
                   resp = toResponse(response);
+                  if (!resp) {
+                    err = std::make_shared<cstn::rpc_exception>("missing response", req);
+                  }
               } else {
                   err = std::make_shared<cstn::rpc_exception>(status.error_message(), req);
               }

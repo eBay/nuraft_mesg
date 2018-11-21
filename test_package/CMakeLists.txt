@@ -14,6 +14,7 @@ if  (${MEMORY_SANITIZER_ON})
 endif ()
 
 set(CMAKE_CXX_STANDARD 17)
+set(CPP_WARNINGS "-Wall -Wextra -Werror")
 
 find_program(CCACHE_FOUND ccache)
 if (CCACHE_FOUND)

@@ -120,7 +120,7 @@ toRequest(RaftMessage const& raft_msg) {
 inline
 shared<cstn::resp_msg>
 toResponse(RaftMessage const& raft_msg) {
-   assert(raft_msg.has_rc_response());
+   if (!raft_msg.has_rc_response()) return nullptr;
    auto const& base = raft_msg.base();
    auto const& resp = raft_msg.rc_response();
    auto message = std::make_shared<cstn::resp_msg>(base.term(),
