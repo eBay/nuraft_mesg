@@ -19,7 +19,7 @@ struct example_factory : public raft_core::grpc_factory
   create_client(const std::string &client,
                 ::grpc::CompletionQueue* cq,
                 raft_core::shared<cornerstone::rpc_client>& raft_client) override {
-    auto const endpoint = format(fmt("127.0.0.1:900{}"), client);
+    auto const endpoint = format(FMT_STRING("127.0.0.1:900{}"), client);
     LOGDEBUGMOD(raft_core, "Creating client for [{}] @ [{}]", client, endpoint);
 
     raft_client = sds::grpc::GrpcConnectionFactory::Make<raft_core::simple_grpc_client>(endpoint,

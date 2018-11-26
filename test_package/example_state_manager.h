@@ -17,7 +17,7 @@ class simple_state_mgr : public cs::state_mgr {
    void save_state(const cs::srv_state& state) override;
    cs::ptr<cs::srv_state> read_state() override;
    cs::ptr<cs::log_store> load_log_store() override {
-       return cs::cs_new<cs::jungle_log_store>(format(fmt("store{}"), _srv_id));
+       return cs::cs_new<cs::jungle_log_store>(format(FMT_STRING("store{}"), _srv_id));
    }
    int32_t server_id() override { return _srv_id; }
 

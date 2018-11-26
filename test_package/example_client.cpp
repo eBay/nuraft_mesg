@@ -23,7 +23,7 @@ SDS_LOGGING_INIT(raft_core)
 using namespace raft_core;
 
 void cleanup(const std::string& prefix) {
-    auto r = system(format(fmt("rm -rf {}"), prefix).data());
+    auto r = system(format(FMT_STRING("rm -rf {}"), prefix).data());
 }
 
 void send_message(uint32_t leader_id, std::string const& message) {

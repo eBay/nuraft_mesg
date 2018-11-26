@@ -26,10 +26,10 @@ SDS_LOGGING_INIT(raft_core)
 int main(int argc, char** argv) {
     SDS_OPTIONS_LOAD(argc, argv, logging, server);
     auto server_id = SDS_OPTIONS["server_id"].as<uint32_t>();
-    auto server_address = format(fmt("0.0.0.0:900{}"), server_id);
+    auto server_address = format(FMT_STRING("0.0.0.0:900{}"), server_id);
 
     // Can start using LOG from this point onward.
-    sds_logging::SetLogger(format(fmt("server_{}"), server_id));
+    sds_logging::SetLogger(format(FMT_STRING("server_{}"), server_id));
     spdlog::set_pattern("[%D %T] [%^%l%$] [%n] [%t] %v");
 
     if (0 <= server_id && 10 > server_id) {
