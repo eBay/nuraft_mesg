@@ -5,35 +5,59 @@
 #include <mutex>
 #include <string>
 
-#include <cornerstone/grpc_factory.hpp>
+#include <raft_core_grpc/grpc_factory.hpp>
 #include <sds_logging/logging.h>
 
 SDS_LOGGING_DECL(sds_msg)
 
 namespace cstn = ::cornerstone;
 
-namespace sds_messaging {
+namespace sds::messaging {
 
 using group_name_t = std::string;
+
+class mesg_client;
 
 template<typename T>
 using shared = std::shared_ptr<T>;
 
-struct grpc_factory : public cstn::grpc_factory {
-   grpc_factory(group_name_t const& grp_id,
+class group_factory : public raft_core::grpc_factory {
+ public:
+   using raft_core::grpc_factory::grpc_factory;
+
+   using raft_core::grpc_factory::create_client;
+
+   std::error_condition
+   create_client(const std::string &client, cstn::ptr<cstn::rpc_client>&) override;
+
+   std::error_condition
+   reinit_client(raft_core::shared<cornerstone::rpc_client>& raft_client) override;
+
+   virtual std::string lookupEndpoint(std::string const& client) = 0;
+};
+
+class grpc_factory final : public raft_core::grpc_factory {
+   shared<group_factory> _group_factory;
+   group_name_t const    _group_name;
+
+ public:
+   grpc_factory(shared<group_factory> g_factory,
+                group_name_t const& grp_id,
                 uint32_t const current_leader) :
-         cstn::grpc_factory(current_leader),
+         raft_core::grpc_factory(current_leader),
+         _group_factory(g_factory),
          _group_name(grp_id)
    { }
 
-   cstn::ptr<cstn::rpc_client> create_client(const std::string &client) override;
+   group_name_t group_name() const { return _group_name; }
 
-   group_name_t group_name() const                { return _group_name; }
+   std::error_condition
+   create_client(const std::string &client,
+                 cstn::ptr<cstn::rpc_client>&) override;
 
-   virtual std::string lookupEndpoint(std::string const& client) = 0;
-
- private:
-   group_name_t const _group_name;
+   std::error_condition
+   reinit_client(raft_core::shared<cornerstone::rpc_client>& raft_client) override;
 };
+
 
 }
