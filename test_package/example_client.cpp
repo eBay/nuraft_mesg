@@ -1,25 +1,14 @@
-/**
-*
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  The ASF licenses
-* this file to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+///
+// Copyright 2018 (c) eBay Corporation
+//
+// Authors:
+//      Brian Szmyd <bszmyd@ebay.com>
+//
 
 #include <iostream>
 #include <cassert>
 
-#include <cornerstone/grpc_factory.hpp>
-#include <sds_logging/logging.h>
+#include <cornerstone.hxx>
 
 #include "example_factory.h"
 
@@ -31,16 +20,16 @@ SDS_OPTION_GROUP(client, (add, "a", "add", "Add a server to the cluster", cxxopt
 
 SDS_OPTIONS_ENABLE(logging, client)
 SDS_LOGGING_INIT(raft_core)
-using namespace cornerstone;
+using namespace raft_core;
 
 void cleanup(const std::string& prefix) {
-    auto r = system(format(fmt("rm -rf {}"), prefix).data());
+    auto r = system(format(FMT_STRING("rm -rf {}"), prefix).data());
 }
 
 void send_message(uint32_t leader_id, std::string const& message) {
-    auto factory = cs_new<example_factory>(leader_id);
+    auto factory = std::make_shared<example_factory>(leader_id);
 
-    auto buf = buffer::alloc(message.length()+1);
+    auto buf = cornerstone::buffer::alloc(message.length()+1);
     buf->put(message.c_str());
     buf->pos(0);
 
@@ -48,12 +37,12 @@ void send_message(uint32_t leader_id, std::string const& message) {
 }
 
 void add_new_server(uint32_t leader_id, uint32_t srv_id) {
-    auto factory = cs_new<example_factory>(leader_id);
+    auto factory = std::make_shared<example_factory>(leader_id);
     if (!example_factory::add_server(srv_id, factory).get()) exit(-1);
 }
 
 void remove_server(int leader_id, int srv_id) {
-    auto factory = cs_new<example_factory>(leader_id);
+    auto factory = std::make_shared<example_factory>(leader_id);
     if (!example_factory::rem_server(srv_id, factory).get()) exit(-1);
 }
 

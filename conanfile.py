@@ -4,7 +4,7 @@ from conans import ConanFile, CMake, tools
 
 class RaftCoreGRPCConan(ConanFile):
     name = "raft_core_grpc"
-    version = "0.5.0"
+    version = "0.6.0"
 
     license = "Apache 2.0"
     url = "https://github.corp.ebay.com/SDS/raft_core_grpc"
@@ -24,9 +24,10 @@ class RaftCoreGRPCConan(ConanFile):
 
 
     requires = (
-            "grpc/1.16.0@oss/stable",
+            "gtest/1.8.1@bincrafters/stable",
             "raft_core/0.3.0@oss/stable",
-            "sds_logging/3.3.0@sds/testing"
+            "sds_grpc/0.0.6@dev/szmyd",
+            "sds_logging/3.4.1@sds/testing"
         )
 
     generators = "cmake"
@@ -67,8 +68,8 @@ class RaftCoreGRPCConan(ConanFile):
         self.copy("*.a", dst="lib", keep_path=False)
         self.copy("*.lib", dst="lib", keep_path=False)
         self.copy("*.proto", dst="proto/", keep_path=False)
-        self.copy("*.h", dst="include/cornerstone", keep_path=False)
-        self.copy("*.hpp", dst="include/cornerstone", keep_path=False)
+        self.copy("*.h", dst="include/raft_core_grpc", keep_path=False)
+        self.copy("*.hpp", dst="include/raft_core_grpc", keep_path=False)
 
     def package_info(self):
         self.cpp_info.libs = tools.collect_libs(self)

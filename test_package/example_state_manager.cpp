@@ -24,7 +24,7 @@ jsonObjectFromFile(std::ifstream& istrm, picojson::object& json_object) {
 
 std::error_condition
 loadConfigFile(picojson::object& config_map, int32_t const _srv_id) {
-   auto const config_file = format(fmt("s{}.config"), _srv_id);
+   auto const config_file = format(FMT_STRING("s{}.config"), _srv_id);
    std::ifstream istrm(config_file, std::ios::binary);
    if (!istrm.is_open()) {
       return std::make_error_condition(std::errc::no_such_file_or_directory);
@@ -35,7 +35,7 @@ loadConfigFile(picojson::object& config_map, int32_t const _srv_id) {
 
 std::error_condition
 loadStateFile(picojson::object& state_map, int32_t const _srv_id) {
-   auto const state_file = format(fmt("s{}.state"), _srv_id);
+   auto const state_file = format(FMT_STRING("s{}.state"), _srv_id);
    std::ifstream istrm(state_file, std::ios::binary);
    if (!istrm.is_open()) {
       return std::make_error_condition(std::errc::no_such_file_or_directory);
@@ -143,7 +143,7 @@ simple_state_mgr::read_state() {
 
 void
 simple_state_mgr::save_config(const cs::cluster_config& config) {
-   auto const config_file = format(fmt("s{}.config"), _srv_id);
+   auto const config_file = format(FMT_STRING("s{}.config"), _srv_id);
    auto json_obj = toClusterConfig(config);
    try {
       std::ofstream ostrm(config_file, std::ios::binary);
@@ -157,7 +157,7 @@ simple_state_mgr::save_config(const cs::cluster_config& config) {
 
 void
 simple_state_mgr::save_state(const cs::srv_state& state) {
-   auto const state_file = format(fmt("s{}.state"), _srv_id);
+   auto const state_file = format(FMT_STRING("s{}.state"), _srv_id);
    picojson::object json_obj;
    json_obj["term"] = picojson::value((double)state.get_term());
    json_obj["voted_for"] = picojson::value((double)state.get_voted_for());

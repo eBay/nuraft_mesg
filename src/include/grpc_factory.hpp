@@ -6,10 +6,10 @@
 #include <string>
 
 #include <cornerstone.hxx>
-#include <grpcpp/support/status.h>
+#include <sds_grpc/client.h>
 #include <sds_logging/logging.h>
 
-#include "raft_service.grpc.pb.h"
+#include "utils.hpp"
 
 SDS_LOGGING_DECL(raft_core)
 
@@ -17,47 +17,36 @@ namespace grpc {
 struct ClientContext;
 }
 
-namespace cornerstone {
+namespace raft_core {
 
-template<typename T>
-using shared = std::shared_ptr<T>;
-
-struct grpc_client : public rpc_client {
-   using rpc_client::rpc_client;
-
-   virtual ::grpc::Status send(::grpc::ClientContext* ctx,
-                               raft_core::RaftMessage const& message,
-                               raft_core::RaftMessage* response) = 0;
-
-   void send(ptr<req_msg>& req, rpc_handler& complete) override;
-};
-
-struct simple_grpc_client : public grpc_client {
-   explicit simple_grpc_client(shared<::grpc::ChannelInterface> channel) :
-      grpc_client(),
-      _stub(raft_core::RaftSvc::NewStub(channel))
-   {}
-
-   ~simple_grpc_client() override = default;
-
-   ::grpc::Status send(::grpc::ClientContext *ctx,
-                       raft_core::RaftMessage const &message,
-                       raft_core::RaftMessage *response) override;
-
- private:
-   std::unique_ptr<typename raft_core::RaftSvc::Stub> _stub;
-};
-
-
-struct grpc_factory : public rpc_client_factory {
+class grpc_factory : public cstn::rpc_client_factory {
+ public:
    explicit grpc_factory(uint32_t const current_leader) :
          rpc_client_factory(),
          _current_leader(current_leader)
    { }
-   ~grpc_factory() override = default;
+
+   ~grpc_factory() override {
+     std::lock_guard<std::mutex> lk(_client_lock);
+     for (auto& client_pair : _clients) {
+       // FIXME
+       [[maybe_unused]] auto leak_ptr = client_pair.second.release();
+       client_pair.second.reset();
+     }
+     _clients.clear();
+   }
 
    uint32_t current_leader() const                { std::lock_guard<std::mutex> lk(_leader_lock); return _current_leader; }
    void update_leader(uint32_t const leader)      { std::lock_guard<std::mutex> lk(_leader_lock); _current_leader = leader; }
+
+   cstn::ptr<cstn::rpc_client>
+   create_client(const std::string &client) override;
+
+   virtual
+   std::error_condition
+   create_client(const std::string &client,
+                 ::grpc::CompletionQueue* cq,
+                 cstn::ptr<cstn::rpc_client>&) = 0;
 
    // Construct and send an AddServer message to the cluster
    static
@@ -67,7 +56,7 @@ struct grpc_factory : public rpc_client_factory {
    // Send a client request to the cluster
    static
    std::future<bool>
-   client_request(shared<buffer> buf, shared<grpc_factory> factory);
+   client_request(shared<cstn::buffer> buf, shared<grpc_factory> factory);
 
    // Construct and send a RemoveServer message to the cluster
    static
@@ -77,11 +66,13 @@ struct grpc_factory : public rpc_client_factory {
    // Send a pre-made message to the cluster
    static
    std::future<bool>
-   cluster_request(shared<req_msg> msg, shared<grpc_factory> factory);
+   cluster_request(shared<cstn::req_msg> msg, shared<grpc_factory> factory);
 
  private:
-   uint32_t           _current_leader;
    mutable std::mutex _leader_lock;
+   uint32_t           _current_leader;
+   std::mutex _client_lock;
+   std::map<std::string, std::unique_ptr<sds::grpc::GrpcClient>> _clients;
 };
 
 }

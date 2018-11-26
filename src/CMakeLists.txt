@@ -12,9 +12,7 @@ get_filename_component(PROTO_PATH ${FIRST_PROTO} DIRECTORY)
 include_directories(BEFORE include ${PROTO_PATH})
 
 set(LIBRARY_SOURCES
-            include/grpc_factory.hpp
-            include/grpc_service.hpp
-            lib/factory.cpp
+            lib/grpc_factory.cpp
             ${PROTO_SRCS}
             ${PROTO_HDRS}
             ${GRPC_SRCS}
