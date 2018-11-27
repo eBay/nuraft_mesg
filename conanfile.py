@@ -26,7 +26,7 @@ class RaftCoreGRPCConan(ConanFile):
     requires = (
             "gtest/1.8.1@bincrafters/stable",
             "raft_core/0.3.0@oss/stable",
-            "sds_grpc/0.0.6@dev/szmyd",
+            "sds_grpc/0.0.5@sds/testing",
             "sds_logging/3.4.1@sds/testing"
         )
 
