@@ -4,7 +4,7 @@ from conans import ConanFile, CMake, tools
 
 class RaftCoreGRPCConan(ConanFile):
     name = "raft_core_grpc"
-    version = "0.6.0"
+    version = "0.6.1"
 
     license = "Apache 2.0"
     url = "https://github.corp.ebay.com/SDS/raft_core_grpc"
@@ -15,29 +15,30 @@ class RaftCoreGRPCConan(ConanFile):
         "shared": ['True', 'False'],
         "fPIC": ['True', 'False'],
         "coverage": ['True', 'False'],
+        "sanitize": ['True', 'False'],
         }
     default_options = (
         'shared=False',
         'fPIC=True',
         'coverage=False',
+        'sanitize=False',
         )
 
 
     requires = (
             "gtest/1.8.1@bincrafters/stable",
             "raft_core/0.3.0@oss/stable",
-            "sds_grpc/0.0.5@sds/testing",
+            "sds_grpc/0.0.6@sds/testing",
             "sds_logging/3.4.1@sds/testing"
         )
 
     generators = "cmake"
     exports = ["LICENSE.md"]
     exports_sources = "CMakeLists.txt", "cmake/*", "src/*"
-    sanitize = False
 
     def configure(self):
-        if self.settings.build_type == "Debug":
-            self.sanitize = True
+        if self.settings.build_type == "Debug" and self.options.coverage == "False":
+            self.options.sanitize = True
         if not self.settings.compiler == "gcc":
             del self.options.coverage
 
@@ -54,7 +55,7 @@ class RaftCoreGRPCConan(ConanFile):
                 definitions['CONAN_BUILD_COVERAGE'] = 'ON'
                 test_target = 'coverage'
 
-        if self.sanitize == 'True':
+        if self.options.sanitize == 'True':
             definitions['MEMORY_SANITIZER_ON'] = 'ON'
 
         cmake.configure(defs=definitions)
@@ -73,7 +74,7 @@ class RaftCoreGRPCConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = tools.collect_libs(self)
-        if (self.sanitize) :
+        if (self.options.sanitize) :
             self.cpp_info.sharedlinkflags.append("-fsanitize=address")
             self.cpp_info.exelinkflags.append("-fsanitize=address")
             self.cpp_info.sharedlinkflags.append("-fsanitize=undefined")
