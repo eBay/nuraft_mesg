@@ -5,7 +5,7 @@
 //      Brian Szmyd <bszmyd@ebay.com>
 //
 // Brief:
-//   grpc_factory static functions that makes for easy client creation.
+//   grpc_server step function
 //
 
 #include "grpc_server.hpp"
