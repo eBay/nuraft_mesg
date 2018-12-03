@@ -45,15 +45,6 @@ fromRCRequest(cstn::req_msg& rcmsg) {
 }
 
 inline
-RaftMessage
-fromRequest(cstn::req_msg& rcreq) {
-   RaftMessage message;
-   message.set_allocated_base(fromBaseRequest(rcreq));
-   message.set_allocated_rc_request(fromRCRequest(rcreq));
-   return message;
-}
-
-inline
 shared<cstn::resp_msg>
 toResponse(RaftMessage const& raft_msg) {
    if (!raft_msg.has_rc_response()) return nullptr;
@@ -94,15 +85,18 @@ class grpc_client :
    ~grpc_client() override = default;
 
    void send(shared<cstn::req_msg>& req, cstn::rpc_handler& complete) override {
-     auto message = fromRequest(*req);
+     assert(req && complete);
+     RaftMessage grpc_request;
+     grpc_request.set_allocated_base(fromBaseRequest(*req));
+     grpc_request.set_allocated_rc_request(fromRCRequest(*req));
 
      LOGTRACEMOD(raft_core, "Sending [{}] from: [{}] to: [{}]",
-         cstn::msg_type_to_string(cstn::msg_type(message.base().type())),
-         message.base().src(),
-         message.base().dest()
+         cstn::msg_type_to_string(cstn::msg_type(grpc_request.base().type())),
+         grpc_request.base().src(),
+         grpc_request.base().dest()
          );
 
-     send(message,
+     send(grpc_request,
           [req, complete]
           (RaftMessage& response, ::grpc::Status& status) mutable -> void
           {

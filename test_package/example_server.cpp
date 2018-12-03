@@ -6,7 +6,6 @@
 //
 
 #include <cassert>
-#include <grpcpp/security/server_credentials.h>
 
 #include <raft_core_grpc/simple_server.hpp>
 #include <sds_logging/logging.h>
