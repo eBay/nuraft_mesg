@@ -13,6 +13,7 @@ include_directories(BEFORE include ${PROTO_PATH})
 
 set(LIBRARY_SOURCES
             lib/grpc_factory.cpp
+            lib/grpc_server.cpp
             ${PROTO_SRCS}
             ${PROTO_HDRS}
             ${GRPC_SRCS}

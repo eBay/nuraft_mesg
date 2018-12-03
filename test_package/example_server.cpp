@@ -55,23 +55,28 @@ int main(int argc, char** argv) {
         ptr<rpc_listener> listener;
 
         // Run server.
-        ptr<raft_server> server = std::make_shared<raft_server>(new context(smgr,
-                                                                            smachine,
-                                                                            listener,
-                                                                            l,
-                                                                            rpc_cli_factory,
-                                                                            scheduler,
-                                                                            params));
-        auto grpc_svc_ = std::make_shared<raft_core::simple_server>(std::move(server));
-        grpc_svc_->run("", "", server_address, 2);
+        auto server = std::make_unique<raft_server>(new context(smgr,
+                                                                smachine,
+                                                                listener,
+                                                                l,
+                                                                rpc_cli_factory,
+                                                                scheduler,
+                                                                params));
+        auto grpc_svc_ = std::make_unique<raft_core::simple_server>(std::move(server));
+
+        auto grpc_server = sds::grpc::GrpcServer::make(server_address, 2, "", "");
+        grpc_svc_->associate(grpc_server);
+        grpc_server->run();
+        grpc_svc_->bind(grpc_server);
 
         std::condition_variable stop_cv;
         std::mutex stop_cv_lock;
         {
             std::unique_lock<std::mutex> ulock(stop_cv_lock);
             stop_cv.wait(ulock);
-            grpc_svc_.reset();
+            grpc_server->shutdown();
         }
+        delete grpc_server;
     } else {
         LOGERROR("Server ID must be between 0 and 9");
     }

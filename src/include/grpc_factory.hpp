@@ -9,7 +9,7 @@
 #include <sds_grpc/client.h>
 #include <sds_logging/logging.h>
 
-#include "utils.hpp"
+#include "common.hpp"
 
 SDS_LOGGING_DECL(raft_core)
 
