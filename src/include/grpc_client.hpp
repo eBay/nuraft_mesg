@@ -65,62 +65,48 @@ toResponse(RaftMessage const& raft_msg) {
 }
 
 
-template<typename TSERVICE>
 class grpc_client :
-    public cstn::rpc_client,
-    public sds::grpc::GrpcConnection<TSERVICE>
+    public cstn::rpc_client
 {
  public:
-   using handle_resp = std::function<void(RaftMessage&, ::grpc::Status&)>;
+    using handle_resp = std::function<void(RaftMessage&, ::grpc::Status&)>;
 
-   grpc_client(std::string const& addr,
-               uint32_t deadline,
-               ::grpc::CompletionQueue* cq,
-               std::string const& target_domain,
-               std::string const& ssl_cert) :
-     cstn::rpc_client(),
-     sds::grpc::GrpcConnection<TSERVICE>(addr, deadline, cq, target_domain, ssl_cert)
-   { }
+    using cstn::rpc_client::rpc_client;
+    ~grpc_client() override = default;
 
-   ~grpc_client() override = default;
+    void send(shared<cstn::req_msg>& req, cstn::rpc_handler& complete) override {
+        assert(req && complete);
+        RaftMessage grpc_request;
+        grpc_request.set_allocated_base(fromBaseRequest(*req));
+        grpc_request.set_allocated_rc_request(fromRCRequest(*req));
 
-   void send(shared<cstn::req_msg>& req, cstn::rpc_handler& complete) override {
-     assert(req && complete);
-     RaftMessage grpc_request;
-     grpc_request.set_allocated_base(fromBaseRequest(*req));
-     grpc_request.set_allocated_rc_request(fromRCRequest(*req));
+        LOGTRACEMOD(raft_core, "Sending [{}] from: [{}] to: [{}]",
+                cstn::msg_type_to_string(cstn::msg_type(grpc_request.base().type())),
+                grpc_request.base().src(),
+                grpc_request.base().dest()
+                );
 
-     LOGTRACEMOD(raft_core, "Sending [{}] from: [{}] to: [{}]",
-         cstn::msg_type_to_string(cstn::msg_type(grpc_request.base().type())),
-         grpc_request.base().src(),
-         grpc_request.base().dest()
-         );
+        send(grpc_request,
+            [req, complete]
+            (RaftMessage& response, ::grpc::Status& status) mutable -> void {
+                shared<cstn::rpc_exception> err;
+                shared<cstn::resp_msg> resp;
 
-     send(grpc_request,
-          [req, complete]
-          (RaftMessage& response, ::grpc::Status& status) mutable -> void
-          {
-              shared<cstn::rpc_exception> err;
-              shared<cstn::resp_msg> resp;
-
-              if (status.ok()) {
-                  resp = toResponse(response);
-                  if (!resp) {
-                    err = std::make_shared<cstn::rpc_exception>("missing response", req);
-                  }
-              } else {
-                  err = std::make_shared<cstn::rpc_exception>(status.error_message(), req);
-              }
-              complete(resp, err);
-          });
+                if (status.ok()) {
+                    resp = toResponse(response);
+                    if (!resp) {
+                        err = std::make_shared<cstn::rpc_exception>("missing response", req);
+                    }
+                } else {
+                    err = std::make_shared<cstn::rpc_exception>(status.error_message(), req);
+                }
+                complete(resp, err);
+            });
    }
 
  protected:
-   virtual void send(RaftMessage const& message, handle_resp complete) = 0;
+    virtual void send(RaftMessage const& message, handle_resp complete) = 0;
 
- private:
-   boxed<TSERVICE> _connection;
-   boxed<sds::grpc::GrpcClient> _client;
 };
 
 }

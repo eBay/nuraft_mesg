@@ -9,6 +9,7 @@
 //
 
 #include "grpc_factory.hpp"
+#include "grpc_client.hpp"
 
 namespace raft_core {
 
@@ -25,13 +26,9 @@ struct client_ctx {
    void set(bool const success)                 { return _promise.set_value(success); }
 
  private:
-   Payload const           _payload;
-   shared<grpc_factory>    _cli_factory;
-
-   std::condition_variable _join_cv;
-   std::mutex              _join_lk;
-
-   std::promise<bool> _promise;
+   Payload const        _payload;
+   shared<grpc_factory> _cli_factory;
+   std::promise<bool>   _promise;
 };
 
 template<typename PayloadType>
@@ -79,12 +76,18 @@ void
 respHandler(shared<ContextType> ctx,
             shared<cstn::resp_msg>& rsp,
             shared<cstn::rpc_exception>& err) {
+   auto factory = ctx->cli_factory();
    if (err) {
       LOGERROR("{}", err->what());
       ctx->set(false);
       return;
    } else if (rsp->get_accepted()) {
+      LOGDEBUGMOD(raft_core, "Accepted response");
       ctx->set(true);
+      return;
+   } else if (factory->current_leader() == rsp->get_dst()) {
+      LOGWARN("Request ignored");
+      ctx->set(false);
       return;
    } else if (0 > rsp->get_dst()) {
       LOGWARN("No known leader!");
@@ -93,7 +96,6 @@ respHandler(shared<ContextType> ctx,
    }
 
    // Not accepted: means that `get_dst()` is a new leader.
-   auto factory = ctx->cli_factory();
    LOGDEBUGMOD(raft_core, "Updating leader from {} to {}", factory->current_leader(), rsp->get_dst());
    factory->update_leader(rsp->get_dst());
    auto client = factory->create_client(std::to_string(rsp->get_dst()));
@@ -110,33 +112,27 @@ respHandler(shared<ContextType> ctx,
 
 cstn::ptr<cstn::rpc_client>
 grpc_factory::create_client(const std::string &client) {
-    // FIXME: GrpcClient currently joins() indefinitely...leak it
-    [[maybe_unused]] sds::grpc::GrpcClient* old_client;
-    cstn::ptr<cstn::rpc_client> raft_client;
+    cstn::ptr<grpc_client> old_client, new_client;;
 
     // Protected section
     { std::lock_guard<std::mutex> lk(_client_lock);
     auto [it, happened] = _clients.emplace(client, nullptr);
-    if (_clients.end() == it) return raft_client;
+    if (_clients.end() != it) {
+        // Defer destruction of old client if it existed
+        if (!happened) {
+            LOGDEBUGMOD(raft_core, "Re-creating client for {}", client);
+            // Defer destruction of old client to outside this protected section
+            old_client.swap(it->second);
+        }
 
-    // Defer destruction of old client if it existed
-    if (!happened) {
-        LOGDEBUGMOD(raft_core, "Re-creating client for {}", client);
-        // FIXME
-        old_client =it->second.release();
-    }
-
-    auto grpc_client = new sds::grpc::GrpcClient(); // check if grpc client has already run
-    grpc_client->run(1);
-
-    if (auto err = create_client(client, &(grpc_client->cq()), raft_client); err) {
-        LOGERROR("Failed to create client for {}: {}", client, err.message());
-        delete grpc_client;
-    } else {
-        it->second.reset(grpc_client);
+        if (auto err = create_client(client, it->second); err) {
+            LOGERROR("Failed to create client for {}: {}", client, err.message());
+        }  else {
+            new_client = it->second;
+        }
     }
     } // End of Protected section
-    return raft_client;
+    return new_client;
 }
 
 std::future<bool>

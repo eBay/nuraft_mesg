@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
 
     // Can start using LOG from this point onward.
     sds_logging::SetLogger("raft_client");
-    spdlog::set_pattern("[%D %T%z] [%^%l%$] [%n] [%t] %v");
+    spdlog::set_pattern("[%D %T%z] [%n] [%^%l%$] [%t] %v");
 
     if (SDS_OPTIONS.count("clean")) {
         cleanup("*.config");

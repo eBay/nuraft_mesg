@@ -16,23 +16,43 @@
 
 namespace raft_core {
 
-class simple_grpc_client :
-    public grpc_client<RaftSvc>
-{
- public:
-     using sds::grpc::GrpcConnection<RaftSvc>::dead_line_;
-     using sds::grpc::GrpcConnection<RaftSvc>::completion_queue_;
+constexpr char worker_name[] = "simple_raft_client";
 
-     using grpc_client<RaftSvc>::grpc_client;
-     ~simple_grpc_client() override = default;
+class simple_grpc_client :
+    public grpc_client,
+    public sds::grpc::GrpcAsyncClient
+{
+    ::sds::grpc::GrpcAsyncClient::AsyncStub<RaftSvc>::UPtr _stub;
+
+ public:
+    simple_grpc_client(std::string const& addr,
+                       std::string const& target_domain,
+                       std::string const& ssl_cert) :
+        grpc_client::grpc_client(),
+        sds::grpc::GrpcAsyncClient(addr, target_domain, ssl_cert)
+    {
+        assert(sds::grpc::GrpcAyncClientWorker::create_worker(worker_name, 2));
+    }
+
+    bool init() override {
+        if (!sds::grpc::GrpcAsyncClient::init()) {
+            LOGERROR("Initializing client failed!");
+            return false;
+        }
+        _stub = sds::grpc::GrpcAsyncClient::make_stub<RaftSvc>(worker_name);
+        if (!_stub)
+            LOGERROR("Failed to create Async client!");
+        else
+            LOGDEBUG("Created Async client.");
+        return (!!_stub);
+    }
 
  protected:
-     void send(RaftMessage const &message, handle_resp complete) override {
-         auto call = new sds::grpc::ClientCallData<RaftMessage, RaftMessage>(complete);
-         call->set_deadline(dead_line_);
-         call->responder_reader() = stub()->AsyncStep(&call->context(), message, completion_queue_);
-         call->responder_reader()->Finish(&call->reply(), &call->status(), (void*)call);
-     }
+    void send(RaftMessage const &message, handle_resp complete) override {
+        _stub->call_unary<RaftMessage, RaftMessage>(message,
+                                                    &RaftSvc::StubInterface::AsyncStep,
+                                                    complete);
+    }
 };
 
 }

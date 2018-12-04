@@ -28,7 +28,7 @@ class RaftCoreGRPCConan(ConanFile):
             "gtest/1.8.1@bincrafters/stable",
             "OpenSSL/1.0.2q@conan/stable",
             "raft_core/0.3.0@oss/stable",
-            "sds_grpc/1.0.1@sds/testing",
+            "sds_grpc/1.0.2@sds/testing",
             "sds_logging/3.4.1@sds/testing"
         )
 
