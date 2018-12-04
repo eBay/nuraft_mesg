@@ -9,7 +9,6 @@
 //
 
 #include "grpc_factory.hpp"
-#include "grpc_client.hpp"
 
 namespace raft_core {
 
@@ -112,7 +111,7 @@ respHandler(shared<ContextType> ctx,
 
 cstn::ptr<cstn::rpc_client>
 grpc_factory::create_client(const std::string &client) {
-    cstn::ptr<grpc_client> old_client, new_client;;
+    cstn::ptr<cstn::rpc_client> old_client, new_client;;
 
     // Protected section
     { std::lock_guard<std::mutex> lk(_client_lock);

@@ -18,6 +18,8 @@
 
 namespace raft_core {
 
+constexpr char worker_name[] = "simple_raft_client";
+
 inline
 LogEntry*
 fromLogEntry(cstn::log_entry const& entry, LogEntry* log) {
@@ -64,15 +66,37 @@ toResponse(RaftMessage const& raft_msg) {
    return message;
 }
 
-
+template<typename TSERVICE>
 class grpc_client :
-    public cstn::rpc_client
+    public cstn::rpc_client,
+    public sds::grpc::GrpcAsyncClient
 {
  public:
     using handle_resp = std::function<void(RaftMessage&, ::grpc::Status&)>;
 
-    using cstn::rpc_client::rpc_client;
+    grpc_client(std::string const& addr,
+                std::string const& target_domain,
+                std::string const& ssl_cert,
+                int num_t) :
+        cstn::rpc_client(),
+        sds::grpc::GrpcAsyncClient(addr, target_domain, ssl_cert) {
+        assert(sds::grpc::GrpcAyncClientWorker::create_worker(worker_name, num_t));
+    }
+
     ~grpc_client() override = default;
+
+    bool init() override {
+        if (!sds::grpc::GrpcAsyncClient::init()) {
+            LOGERROR("Initializing client failed!");
+            return false;
+        }
+        _stub = sds::grpc::GrpcAsyncClient::make_stub<TSERVICE>(worker_name);
+        if (!_stub)
+            LOGERROR("Failed to create Async client!");
+        else
+            LOGDEBUG("Created Async client.");
+        return (!!_stub);
+    }
 
     void send(shared<cstn::req_msg>& req, cstn::rpc_handler& complete) override {
         assert(req && complete);
@@ -105,8 +129,9 @@ class grpc_client :
    }
 
  protected:
-    virtual void send(RaftMessage const& message, handle_resp complete) = 0;
+    typename ::sds::grpc::GrpcAsyncClient::AsyncStub<TSERVICE>::UPtr _stub;
 
+    virtual void send(RaftMessage const& message, handle_resp complete) = 0;
 };
 
 }

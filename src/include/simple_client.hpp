@@ -16,36 +16,11 @@
 
 namespace raft_core {
 
-constexpr char worker_name[] = "simple_raft_client";
-
 class simple_grpc_client :
-    public grpc_client,
-    public sds::grpc::GrpcAsyncClient
+    public grpc_client<RaftSvc>
 {
-    ::sds::grpc::GrpcAsyncClient::AsyncStub<RaftSvc>::UPtr _stub;
-
  public:
-    simple_grpc_client(std::string const& addr,
-                       std::string const& target_domain,
-                       std::string const& ssl_cert) :
-        grpc_client::grpc_client(),
-        sds::grpc::GrpcAsyncClient(addr, target_domain, ssl_cert)
-    {
-        assert(sds::grpc::GrpcAyncClientWorker::create_worker(worker_name, 2));
-    }
-
-    bool init() override {
-        if (!sds::grpc::GrpcAsyncClient::init()) {
-            LOGERROR("Initializing client failed!");
-            return false;
-        }
-        _stub = sds::grpc::GrpcAsyncClient::make_stub<RaftSvc>(worker_name);
-        if (!_stub)
-            LOGERROR("Failed to create Async client!");
-        else
-            LOGDEBUG("Created Async client.");
-        return (!!_stub);
-    }
+    using grpc_client<RaftSvc>::grpc_client;
 
  protected:
     void send(RaftMessage const &message, handle_resp complete) override {

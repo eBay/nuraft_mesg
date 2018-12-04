@@ -18,8 +18,6 @@ struct ClientContext;
 
 namespace raft_core {
 
-class grpc_client;
-
 class grpc_factory : public cstn::rpc_client_factory {
  public:
    explicit grpc_factory(uint32_t const current_leader) :
@@ -27,13 +25,7 @@ class grpc_factory : public cstn::rpc_client_factory {
          _current_leader(current_leader)
    { }
 
-   ~grpc_factory() override {
-     std::lock_guard<std::mutex> lk(_client_lock);
-     for (auto& client_pair : _clients) {
-       client_pair.second.reset();
-     }
-     _clients.clear();
-   }
+   ~grpc_factory() override = default;
 
    uint32_t current_leader() const                { std::lock_guard<std::mutex> lk(_leader_lock); return _current_leader; }
    void update_leader(uint32_t const leader)      { std::lock_guard<std::mutex> lk(_leader_lock); _current_leader = leader; }
@@ -44,7 +36,7 @@ class grpc_factory : public cstn::rpc_client_factory {
    virtual
    std::error_condition
    create_client(const std::string &client,
-                 cstn::ptr<grpc_client>&) = 0;
+                 cstn::ptr<cstn::rpc_client>&) = 0;
 
    // Construct and send an AddServer message to the cluster
    static
@@ -70,7 +62,7 @@ class grpc_factory : public cstn::rpc_client_factory {
    mutable std::mutex _leader_lock;
    uint32_t           _current_leader;
    std::mutex _client_lock;
-   std::map<std::string, std::shared_ptr<grpc_client>> _clients;
+   std::map<std::string, std::shared_ptr<cstn::rpc_client>> _clients;
 };
 
 }
