@@ -88,11 +88,16 @@ class grpc_client :
     ~grpc_client() override = default;
 
     bool init() override {
-        if (!sds::grpc::GrpcAsyncClient::init()) {
-            LOGERROR("Initializing client failed!");
-            return false;
+        // Re-create channel only if current channel is busted.
+        if (!_stub || !is_connection_ready()) {
+            if (!sds::grpc::GrpcAsyncClient::init()) {
+                LOGERROR("Initializing client failed!");
+                return false;
+            }
+            _stub = sds::grpc::GrpcAsyncClient::make_stub<TSERVICE>(worker_name);
+        } else {
+            LOGDEBUGMOD(raft_core, "Channel looks fine, re-using");
         }
-        _stub = sds::grpc::GrpcAsyncClient::make_stub<TSERVICE>(worker_name);
         return (!!_stub);
     }
 

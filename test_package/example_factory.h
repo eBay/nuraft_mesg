@@ -26,4 +26,14 @@ create_client(const std::string &client,
         std::make_error_condition(std::errc::connection_aborted) :
         std::error_condition();
 }
+
+std::error_condition
+reinit_client(raft_core::shared<cornerstone::rpc_client>& raft_client) override {
+    assert(raft_client);
+    auto grpc_client = std::dynamic_pointer_cast<raft_core::simple_grpc_client>(raft_client);
+    return (!grpc_client->init()) ?
+        std::make_error_condition(std::errc::connection_aborted) :
+        std::error_condition();
+}
+
 };

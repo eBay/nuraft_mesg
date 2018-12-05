@@ -38,6 +38,10 @@ class grpc_factory : public cstn::rpc_client_factory {
    create_client(const std::string &client,
                  cstn::ptr<cstn::rpc_client>&) = 0;
 
+   virtual
+   std::error_condition
+   reinit_client(cstn::ptr<cstn::rpc_client>&) = 0;
+
    // Construct and send an AddServer message to the cluster
    static
    std::future<bool>

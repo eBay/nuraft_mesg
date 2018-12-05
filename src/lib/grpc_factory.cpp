@@ -111,23 +111,25 @@ respHandler(shared<ContextType> ctx,
 
 cstn::ptr<cstn::rpc_client>
 grpc_factory::create_client(const std::string &client) {
-    cstn::ptr<cstn::rpc_client> old_client, new_client;;
+    cstn::ptr<cstn::rpc_client> new_client;;
 
     // Protected section
     { std::lock_guard<std::mutex> lk(_client_lock);
     auto [it, happened] = _clients.emplace(client, nullptr);
     if (_clients.end() != it) {
-        // Defer destruction of old client if it existed
         if (!happened) {
             LOGDEBUGMOD(raft_core, "Re-creating client for {}", client);
-            // Defer destruction of old client to outside this protected section
-            old_client.swap(it->second);
-        }
-
-        if (auto err = create_client(client, it->second); err) {
-            LOGERROR("Failed to create client for {}: {}", client, err.message());
-        }  else {
-            new_client = it->second;
+            if (auto err = reinit_client(it->second); err) {
+              LOGERROR("Failed to re-initialize client {}: {}", client, err.message());
+            } else {
+              new_client = it->second;
+            }
+        } else {
+          if (auto err = create_client(client, it->second); err) {
+              LOGERROR("Failed to create client for {}: {}", client, err.message());
+          }  else {
+              new_client = it->second;
+          }
         }
     }
     } // End of Protected section
