@@ -93,10 +93,6 @@ class grpc_client :
             return false;
         }
         _stub = sds::grpc::GrpcAsyncClient::make_stub<TSERVICE>(worker_name);
-        if (!_stub)
-            LOGERROR("Failed to create Async client!");
-        else
-            LOGDEBUG("Created Async client.");
         return (!!_stub);
     }
 
