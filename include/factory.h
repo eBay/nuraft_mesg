@@ -52,8 +52,7 @@ class grpc_factory final : public raft_core::grpc_factory {
    group_name_t group_name() const { return _group_name; }
 
    std::error_condition
-   create_client(const std::string &client,
-                 cstn::ptr<cstn::rpc_client>&) override;
+   create_client(const std::string &client, cstn::ptr<cstn::rpc_client>&) override;
 
    std::error_condition
    reinit_client(raft_core::shared<cornerstone::rpc_client>& raft_client) override;

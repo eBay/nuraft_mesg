@@ -25,15 +25,8 @@ class messaging_client :
 
     void send(RaftGroupMsg const &message, handle_resp complete) {
         auto group_compl =
-            [complete]
-            (RaftGroupMsg& response, ::grpc::Status& status) mutable -> void
-            {
-                raft_core::RaftMessage raft_resp;
-                if (status.ok()) {
-                    raft_resp.CopyFrom(response.message());
-                }
-                complete(raft_resp, status);
-            };
+            [complete] (RaftGroupMsg& response, ::grpc::Status& status) mutable -> void
+            { complete(*response.mutable_message(), status); };
 
         _stub->call_unary<RaftGroupMsg, RaftGroupMsg>(message,
                                                       &Messaging::StubInterface::AsyncRaftStep,
