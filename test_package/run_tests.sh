@@ -2,6 +2,13 @@
 
 set -eu
 export ASAN_OPTIONS=detect_leaks=0
+LOG_MODS="raft_core"
+CLIENT_VERBOSITY=3
+SERVER_VERBOSITY=1
+
+CLIENT_CLI_OPTS="-csv ${CLIENT_VERBOSITY} --log_mods ${LOG_MODS}"
+SERVER_CLI_OPTS="-sv ${SERVER_VERBOSITY} --log_mods ${LOG_MODS}"
+
 SERVER_COUNT=4
 
 SERVER_PIDS=()
@@ -10,12 +17,12 @@ echo """
 [----------] Global test environment set-up.
 [----------] 1 test from raft_test
 [          ] Cleaning client"
-./bin/raft_client -v 3 -c --clean
+./bin/raft_client ${CLIENT_CLI_OPTS} --clean
 echo "[ RUN      ] Echo_Server.Members${SERVER_COUNT}"
 for i in $(seq 0 $((${SERVER_COUNT} - 1)))
 do
   echo "[          ] Starting server_${i}"
-  ./bin/raft_server -v 1 --log_mods raft_core --server_id $i >/dev/null &
+  ./bin/raft_server ${SERVER_CLI_OPTS} --server_id $i >/dev/null &
   SERVER_PIDS+=($!)
 done
 
@@ -25,16 +32,17 @@ sleep 3
 for i in $(seq 1 $((${SERVER_COUNT} - 2)))
 do
   echo "[          ] Adding Server $i"
-  ./bin/raft_client -v 3 -c --add $i --server 0
+  ./bin/raft_client ${CLIENT_CLI_OPTS} --add $i --server 0
+  sleep 1
 done
 
 echo "[          ] Settling group"
 sleep 3
 
 echo "[          ] Writing Message"
-./bin/raft_client -v 3 -c -m 'test::message'
+./bin/raft_client ${CLIENT_CLI_OPTS} -m 'test::message'
 echo "[          ] Adding Server $((${SERVER_COUNT} - 1))"
-./bin/raft_client -v 3 -c --add $((${SERVER_COUNT} - 1))
+./bin/raft_client ${CLIENT_CLI_OPTS} --add $((${SERVER_COUNT} - 1))
 echo "[          ] Letting new member sync"
 sleep 3
 echo "[          ] Counting Server Processes"

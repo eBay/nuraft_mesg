@@ -1,3 +1,6 @@
+set(CPP_WARNINGS "-Wall -Wextra -Werror -Wno-unused-parameter")
+set(CMAKE_CXX_FLAGS "${CPP_WARNINGS} ${CMAKE_CXX_FLAGS}")
+
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
                             proto/raft_types.proto
                             proto/raft_service.proto

@@ -50,8 +50,6 @@ toRequest(RaftMessage const& raft_msg) {
     return message;
 }
 
-grpc_server::~grpc_server() { if (_raft_server) _raft_server->shutdown(); }
-
 ::grpc::Status
 grpc_server::step(RaftMessage& request, RaftMessage& reply) {
     LOGTRACEMOD(raft_core, "Stepping [{}] from: [{}] to: [{}]",

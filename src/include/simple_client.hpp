@@ -20,19 +20,14 @@ class simple_grpc_client :
     public grpc_client<RaftSvc>
 {
  public:
-     using sds::grpc::GrpcConnection<RaftSvc>::dead_line_;
-     using sds::grpc::GrpcConnection<RaftSvc>::completion_queue_;
-
-     using grpc_client<RaftSvc>::grpc_client;
-     ~simple_grpc_client() override = default;
+    using grpc_client<RaftSvc>::grpc_client;
 
  protected:
-     void send(RaftMessage const &message, handle_resp complete) override {
-         auto call = new sds::grpc::ClientCallData<RaftMessage, RaftMessage>(complete);
-         call->set_deadline(dead_line_);
-         call->responder_reader() = stub()->AsyncStep(&call->context(), message, completion_queue_);
-         call->responder_reader()->Finish(&call->reply(), &call->status(), (void*)call);
-     }
+    void send(RaftMessage const &message, handle_resp complete) override {
+        _stub->call_unary<RaftMessage, RaftMessage>(message,
+                                                    &RaftSvc::StubInterface::AsyncStep,
+                                                    complete);
+    }
 };
 
 }
