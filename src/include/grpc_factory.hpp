@@ -20,15 +20,15 @@ namespace raft_core {
 
 class grpc_factory : public cstn::rpc_client_factory {
  public:
-   explicit grpc_factory(uint32_t const current_leader) :
+   explicit grpc_factory(int32_t const current_leader) :
          rpc_client_factory(),
          _current_leader(current_leader)
    { }
 
    ~grpc_factory() override = default;
 
-   uint32_t current_leader() const                { std::lock_guard<std::mutex> lk(_leader_lock); return _current_leader; }
-   void update_leader(uint32_t const leader)      { std::lock_guard<std::mutex> lk(_leader_lock); _current_leader = leader; }
+   int32_t current_leader() const                { std::lock_guard<std::mutex> lk(_leader_lock); return _current_leader; }
+   void update_leader(int32_t const leader)      { std::lock_guard<std::mutex> lk(_leader_lock); _current_leader = leader; }
 
    cstn::ptr<cstn::rpc_client>
    create_client(const std::string &client) override;
@@ -60,7 +60,7 @@ class grpc_factory : public cstn::rpc_client_factory {
 
  private:
    mutable std::mutex _leader_lock;
-   uint32_t           _current_leader;
+   int32_t            _current_leader;
    std::mutex _client_lock;
    std::map<std::string, std::shared_ptr<cstn::rpc_client>> _clients;
 };
