@@ -33,6 +33,7 @@ for i in $(seq 1 $((${SERVER_COUNT} - 2)))
 do
   echo "[          ] Adding Server $i"
   ./bin/raft_client ${CLIENT_CLI_OPTS} --add $i --server 0
+  sleep 1
 done
 
 echo "[          ] Settling group"
