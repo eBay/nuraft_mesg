@@ -80,7 +80,9 @@ class grpc_client :
                 int num_t) :
         cstn::rpc_client(),
         sds::grpc::GrpcAsyncClient(addr, target_domain, ssl_cert) {
-        assert(sds::grpc::GrpcAyncClientWorker::create_worker(worker_name, num_t));
+        if (!sds::grpc::GrpcAyncClientWorker::create_worker(worker_name, num_t)) {
+            throw std::system_error(ECONNABORTED, std::generic_category(), "Failed to create workers");
+        }
     }
 
     ~grpc_client() override = default;

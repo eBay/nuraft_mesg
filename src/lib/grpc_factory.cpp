@@ -138,6 +138,11 @@ std::future<bool>
 grpc_factory::add_server(uint32_t const srv_id, shared<grpc_factory> factory) {
    auto client = factory->create_client(std::to_string(factory->current_leader()));
    assert(client);
+   if (!client) {
+      std::promise<bool> p;
+      p.set_value(false);
+      return p.get_future();
+   }
 
    auto ctx = std::make_shared<client_ctx<uint32_t>>(srv_id, factory);
    auto handler = static_cast<cstn::rpc_handler>([ctx] (shared<cstn::resp_msg>& rsp,
@@ -154,6 +159,11 @@ std::future<bool>
 grpc_factory::rem_server(uint32_t const srv_id, shared<grpc_factory> factory) {
    auto client = factory->create_client(std::to_string(factory->current_leader()));
    assert(client);
+   if (!client) {
+      std::promise<bool> p;
+      p.set_value(false);
+      return p.get_future();
+   }
 
    auto ctx = std::make_shared<client_ctx<uint32_t>>(srv_id, factory);
    auto handler = static_cast<cstn::rpc_handler>([ctx] (shared<cstn::resp_msg>& rsp,
@@ -170,6 +180,11 @@ std::future<bool>
 grpc_factory::client_request(shared<cstn::buffer> buf, shared<grpc_factory> factory) {
    auto client = factory->create_client(std::to_string(factory->current_leader()));
    assert(client);
+   if (!client) {
+      std::promise<bool> p;
+      p.set_value(false);
+      return p.get_future();
+   }
 
    auto ctx = std::make_shared<client_ctx<shared<cstn::buffer>>>(buf, factory);
    auto handler = static_cast<cstn::rpc_handler>([ctx] (shared<cstn::resp_msg>& rsp,
