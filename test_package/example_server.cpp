@@ -54,14 +54,14 @@ int main(int argc, char** argv) {
 
     // Run server.
     {
-        auto server = std::make_unique<raft_server>(new context(smgr,
+        auto server = std::make_shared<raft_server>(new context(smgr,
                     smachine,
                     listener,
                     l,
                     rpc_cli_factory,
                     scheduler,
                     params));
-        auto grpc_svc_ = std::make_unique<raft_core::simple_server>(std::move(server));
+        auto grpc_svc_ = std::make_unique<raft_core::simple_server>(server);
 
         auto grpc_server = std::unique_ptr<sds::grpc::GrpcServer>(sds::grpc::GrpcServer::make(
                                                                     server_address, 2, "", ""));

@@ -22,13 +22,13 @@ class GrpcServer;
 namespace raft_core {
 
 class grpc_server {
-    boxed<cstn::raft_server> _raft_server;
+    shared<cstn::raft_server> _raft_server;
 
  public:
-    explicit grpc_server(boxed<cstn::raft_server>&& raft_server) :
-        _raft_server(std::move(raft_server))
+    explicit grpc_server(shared<cstn::raft_server>& raft_server) :
+        _raft_server(raft_server)
      { }
-    ~grpc_server();
+    ~grpc_server() = default;
     grpc_server(const grpc_server&) = delete;
     grpc_server& operator=(const grpc_server&) = delete;
 
