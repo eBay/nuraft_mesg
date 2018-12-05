@@ -26,24 +26,30 @@ void cleanup(const std::string& prefix) {
     auto r = system(format(FMT_STRING("rm -rf {}"), prefix).data());
 }
 
-void send_message(uint32_t leader_id, std::string const& message) {
+int send_message(uint32_t leader_id, std::string const& message) {
     auto factory = std::make_shared<example_factory>(leader_id);
 
     auto buf = cornerstone::buffer::alloc(message.length()+1);
     buf->put(message.c_str());
     buf->pos(0);
 
-    if (!example_factory::client_request(buf, factory).get()) exit(-1);
+    int ret = example_factory::client_request(buf, factory).get() ? 0 : -1;
+    sds::grpc::GrpcAyncClientWorker::shutdown_all();
+    return ret;
 }
 
-void add_new_server(uint32_t leader_id, uint32_t srv_id) {
+int add_new_server(uint32_t leader_id, uint32_t srv_id) {
     auto factory = std::make_shared<example_factory>(leader_id);
-    if (!example_factory::add_server(srv_id, factory).get()) exit(-1);
+    int ret = example_factory::add_server(srv_id, factory).get() ? 0 : -1;
+    sds::grpc::GrpcAyncClientWorker::shutdown_all();
+    return ret;
 }
 
-void remove_server(int leader_id, int srv_id) {
+int remove_server(int leader_id, int srv_id) {
     auto factory = std::make_shared<example_factory>(leader_id);
-    if (!example_factory::rem_server(srv_id, factory).get()) exit(-1);
+    int ret = example_factory::rem_server(srv_id, factory).get() ? 0 : -1;
+    sds::grpc::GrpcAyncClientWorker::shutdown_all();
+    return ret;
 }
 
 int main(int argc, char** argv) {
@@ -65,10 +71,10 @@ int main(int argc, char** argv) {
     if (SDS_OPTIONS.count("echo")) {
         send_message(server_id, SDS_OPTIONS["echo"].as<std::string>());
     } else if (SDS_OPTIONS.count("add")) {
-        add_new_server(server_id, SDS_OPTIONS["add"].as<uint32_t>());
+        return add_new_server(server_id, SDS_OPTIONS["add"].as<uint32_t>());
 
     } else if (SDS_OPTIONS.count("remove")) {
-        remove_server(server_id, SDS_OPTIONS["remove"].as<uint32_t>());
+        return remove_server(server_id, SDS_OPTIONS["remove"].as<uint32_t>());
     } else {
         std::cout << SDS_PARSER.help({}) << std::endl;
     }
