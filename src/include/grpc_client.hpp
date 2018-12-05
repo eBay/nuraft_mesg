@@ -66,40 +66,14 @@ toResponse(RaftMessage const& raft_msg) {
    return message;
 }
 
-template<typename TSERVICE>
-class grpc_client :
-    public cstn::rpc_client,
-    public sds::grpc::GrpcAsyncClient
+class grpc_base_client :
+    public cstn::rpc_client
 {
  public:
     using handle_resp = std::function<void(RaftMessage&, ::grpc::Status&)>;
 
-    grpc_client(std::string const& addr,
-                std::string const& target_domain,
-                std::string const& ssl_cert,
-                int num_t) :
-        cstn::rpc_client(),
-        sds::grpc::GrpcAsyncClient(addr, target_domain, ssl_cert) {
-        if (!sds::grpc::GrpcAyncClientWorker::create_worker(worker_name, num_t)) {
-            throw std::system_error(ECONNABORTED, std::generic_category(), "Failed to create workers");
-        }
-    }
-
-    ~grpc_client() override = default;
-
-    bool init() override {
-        // Re-create channel only if current channel is busted.
-        if (!_stub || !is_connection_ready()) {
-            if (!sds::grpc::GrpcAsyncClient::init()) {
-                LOGERROR("Initializing client failed!");
-                return false;
-            }
-            _stub = sds::grpc::GrpcAsyncClient::make_stub<TSERVICE>(worker_name);
-        } else {
-            LOGDEBUGMOD(raft_core, "Channel looks fine, re-using");
-        }
-        return (!!_stub);
-    }
+    using cstn::rpc_client::rpc_client;
+    ~grpc_base_client() override = default;
 
     void send(shared<cstn::req_msg>& req, cstn::rpc_handler& complete) override {
         assert(req && complete);
@@ -132,9 +106,44 @@ class grpc_client :
    }
 
  protected:
-    typename ::sds::grpc::GrpcAsyncClient::AsyncStub<TSERVICE>::UPtr _stub;
-
     virtual void send(RaftMessage const& message, handle_resp complete) = 0;
+};
+
+template<typename TSERVICE>
+class grpc_client :
+    public grpc_base_client,
+    public sds::grpc::GrpcAsyncClient
+{
+ public:
+    grpc_client(std::string const& addr,
+                std::string const& target_domain,
+                std::string const& ssl_cert,
+                int num_t) :
+        grpc_base_client(),
+        sds::grpc::GrpcAsyncClient(addr, target_domain, ssl_cert) {
+        if (!sds::grpc::GrpcAyncClientWorker::create_worker(worker_name, num_t)) {
+            throw std::system_error(ECONNABORTED, std::generic_category(), "Failed to create workers");
+        }
+    }
+
+    ~grpc_client() override = default;
+
+    bool init() override {
+        // Re-create channel only if current channel is busted.
+        if (!_stub || !is_connection_ready()) {
+            if (!sds::grpc::GrpcAsyncClient::init()) {
+                LOGERROR("Initializing client failed!");
+                return false;
+            }
+            _stub = sds::grpc::GrpcAsyncClient::make_stub<TSERVICE>(worker_name);
+        } else {
+            LOGDEBUGMOD(raft_core, "Channel looks fine, re-using");
+        }
+        return (!!_stub);
+    }
+
+ protected:
+    typename ::sds::grpc::GrpcAsyncClient::AsyncStub<TSERVICE>::UPtr _stub;
 };
 
 }
