@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include <cornerstone.hxx>
 #include <sds_logging/logging.h>
 
@@ -26,16 +28,5 @@ using boxed = std::unique_ptr<T>;
 
 template<typename T>
 using shared = std::shared_ptr<T>;
-
-inline
-RCMsgBase*
-fromBaseRequest(cstn::msg_base const& rcbase) {
-   auto base = new RCMsgBase;
-   base->set_term(rcbase.get_term());
-   base->set_src(rcbase.get_src());
-   base->set_dest(rcbase.get_dst());
-   base->set_type(rcbase.get_type());
-   return base;
-}
 
 }

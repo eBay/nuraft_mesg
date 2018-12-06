@@ -5,10 +5,11 @@
 //      Brian Szmyd <bszmyd@ebay.com>
 //
 // Brief:
-//   grpc_server step function
+//   grpc_server step function and response transformations
 //
 
 #include "grpc_server.hpp"
+#include "utils.hpp"
 
 namespace raft_core {
 

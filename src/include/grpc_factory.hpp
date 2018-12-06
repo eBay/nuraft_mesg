@@ -1,72 +1,71 @@
+///
+// Copyright 2018 (c) eBay Corporation
+//
+// Authors:
+//      Brian Szmyd <bszmyd@ebay.com>
+//
+// Brief:
+//   Implements cornerstone's rpc_client_factory providing sds::grpc::GrpcAsyncClient
+//   inherited rpc_client instances sharing a common worker pool.
+
 #pragma once
 
 #include <future>
 #include <memory>
 #include <mutex>
-#include <string>
-
-#include <cornerstone.hxx>
-#include <sds_logging/logging.h>
 
 #include "common.hpp"
 
 SDS_LOGGING_DECL(raft_core)
 
-namespace grpc {
-struct ClientContext;
-}
-
 namespace raft_core {
 
-class grpc_factory : public cstn::rpc_client_factory {
+class grpc_factory :
+  public cstn::rpc_client_factory,
+  public std::enable_shared_from_this<grpc_factory>
+{
+    mutable std::mutex _leader_lock;
+    int32_t            _current_leader;
+    std::string        _worker_name;
+    std::mutex _client_lock;
+    std::map<std::string, std::shared_ptr<cstn::rpc_client>> _clients;
+
  public:
-   explicit grpc_factory(int32_t const current_leader) :
-         rpc_client_factory(),
-         _current_leader(current_leader)
-   { }
+    grpc_factory(int32_t const current_leader, int const cli_thread_count, std::string const& name);
+    ~grpc_factory() override = default;
 
-   ~grpc_factory() override = default;
+    std::string const& workerName() const { return _worker_name; }
 
-   int32_t current_leader() const                { std::lock_guard<std::mutex> lk(_leader_lock); return _current_leader; }
-   void update_leader(int32_t const leader)      { std::lock_guard<std::mutex> lk(_leader_lock); _current_leader = leader; }
+    int32_t current_leader() const                { std::lock_guard<std::mutex> lk(_leader_lock); return _current_leader; }
+    void update_leader(int32_t const leader)      { std::lock_guard<std::mutex> lk(_leader_lock); _current_leader = leader; }
 
-   cstn::ptr<cstn::rpc_client>
-   create_client(const std::string &client) override;
+    cstn::ptr<cstn::rpc_client>
+    create_client(const std::string &client) override;
 
-   virtual
-   std::error_condition
-   create_client(const std::string &client,
-                 cstn::ptr<cstn::rpc_client>&) = 0;
+    virtual
+    std::error_condition
+    create_client(const std::string &client, cstn::ptr<cstn::rpc_client>&) = 0;
 
-   virtual
-   std::error_condition
-   reinit_client(cstn::ptr<cstn::rpc_client>&) = 0;
+    virtual
+    std::error_condition
+    reinit_client(cstn::ptr<cstn::rpc_client>&) = 0;
 
-   // Construct and send an AddServer message to the cluster
-   static
-   std::future<bool>
-   add_server(uint32_t const srv_id, shared<grpc_factory> factory);
+    // Construct and send an AddServer message to the cluster
+    std::future<bool>
+    add_server(uint32_t const srv_id);
 
-   // Send a client request to the cluster
-   static
-   std::future<bool>
-   client_request(shared<cstn::buffer> buf, shared<grpc_factory> factory);
+    // Send a client request to the cluster
+    std::future<bool>
+    client_request(shared<cstn::buffer> buf);
 
-   // Construct and send a RemoveServer message to the cluster
-   static
-   std::future<bool>
-   rem_server(uint32_t const srv_id, shared<grpc_factory> factory);
+    // Construct and send a RemoveServer message to the cluster
+    std::future<bool>
+    rem_server(uint32_t const srv_id);
 
-   // Send a pre-made message to the cluster
-   static
-   std::future<bool>
-   cluster_request(shared<cstn::req_msg> msg, shared<grpc_factory> factory);
+    // Send a pre-made message to the cluster
+    std::future<bool>
+    cluster_request(shared<cstn::req_msg> msg);
 
- private:
-   mutable std::mutex _leader_lock;
-   int32_t            _current_leader;
-   std::mutex _client_lock;
-   std::map<std::string, std::shared_ptr<cstn::rpc_client>> _clients;
 };
 
 }
