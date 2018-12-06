@@ -36,15 +36,15 @@ class group_factory : public raft_core::grpc_factory {
    virtual std::string lookupEndpoint(std::string const& client) = 0;
 };
 
-class grpc_factory final : public raft_core::grpc_factory {
+class mesg_factory final : public raft_core::grpc_factory {
    shared<group_factory> _group_factory;
    group_name_t const    _group_name;
 
  public:
-   grpc_factory(shared<group_factory> g_factory,
+   mesg_factory(shared<group_factory> g_factory,
                 group_name_t const& grp_id,
                 uint32_t const current_leader) :
-         raft_core::grpc_factory(current_leader),
+         raft_core::grpc_factory(current_leader, 0, grp_id),
          _group_factory(g_factory),
          _group_name(grp_id)
    { }
