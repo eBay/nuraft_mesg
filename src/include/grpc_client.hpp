@@ -37,7 +37,6 @@ class grpc_client :
     public grpc_base_client,
     public sds::grpc::GrpcAsyncClient
 {
-    char const* _worker_name;
  public:
     grpc_client(std::string const& worker_name,
                 std::string const& addr,
@@ -65,6 +64,7 @@ class grpc_client :
     }
 
  protected:
+    char const* _worker_name;
     typename ::sds::grpc::GrpcAsyncClient::AsyncStub<TSERVICE>::UPtr _stub;
 };
 
