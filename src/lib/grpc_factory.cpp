@@ -118,8 +118,10 @@ grpc_factory::grpc_factory(int32_t const current_leader,
     _current_leader(current_leader),
     _worker_name(name)
 {
-    if (!sds::grpc::GrpcAyncClientWorker::create_worker(_worker_name.data(), cli_thread_count)) {
-        throw std::system_error(ENOTCONN, std::generic_category(), "Failed to create workers");
+    if (0 < cli_thread_count) {
+        if (!sds::grpc::GrpcAyncClientWorker::create_worker(_worker_name.data(), cli_thread_count)) {
+            throw std::system_error(ENOTCONN, std::generic_category(), "Failed to create workers");
+        }
     }
 }
 
