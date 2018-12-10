@@ -8,6 +8,8 @@
 //   grpc_factory static functions that makes for easy client creation.
 //
 
+#include <sds_grpc/client.h>
+
 #include "grpc_factory.hpp"
 
 namespace raft_core {
@@ -109,6 +111,20 @@ respHandler(shared<ContextType> ctx,
    client->send(msg, handler);
 }
 
+grpc_factory::grpc_factory(int32_t const current_leader,
+                           int const cli_thread_count,
+                           std::string const& name) :
+    rpc_client_factory(),
+    _current_leader(current_leader),
+    _worker_name(name)
+{
+    if (0 < cli_thread_count) {
+        if (!sds::grpc::GrpcAyncClientWorker::create_worker(_worker_name.data(), cli_thread_count)) {
+            throw std::system_error(ENOTCONN, std::generic_category(), "Failed to create workers");
+        }
+    }
+}
+
 cstn::ptr<cstn::rpc_client>
 grpc_factory::create_client(const std::string &client) {
     cstn::ptr<cstn::rpc_client> new_client;;
@@ -120,16 +136,16 @@ grpc_factory::create_client(const std::string &client) {
         if (!happened) {
             LOGDEBUGMOD(raft_core, "Re-creating client for {}", client);
             if (auto err = reinit_client(it->second); err) {
-              LOGERROR("Failed to re-initialize client {}: {}", client, err.message());
+                LOGERROR("Failed to re-initialize client {}: {}", client, err.message());
             } else {
-              new_client = it->second;
+                new_client = it->second;
             }
         } else {
-          if (auto err = create_client(client, it->second); err) {
-              LOGERROR("Failed to create client for {}: {}", client, err.message());
-          }  else {
-              new_client = it->second;
-          }
+            if (auto err = create_client(client, it->second); err) {
+                LOGERROR("Failed to create client for {}: {}", client, err.message());
+            }  else {
+                new_client = it->second;
+            }
         }
     }
     } // End of Protected section
@@ -137,8 +153,8 @@ grpc_factory::create_client(const std::string &client) {
 }
 
 std::future<bool>
-grpc_factory::add_server(uint32_t const srv_id, shared<grpc_factory> factory) {
-   auto client = factory->create_client(std::to_string(factory->current_leader()));
+grpc_factory::add_server(uint32_t const srv_id) {
+   auto client = create_client(std::to_string(current_leader()));
    assert(client);
    if (!client) {
       std::promise<bool> p;
@@ -146,7 +162,7 @@ grpc_factory::add_server(uint32_t const srv_id, shared<grpc_factory> factory) {
       return p.get_future();
    }
 
-   auto ctx = std::make_shared<client_ctx<uint32_t>>(srv_id, factory);
+   auto ctx = std::make_shared<client_ctx<uint32_t>>(srv_id, shared_from_this());
    auto handler = static_cast<cstn::rpc_handler>([ctx] (shared<cstn::resp_msg>& rsp,
                                                         shared<cstn::rpc_exception>& err) {
          respHandler(ctx, rsp, err);
@@ -158,8 +174,8 @@ grpc_factory::add_server(uint32_t const srv_id, shared<grpc_factory> factory) {
 }
 
 std::future<bool>
-grpc_factory::rem_server(uint32_t const srv_id, shared<grpc_factory> factory) {
-   auto client = factory->create_client(std::to_string(factory->current_leader()));
+grpc_factory::rem_server(uint32_t const srv_id) {
+   auto client = create_client(std::to_string(current_leader()));
    assert(client);
    if (!client) {
       std::promise<bool> p;
@@ -167,7 +183,7 @@ grpc_factory::rem_server(uint32_t const srv_id, shared<grpc_factory> factory) {
       return p.get_future();
    }
 
-   auto ctx = std::make_shared<client_ctx<uint32_t>>(srv_id, factory);
+   auto ctx = std::make_shared<client_ctx<uint32_t>>(srv_id, shared_from_this());
    auto handler = static_cast<cstn::rpc_handler>([ctx] (shared<cstn::resp_msg>& rsp,
                                                         shared<cstn::rpc_exception>& err) {
          respHandler(ctx, rsp, err);
@@ -179,8 +195,8 @@ grpc_factory::rem_server(uint32_t const srv_id, shared<grpc_factory> factory) {
 }
 
 std::future<bool>
-grpc_factory::client_request(shared<cstn::buffer> buf, shared<grpc_factory> factory) {
-   auto client = factory->create_client(std::to_string(factory->current_leader()));
+grpc_factory::client_request(shared<cstn::buffer> buf) {
+   auto client = create_client(std::to_string(current_leader()));
    assert(client);
    if (!client) {
       std::promise<bool> p;
@@ -188,7 +204,7 @@ grpc_factory::client_request(shared<cstn::buffer> buf, shared<grpc_factory> fact
       return p.get_future();
    }
 
-   auto ctx = std::make_shared<client_ctx<shared<cstn::buffer>>>(buf, factory);
+   auto ctx = std::make_shared<client_ctx<shared<cstn::buffer>>>(buf, shared_from_this());
    auto handler = static_cast<cstn::rpc_handler>([ctx] (shared<cstn::resp_msg>& rsp,
                                                         shared<cstn::rpc_exception>& err) {
          respHandler(ctx, rsp, err);

@@ -15,6 +15,7 @@ get_filename_component(PROTO_PATH ${FIRST_PROTO} DIRECTORY)
 include_directories(BEFORE include ${PROTO_PATH})
 
 set(LIBRARY_SOURCES
+            lib/grpc_client.cpp
             lib/grpc_factory.cpp
             lib/grpc_server.cpp
             ${PROTO_SRCS}
