@@ -79,7 +79,7 @@ msg_service::raftStep(RaftGroupMsg& request, RaftGroupMsg& response) {
 // We've hooked the gRPC server up to our "super-server", so we
 // do not need to bind the grpc_servers to anything...just piggy-backing
 // on their ::step() and transformations.
-class null_service : public raft_core::grpc_server {
+class null_service final : public raft_core::grpc_server {
  public:
     using raft_core::grpc_server::grpc_server;
     void associate(sds::grpc::GrpcServer*) override {};
@@ -95,7 +95,7 @@ msg_service::joinRaftGroup(group_name_t const& group_name) {
     if (_raft_servers.end() == it || !happened) return;
 
     cornerstone::context* ctx {nullptr};
-    if (auto err = _get_server_ctx(group_name, &ctx); err) {
+    if (auto err = _get_server_ctx(group_name, ctx); err) {
         LOGERRORMOD(sds_msg,
                     "Error during RAFT server creation on group {}: {}",
                     group_name,

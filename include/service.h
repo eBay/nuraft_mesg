@@ -16,7 +16,7 @@ namespace sds::messaging {
 template<typename T>
 using boxed = std::unique_ptr<T>;
 
-using get_server_ctx_cb = std::function<std::error_condition(group_name_t const&, cornerstone::context** ctx_out)>;
+using get_server_ctx_cb = std::function<std::error_condition(group_name_t const&, cornerstone::context*& ctx_out)>;
 using lock_type = std::shared_mutex;
 
 class msg_service

@@ -13,9 +13,7 @@ class messaging_client :
     using raft_core::grpc_client<Messaging>::grpc_client;
     ~messaging_client() override = default;
 
-    void send(raft_core::RaftMessage const &, handle_resp ) override {
-        throw std::runtime_error("Bad call!");
-    }
+    using raft_core::grpc_base_client::send;
 
     void send(RaftGroupMsg const &message, handle_resp complete) {
         auto group_compl =
@@ -25,6 +23,11 @@ class messaging_client :
         _stub->call_unary<RaftGroupMsg, RaftGroupMsg>(message,
                                                       &Messaging::StubInterface::AsyncRaftStep,
                                                       group_compl);
+    }
+
+ protected:
+    void send(raft_core::RaftMessage const &, handle_resp ) override {
+        throw std::runtime_error("Bad call!");
     }
 };
 
