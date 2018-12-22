@@ -14,10 +14,10 @@ class TestPackageConan(ConanFile):
 
     requires = (
             "gtest/1.8.1@bincrafters/stable",
-            "jungle_logstore/0.1.4@sds/testing",
+            "jsonformoderncpp/3.5.0@vthiery/stable",
+            "jungle_logstore/0.1.5@sds/testing",
             "OpenSSL/1.0.2q@conan/stable",
-            "picojson/1.3.0@oss/stable",
-            "sds_logging/3.4.1@sds/testing",
+            "sds_logging/3.4.2@sds/testing",
         )
 
     def build(self):
