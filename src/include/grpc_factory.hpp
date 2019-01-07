@@ -52,7 +52,7 @@ class grpc_factory :
 
     // Construct and send an AddServer message to the cluster
     std::future<bool>
-    add_server(uint32_t const srv_id);
+    add_server(uint32_t const srv_id, std::string const& srv_addr);
 
     // Send a client request to the cluster
     std::future<bool>

@@ -23,10 +23,6 @@ class RaftCoreGRPCConan(ConanFile):
         )
 
     requires = (
-            "boost_container/1.67.0@bincrafters/stable",
-            "gtest/1.8.1@bincrafters/stable",
-            "lzma/5.2.4@bincrafters/stable",
-            "OpenSSL/1.0.2q@conan/stable",
             "raft_core/2018.12.21@oss/testing",
             "sds_grpc/1.0.3@sds/testing",
             "sds_logging/3.5.2@sds/testing"
