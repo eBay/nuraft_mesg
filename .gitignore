@@ -4,3 +4,4 @@ test_package/build
 .idea/
 cmake-build*
 build/
+compile_commands*

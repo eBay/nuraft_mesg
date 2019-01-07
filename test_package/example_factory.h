@@ -18,6 +18,7 @@ struct example_factory : public raft_core::grpc_factory
     std::error_condition
     create_client(const std::string &client,
                   raft_core::shared<cornerstone::rpc_client>& raft_client) override {
+        LOGDEBUGMOD(raft_core, "Creating client for [{}]", client);
         auto const endpoint = format(FMT_STRING("127.0.0.1:{}"), 9000 + std::stol(client));
         LOGDEBUGMOD(raft_core, "Creating client for [{}] @ [{}]", client, endpoint);
 

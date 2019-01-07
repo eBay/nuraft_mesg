@@ -34,12 +34,12 @@ struct client_ctx {
 
 template<typename PayloadType>
 shared<cstn::req_msg>
-createMessage(PayloadType payload);
+createMessage(PayloadType payload, std::string const& srv_addr = "");
 
 template<>
 shared<cstn::req_msg>
-createMessage(uint32_t const srv_id) {
-   auto srv_addr = std::to_string(srv_id);
+createMessage(uint32_t const srv_id, std::string const& srv_addr) {
+   assert(!srv_addr.empty());
    auto srv_conf = cstn::srv_config(srv_id, srv_addr);
    auto log = std::make_shared<cstn::log_entry>(
       0,
@@ -53,7 +53,7 @@ createMessage(uint32_t const srv_id) {
 
 template<>
 shared<cstn::req_msg>
-createMessage(shared<cstn::buffer> buf) {
+createMessage(shared<cstn::buffer> buf, std::string const& ) {
    auto log = std::make_shared<cstn::log_entry>(0, buf);
    auto msg = std::make_shared<cstn::req_msg>(0, cstn::msg_type::client_request, 0, 1, 0, 0, 0);
    msg->log_entries().push_back(log);
@@ -62,7 +62,7 @@ createMessage(shared<cstn::buffer> buf) {
 
 template<>
 shared<cstn::req_msg>
-createMessage(int32_t const srv_id) {
+createMessage(int32_t const srv_id, std::string const& ) {
     auto buf = cstn::buffer::alloc(sizeof(srv_id));
     buf->put(srv_id);
     buf->pos(0);
@@ -153,7 +153,7 @@ grpc_factory::create_client(const std::string &client) {
 }
 
 std::future<bool>
-grpc_factory::add_server(uint32_t const srv_id) {
+grpc_factory::add_server(uint32_t const srv_id, std::string const& srv_addr) {
    auto client = create_client(std::to_string(current_leader()));
    assert(client);
    if (!client) {
@@ -168,7 +168,7 @@ grpc_factory::add_server(uint32_t const srv_id) {
          respHandler(ctx, rsp, err);
       });
 
-   auto msg = createMessage(srv_id);
+   auto msg = createMessage(srv_id, srv_addr);
    client->send(msg, handler);
    return ctx->future();
 }
