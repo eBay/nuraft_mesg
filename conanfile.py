@@ -4,24 +4,22 @@ from conans import ConanFile, CMake, tools
 
 class RaftCoreGRPCConan(ConanFile):
     name = "raft_core_grpc"
-    version = "0.7.2"
+    version = "0.7.3"
 
     license = "Apache 2.0"
     url = "https://github.corp.ebay.com/SDS/raft_core_grpc"
     description = "A gRPC service for raft_core"
 
-    settings = "arch", "os", "compiler", "build_type"
+    settings = "arch", "os", "compiler", "build_type", "sanitize"
     options = {
         "shared": ['True', 'False'],
         "fPIC": ['True', 'False'],
         "coverage": ['True', 'False'],
-        "sanitize": ['True', 'False'],
         }
     default_options = (
         'shared=False',
         'fPIC=True',
         'coverage=False',
-        'sanitize=False',
         )
 
     requires = (
@@ -30,8 +28,8 @@ class RaftCoreGRPCConan(ConanFile):
             "lzma/5.2.4@bincrafters/stable",
             "OpenSSL/1.0.2q@conan/stable",
             "raft_core/2018.12.21@oss/testing",
-            "sds_grpc/1.0.2@sds/testing",
-            "sds_logging/3.4.2@sds/testing"
+            "sds_grpc/1.0.3@sds/testing",
+            "sds_logging/3.5.2@sds/testing"
         )
 
     generators = "cmake"
@@ -39,10 +37,10 @@ class RaftCoreGRPCConan(ConanFile):
     exports_sources = "CMakeLists.txt", "cmake/*", "src/*"
 
     def configure(self):
-        if self.settings.build_type == "Debug" and self.options.coverage == "False":
-            self.options.sanitize = True
         if not self.settings.compiler == "gcc":
             del self.options.coverage
+        elif self.settings.sanitize != None:
+            self.options.coverage = 'False'
 
     def build(self):
         cmake = CMake(self)
@@ -52,13 +50,11 @@ class RaftCoreGRPCConan(ConanFile):
                        'MEMORY_SANITIZER_ON': 'OFF'}
         test_target = None
 
-        if self.settings.compiler == "gcc":
-            if self.options.coverage == 'True':
-                definitions['CONAN_BUILD_COVERAGE'] = 'ON'
-                test_target = 'coverage'
-
-        if self.options.sanitize == 'True':
+        if self.settings.sanitize != None:
             definitions['MEMORY_SANITIZER_ON'] = 'ON'
+        elif self.options.coverage == 'True':
+            definitions['CONAN_BUILD_COVERAGE'] = 'ON'
+            test_target = 'coverage'
 
         cmake.configure(defs=definitions)
         cmake.build()
@@ -76,11 +72,10 @@ class RaftCoreGRPCConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = tools.collect_libs(self)
-        if (self.options.sanitize) :
+        if self.settings.sanitize != None:
             self.cpp_info.sharedlinkflags.append("-fsanitize=address")
             self.cpp_info.exelinkflags.append("-fsanitize=address")
             self.cpp_info.sharedlinkflags.append("-fsanitize=undefined")
             self.cpp_info.exelinkflags.append("-fsanitize=undefined")
-        if self.settings.compiler == "gcc":
-            if self.options.coverage == 'True':
-                self.cpp_info.libs.append('gcov')
+        elif self.options.coverage == 'True':
+            self.cpp_info.libs.append('gcov')
