@@ -64,6 +64,11 @@ class group_client :
 };
 
 
+std::string
+mesg_factory::lookup_address(int32_t const srv_id) {
+    return _group_factory->lookup_address(srv_id);
+}
+
 std::error_condition
 mesg_factory::create_client(const std::string &client, cstn::ptr<cstn::rpc_client>& raft_client) {
     // Re-direct this call to a global factory so we can re-use clients to the same endpoints
