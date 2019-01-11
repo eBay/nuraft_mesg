@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <string>
+
 #include <sds_logging/logging.h>
 #include <raft_core_grpc/grpc_factory.hpp>
 #include <raft_core_grpc/simple_client.hpp>
@@ -26,6 +28,11 @@ struct example_factory : public raft_core::grpc_factory
         return (!raft_client) ?
             std::make_error_condition(std::errc::connection_aborted) :
             std::error_condition();
+    }
+
+    std::string
+    lookup_address(int32_t const srv_id) {
+        return std::to_string(srv_id);
     }
 
     std::error_condition

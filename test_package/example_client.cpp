@@ -9,6 +9,7 @@
 #include <cassert>
 
 #include <cornerstone.hxx>
+#include <sds_options/options.h>
 
 #include "example_factory.h"
 
