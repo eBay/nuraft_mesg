@@ -9,6 +9,7 @@
 
 #include <raft_core_grpc/simple_server.hpp>
 #include <sds_logging/logging.h>
+#include <sds_options/options.h>
 
 #include "example_factory.h"
 #include "example_logger.h"

@@ -99,7 +99,8 @@ respHandler(shared<ContextType> ctx,
    // Not accepted: means that `get_dst()` is a new leader.
    LOGDEBUGMOD(raft_core, "Updating leader from {} to {}", factory->current_leader(), rsp->get_dst());
    factory->update_leader(rsp->get_dst());
-   auto client = factory->create_client(std::to_string(rsp->get_dst()));
+   auto const client_address = factory->lookup_address(rsp->get_dst());
+   auto client = factory->create_client(client_address);
 
    // We'll try again by forwarding the message
    auto handler = static_cast<cstn::rpc_handler>([ctx] (shared<cstn::resp_msg>& rsp,

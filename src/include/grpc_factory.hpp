@@ -47,6 +47,10 @@ class grpc_factory :
     create_client(const std::string &client, cstn::ptr<cstn::rpc_client>&) = 0;
 
     virtual
+    std::string
+    lookup_address(int32_t srv_id) = 0;
+
+    virtual
     std::error_condition
     reinit_client(cstn::ptr<cstn::rpc_client>&) = 0;
 
