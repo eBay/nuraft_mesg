@@ -7,6 +7,10 @@ RaftCoreGRPC is a gRPC service for [raft_core](https://github.corp.ebay.com/nukv
 This project provides a custom RPC implementation for gRPC to raft_core as an alternative
 to the internal ASIO implementation.
 
+## Changes
+
+See the [Changelog](CHANGELOG.md) for release information.
+
 ## Usage
 
 This library only provides the RPC service for raft_core. It provides the following:
