@@ -41,10 +41,8 @@ class mesg_factory final : public raft_core::grpc_factory {
    group_name_t const    _group_name;
 
  public:
-   mesg_factory(shared<group_factory> g_factory,
-                group_name_t const& grp_id,
-                uint32_t const current_leader) :
-         raft_core::grpc_factory(current_leader, 0, grp_id),
+   mesg_factory(shared<group_factory> g_factory, group_name_t const& grp_id) :
+         raft_core::grpc_factory(0, grp_id),
          _group_factory(g_factory),
          _group_name(grp_id)
    { }
@@ -53,9 +51,6 @@ class mesg_factory final : public raft_core::grpc_factory {
 
    std::error_condition
    create_client(const std::string &client, cstn::ptr<cstn::rpc_client>& rpc_ptr) override;
-
-   std::string
-   lookup_address(int32_t srv_id) override;
 
    std::error_condition
    reinit_client(raft_core::shared<cornerstone::rpc_client>& raft_client) override;
