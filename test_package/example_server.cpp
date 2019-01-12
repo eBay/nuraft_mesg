@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
         .with_rpc_failure_backoff(50);
 
     ptr<logger> l = std::make_shared<sds_logger>();
-    ptr<rpc_client_factory> rpc_cli_factory = std::make_shared<example_factory>(server_id, 2, server_address);
+    ptr<rpc_client_factory> rpc_cli_factory = std::make_shared<example_factory>(2, server_address);
     ptr<asio_service> asio_svc_ = std::make_shared<asio_service>();
     ptr<delayed_task_scheduler> scheduler = std::static_pointer_cast<delayed_task_scheduler>(asio_svc_);
     ptr<rpc_listener> listener;

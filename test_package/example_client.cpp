@@ -28,27 +28,30 @@ void cleanup(const std::string& prefix) {
 }
 
 int send_message(uint32_t leader_id, std::string const& message) {
-    auto factory = std::make_shared<example_factory>(leader_id, 2, "raft_client");
+    auto factory = std::make_shared<example_factory>(2, "raft_client");
+    auto const dest_cfg = cornerstone::srv_config(leader_id, std::to_string(leader_id));
 
     auto buf = cornerstone::buffer::alloc(message.length()+1);
     buf->put(message.c_str());
     buf->pos(0);
 
-    int ret = factory->client_request(buf).get() ? 0 : -1;
+    int ret = factory->client_request(buf, dest_cfg).get() ? 0 : -1;
     sds::grpc::GrpcAyncClientWorker::shutdown_all();
     return ret;
 }
 
 int add_new_server(uint32_t leader_id, uint32_t srv_id) {
-    auto factory = std::make_shared<example_factory>(leader_id, 2, "raft_client");
-    int ret = factory->add_server(srv_id, fmt::format(FMT_STRING("{}"),srv_id)).get() ? 0 : -1;
+    auto factory = std::make_shared<example_factory>(2, "raft_client");
+    auto const dest_cfg = cornerstone::srv_config(leader_id, std::to_string(leader_id));
+    int ret = factory->add_server(srv_id, fmt::format(FMT_STRING("{}"),srv_id), dest_cfg).get() ? 0 : -1;
     sds::grpc::GrpcAyncClientWorker::shutdown_all();
     return ret;
 }
 
 int remove_server(int leader_id, int srv_id) {
-    auto factory = std::make_shared<example_factory>(leader_id, 2, "raft_client");
-    int ret = factory->rem_server(srv_id).get() ? 0 : -1;
+    auto factory = std::make_shared<example_factory>(2, "raft_client");
+    auto const dest_cfg = cornerstone::srv_config(leader_id, std::to_string(leader_id));
+    int ret = factory->rem_server(srv_id, dest_cfg).get() ? 0 : -1;
     sds::grpc::GrpcAyncClientWorker::shutdown_all();
     return ret;
 }

@@ -10,13 +10,19 @@
 
 #include <sds_grpc/client.h>
 
+#include "grpc_client.hpp"
 #include "grpc_factory.hpp"
 
 namespace raft_core {
 
 template<typename Payload>
 struct client_ctx {
-   client_ctx(Payload payload, shared<grpc_factory> factory) :
+   int32_t              _cur_dest;
+   std::string const    _new_srv_addr;
+
+   client_ctx(Payload payload, shared<grpc_factory> factory, int32_t dest, std::string const& new_srv_addr = "") :
+      _cur_dest(dest),
+      _new_srv_addr(new_srv_addr),
       _payload(payload),
       _cli_factory(factory)
    { }
@@ -86,7 +92,7 @@ respHandler(shared<ContextType> ctx,
       LOGDEBUGMOD(raft_core, "Accepted response");
       ctx->set(true);
       return;
-   } else if (factory->current_leader() == rsp->get_dst()) {
+   } else if (ctx->_cur_dest == rsp->get_dst()) {
       LOGWARN("Request ignored");
       ctx->set(false);
       return;
@@ -97,10 +103,13 @@ respHandler(shared<ContextType> ctx,
    }
 
    // Not accepted: means that `get_dst()` is a new leader.
-   LOGDEBUGMOD(raft_core, "Updating leader from {} to {}", factory->current_leader(), rsp->get_dst());
-   factory->update_leader(rsp->get_dst());
-   auto const client_address = factory->lookup_address(rsp->get_dst());
-   auto client = factory->create_client(client_address);
+   auto gresp = std::dynamic_pointer_cast<grpc_resp>(rsp);
+   LOGDEBUGMOD(raft_core, "Updating destination from {} to {}[{}]",
+               ctx->_cur_dest,
+               rsp->get_dst(),
+               gresp->dest_addr);
+   ctx->_cur_dest = rsp->get_dst();
+   auto client = factory->create_client(gresp->dest_addr);
 
    // We'll try again by forwarding the message
    auto handler = static_cast<cstn::rpc_handler>([ctx] (shared<cstn::resp_msg>& rsp,
@@ -108,15 +117,13 @@ respHandler(shared<ContextType> ctx,
          respHandler(ctx, rsp, err);
       });
 
-   auto msg = createMessage(ctx->payload());
+   LOGDEBUGMOD(raft_core, "Creating new message: {}", ctx->_new_srv_addr);
+   auto msg = createMessage(ctx->payload(), ctx->_new_srv_addr);
    client->send(msg, handler);
 }
 
-grpc_factory::grpc_factory(int32_t const current_leader,
-                           int const cli_thread_count,
-                           std::string const& name) :
+grpc_factory::grpc_factory(int const cli_thread_count, std::string const& name) :
     rpc_client_factory(),
-    _current_leader(current_leader),
     _worker_name(name)
 {
     if (0 < cli_thread_count) {
@@ -154,9 +161,8 @@ grpc_factory::create_client(const std::string &client) {
 }
 
 std::future<bool>
-grpc_factory::add_server(uint32_t const srv_id, std::string const& srv_addr) {
-   auto const client_address = lookup_address(current_leader());
-   auto client = create_client(client_address);
+grpc_factory::add_server(uint32_t const srv_id, std::string const& srv_addr, cstn::srv_config const& dest_cfg) {
+   auto client = create_client(dest_cfg.get_endpoint());
    assert(client);
    if (!client) {
       std::promise<bool> p;
@@ -164,7 +170,7 @@ grpc_factory::add_server(uint32_t const srv_id, std::string const& srv_addr) {
       return p.get_future();
    }
 
-   auto ctx = std::make_shared<client_ctx<uint32_t>>(srv_id, shared_from_this());
+   auto ctx = std::make_shared<client_ctx<uint32_t>>(srv_id, shared_from_this(), dest_cfg.get_id(), srv_addr);
    auto handler = static_cast<cstn::rpc_handler>([ctx] (shared<cstn::resp_msg>& rsp,
                                                         shared<cstn::rpc_exception>& err) {
          respHandler(ctx, rsp, err);
@@ -176,9 +182,8 @@ grpc_factory::add_server(uint32_t const srv_id, std::string const& srv_addr) {
 }
 
 std::future<bool>
-grpc_factory::rem_server(uint32_t const srv_id) {
-   auto const client_address = lookup_address(current_leader());
-   auto client = create_client(client_address);
+grpc_factory::rem_server(uint32_t const srv_id, cstn::srv_config const& dest_cfg) {
+   auto client = create_client(dest_cfg.get_endpoint());
    assert(client);
    if (!client) {
       std::promise<bool> p;
@@ -186,7 +191,7 @@ grpc_factory::rem_server(uint32_t const srv_id) {
       return p.get_future();
    }
 
-   auto ctx = std::make_shared<client_ctx<uint32_t>>(srv_id, shared_from_this());
+   auto ctx = std::make_shared<client_ctx<uint32_t>>(srv_id, shared_from_this(), dest_cfg.get_id());
    auto handler = static_cast<cstn::rpc_handler>([ctx] (shared<cstn::resp_msg>& rsp,
                                                         shared<cstn::rpc_exception>& err) {
          respHandler(ctx, rsp, err);
@@ -198,9 +203,8 @@ grpc_factory::rem_server(uint32_t const srv_id) {
 }
 
 std::future<bool>
-grpc_factory::client_request(shared<cstn::buffer> buf) {
-   auto const client_address = lookup_address(current_leader());
-   auto client = create_client(client_address);
+grpc_factory::client_request(shared<cstn::buffer> buf, cstn::srv_config const& dest_cfg) {
+   auto client = create_client(dest_cfg.get_endpoint());
    assert(client);
    if (!client) {
       std::promise<bool> p;
@@ -208,7 +212,7 @@ grpc_factory::client_request(shared<cstn::buffer> buf) {
       return p.get_future();
    }
 
-   auto ctx = std::make_shared<client_ctx<shared<cstn::buffer>>>(buf, shared_from_this());
+   auto ctx = std::make_shared<client_ctx<shared<cstn::buffer>>>(buf, shared_from_this(), dest_cfg.get_id());
    auto handler = static_cast<cstn::rpc_handler>([ctx] (shared<cstn::resp_msg>& rsp,
                                                         shared<cstn::rpc_exception>& err) {
          respHandler(ctx, rsp, err);

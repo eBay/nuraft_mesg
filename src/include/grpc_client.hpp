@@ -18,6 +18,15 @@
 
 namespace raft_core {
 
+class grpc_resp : public cstn::resp_msg
+{
+ public:
+    using cstn::resp_msg::resp_msg;
+    ~grpc_resp() override = default;
+
+    std::string dest_addr;
+};
+
 class grpc_base_client : public cstn::rpc_client
 {
  public:

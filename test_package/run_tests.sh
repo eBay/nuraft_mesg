@@ -6,7 +6,7 @@ LOG_MODS="raft_core"
 CLIENT_VERBOSITY=1
 SERVER_VERBOSITY=1
 
-CLIENT_CLI_OPTS="-sv ${CLIENT_VERBOSITY} --log_mods ${LOG_MODS}"
+CLIENT_CLI_OPTS="-csv ${CLIENT_VERBOSITY} --log_mods ${LOG_MODS}"
 SERVER_CLI_OPTS="--flush_every 1 -sv ${SERVER_VERBOSITY} --log_mods ${LOG_MODS}"
 
 SERVER_COUNT=4
@@ -40,9 +40,9 @@ echo "[          ] Settling group"
 sleep 3
 
 echo "[          ] Writing Message"
-./bin/raft_client ${CLIENT_CLI_OPTS} -m 'test::message'
+./bin/raft_client ${CLIENT_CLI_OPTS} -m 'test::message' --server 1
 echo "[          ] Adding Server $((${SERVER_COUNT} - 1))"
-./bin/raft_client ${CLIENT_CLI_OPTS} --add $((${SERVER_COUNT} - 1))
+./bin/raft_client ${CLIENT_CLI_OPTS} --add $((${SERVER_COUNT} - 1)) --server 2
 echo "[          ] Letting new member sync"
 sleep 3
 echo "[          ] Counting Server Processes"

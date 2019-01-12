@@ -1,5 +1,5 @@
 # ##########   #######   ############
-FROM ecr.vip.ebayc3.com/sds/sds_cpp_base:1.18
+FROM ecr.vip.ebayc3.com/sds/sds_cpp_base:1.19
 LABEL description="Automated SDS compilation"
 
 ARG CONAN_CHANNEL
@@ -19,7 +19,6 @@ COPY LICENSE.md ${SOURCE_PATH}
 
 RUN conan create -pr debug /tmp/source "${CONAN_USER}"/"${CONAN_CHANNEL}"
 RUN conan create /tmp/source "${CONAN_USER}"/"${CONAN_CHANNEL}"
-RUN conan create -pr bionic_nosanitize /tmp/source "${CONAN_USER}"/"${CONAN_CHANNEL}"
 
 CMD set -eux; \
     eval $(grep 'name =' ${SOURCE_PATH}conanfile.py | sed 's, ,,g' | sed 's,name,PKG_NAME,'); \

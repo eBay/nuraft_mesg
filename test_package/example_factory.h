@@ -30,11 +30,6 @@ struct example_factory : public raft_core::grpc_factory
             std::error_condition();
     }
 
-    std::string
-    lookup_address(int32_t const srv_id) {
-        return std::to_string(srv_id);
-    }
-
     std::error_condition
     reinit_client(raft_core::shared<cornerstone::rpc_client>& raft_client) override {
         assert(raft_client);

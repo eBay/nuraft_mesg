@@ -44,12 +44,15 @@ toResponse(RaftMessage const& raft_msg) {
    if (!raft_msg.has_rc_response()) return nullptr;
    auto const& base = raft_msg.base();
    auto const& resp = raft_msg.rc_response();
-   auto message = std::make_shared<cstn::resp_msg>(base.term(),
-                                                   (cstn::msg_type)base.type(),
-                                                   base.src(),
-                                                   base.dest(),
-                                                   resp.next_index(),
-                                                   resp.accepted());
+   auto message = std::make_shared<grpc_resp>(base.term(),
+                                              (cstn::msg_type)base.type(),
+                                              base.src(),
+                                              base.dest(),
+                                              resp.next_index(),
+                                              resp.accepted());
+   if (!resp.accepted()) {
+       message->dest_addr = resp.dest_addr();
+   }
    if (0 < resp.context().length()) {
       auto ctx_buffer = cstn::buffer::alloc(resp.context().length());
       memcpy(ctx_buffer->data(), resp.context().data(), resp.context().length());
