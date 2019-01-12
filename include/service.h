@@ -25,8 +25,6 @@ class msg_service
    lock_type                                                    _raft_servers_lock;
    std::map<group_name_t, shared<raft_core::grpc_server>>       _raft_servers;
 
-   void joinRaftGroup(int32_t srv_id, group_name_t const& group_name);
-
  public:
    explicit msg_service(get_server_ctx_cb get_server_ctx) :
        _get_server_ctx(get_server_ctx)
@@ -43,6 +41,8 @@ class msg_service
 
    void createRaftGroup(group_name_t const& group_name)
    { joinRaftGroup(0, group_name); }
+
+   void joinRaftGroup(int32_t srv_id, group_name_t const& group_name);
 };
 
 }
