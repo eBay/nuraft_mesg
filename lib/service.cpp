@@ -51,7 +51,7 @@ msg_service::raftStep(RaftGroupMsg& request, RaftGroupMsg& response) {
             );
 
     if (cornerstone::join_cluster_request == base.type()) {
-        joinRaftGroup(group_name);
+        joinRaftGroup(base.dest(), group_name);
     }
 
     shared<raft_core::grpc_server> server;
@@ -87,7 +87,7 @@ class null_service final : public raft_core::grpc_server {
 };
 
 void
-msg_service::joinRaftGroup(group_name_t const& group_name) {
+msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_name) {
     LOGINFOMOD(sds_msg, "Joining RAFT group: {}", group_name);
 
     std::unique_lock<lock_type> lck(_raft_servers_lock);
@@ -95,7 +95,7 @@ msg_service::joinRaftGroup(group_name_t const& group_name) {
     if (_raft_servers.end() == it || !happened) return;
 
     cornerstone::context* ctx {nullptr};
-    if (auto err = _get_server_ctx(group_name, ctx); err) {
+    if (auto err = _get_server_ctx(srv_id, group_name, ctx); err) {
         LOGERRORMOD(sds_msg,
                     "Error during RAFT server creation on group {}: {}",
                     group_name,
