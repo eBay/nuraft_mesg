@@ -16,5 +16,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Upgraded [sds_logging](https://github.corp.ebay.com/SDS/sds_logging) to 3.6.0
 
-[Unreleased]: https://github.corp.ebay.com/SDS/access-mgr/compare/testing/v0.x...develop
+[Unreleased]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/testing/v0.x...develop
 [0.7.4]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/8a5a11a...testing/v0.x
