@@ -155,7 +155,8 @@ grpc_factory::create_client(const std::string &client) {
 
 std::future<bool>
 grpc_factory::add_server(uint32_t const srv_id, std::string const& srv_addr) {
-   auto client = create_client(std::to_string(current_leader()));
+   auto const client_address = lookup_address(current_leader());
+   auto client = create_client(client_address);
    assert(client);
    if (!client) {
       std::promise<bool> p;
@@ -176,7 +177,8 @@ grpc_factory::add_server(uint32_t const srv_id, std::string const& srv_addr) {
 
 std::future<bool>
 grpc_factory::rem_server(uint32_t const srv_id) {
-   auto client = create_client(std::to_string(current_leader()));
+   auto const client_address = lookup_address(current_leader());
+   auto client = create_client(client_address);
    assert(client);
    if (!client) {
       std::promise<bool> p;
@@ -197,7 +199,8 @@ grpc_factory::rem_server(uint32_t const srv_id) {
 
 std::future<bool>
 grpc_factory::client_request(shared<cstn::buffer> buf) {
-   auto client = create_client(std::to_string(current_leader()));
+   auto const client_address = lookup_address(current_leader());
+   auto client = create_client(client_address);
    assert(client);
    if (!client) {
       std::promise<bool> p;
