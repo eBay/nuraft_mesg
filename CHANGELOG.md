@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### None
+
+## [0.8.1] - 2019.01.15
 ### Added
 - New `raft_server()` call on _grpc_server_ to get underlying server.
 
@@ -32,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded [sds_logging](https://github.corp.ebay.com/SDS/sds_logging) to 3.6.0
 
 [Unreleased]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/testing/v0.x...develop
-[0.8.0]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/5e8915d...testing/v0.x
+[0.8.1]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/d12747d...testing/v0.x
+[0.8.0]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/5e8915d...d12747d
 [0.7.5]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/ebcee31...5e8915d
 [0.7.4]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/8a5a11a...ebcee31
