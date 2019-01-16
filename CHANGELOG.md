@@ -5,14 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### None
+### Changed
+- FIX: Return no address if srv_id is not found in raft_server config.
 
 ## [0.8.1] - 2019.01.15
 ### Added
 - New `raft_server()` call on _grpc_server_ to get underlying server.
-
-### Changed
-- FIX: Return no address if srv_id is not found in raft_server config.
 
 ## [0.8.0] - 2019.01.12
 ### Added
