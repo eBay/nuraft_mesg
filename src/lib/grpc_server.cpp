@@ -64,7 +64,10 @@ grpc_server::step(RaftMessage& request, RaftMessage& reply) {
     reply.set_allocated_base(fromBaseRequest(*resp));
     reply.set_allocated_rc_response(fromRCResponse(*resp));
     if (!resp->get_accepted()) {
-        reply.mutable_rc_response()->set_dest_addr(_raft_server->get_srv_config(reply.base().dest())->get_endpoint());
+        auto const srv_conf = _raft_server->get_srv_config(reply.base().dest());
+        if (srv_conf) {
+            reply.mutable_rc_response()->set_dest_addr(srv_conf->get_endpoint());
+        }
     }
     return ::grpc::Status();
 }

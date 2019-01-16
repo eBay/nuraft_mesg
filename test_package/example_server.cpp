@@ -41,11 +41,11 @@ int main(int argc, char** argv) {
     // Parameters.
     raft_params* params(new raft_params());
     (*params)
-        .with_election_timeout_lower(100)
-        .with_election_timeout_upper(200)
-        .with_hb_interval(100)
-        .with_max_append_size(100)
-        .with_rpc_failure_backoff(50);
+        .with_election_timeout_lower(400)
+        .with_election_timeout_upper(800)
+        .with_hb_interval(200)
+        .with_max_append_size(500)
+        .with_rpc_failure_backoff(100);
 
     ptr<logger> l = std::make_shared<sds_logger>();
     ptr<rpc_client_factory> rpc_cli_factory = std::make_shared<example_factory>(2, server_address);

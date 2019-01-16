@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - New `raft_server()` call on _grpc_server_ to get underlying server.
 
+### Changed
+- FIX: Return no address if srv_id is not found in raft_server config.
+
 ## [0.8.0] - 2019.01.12
 ### Added
 - Factory requests now require a `cornerstone::srv_config` for the intial client creation.

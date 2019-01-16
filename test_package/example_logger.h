@@ -9,6 +9,8 @@
 
 #include <sds_logging/logging.h>
 
+SDS_LOGGING_DECL(raft_core)
+
 struct sds_logger : ::cornerstone::logger {
     void debug(const std::string& log_line) override {
         LOGDEBUG("{}", log_line);
@@ -36,12 +38,12 @@ struct sds_logger : ::cornerstone::logger {
                      size_t line_number,
                      const std::string& log_line) override {
         switch(level) {
-        case 1: { LOGCRITICAL("{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
-        case 2: { LOGERROR("{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
-        case 3: { LOGWARN("{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
-        case 4: { LOGINFO("{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
-        case 5: { LOGDEBUG("{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
-        default: { LOGTRACE("{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
+        case 1: { LOGCRITICALMOD(raft_core, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
+        case 2: { LOGERRORMOD(raft_core, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
+        case 3: { LOGWARNMOD(raft_core, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
+        case 4: { LOGINFOMOD(raft_core, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
+        case 5: { LOGDEBUGMOD(raft_core, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
+        default: { LOGTRACEMOD(raft_core, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
         }
     }
 };

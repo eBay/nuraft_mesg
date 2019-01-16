@@ -27,13 +27,13 @@ jsonObjectFromFile(std::string const& filename, json& json_object) {
 
 std::error_condition
 loadConfigFile(json& config_map, int32_t const _srv_id) {
-   auto const config_file = fmt::format(FMT_STRING("s{}.config"), _srv_id);
+   auto const config_file = fmt::format(FMT_STRING("s{}.store/config.json"), _srv_id);
    return jsonObjectFromFile(config_file, config_map);
 }
 
 std::error_condition
 loadStateFile(json& state_map, int32_t const _srv_id) {
-   auto const state_file = fmt::format(FMT_STRING("s{}.state"), _srv_id);
+   auto const state_file = fmt::format(FMT_STRING("s{}.store/state.json"), _srv_id);
    return jsonObjectFromFile(state_file, state_map);
 }
 
@@ -90,7 +90,7 @@ simple_state_mgr::simple_state_mgr(int32_t srv_id)
 
 cs::ptr<cs::cluster_config>
 simple_state_mgr::load_config() {
-   LOGDEBUG("Loading config for", _srv_id);
+   LOGDEBUG("Loading config for {}", _srv_id);
    json config_map;
    if (auto err = loadConfigFile(config_map, _srv_id); !err) {
       return fromClusterConfig(config_map);
@@ -123,7 +123,7 @@ simple_state_mgr::read_state() {
 
 void
 simple_state_mgr::save_config(const cs::cluster_config& config) {
-   auto const config_file = format(FMT_STRING("s{}.config"), _srv_id);
+   auto const config_file = format(FMT_STRING("s{}.store/config.json"), _srv_id);
    auto json_obj = json {
        { "log_idx", config.get_log_idx() },
        { "prev_log_idx", config.get_prev_log_idx() },
@@ -143,7 +143,7 @@ simple_state_mgr::save_config(const cs::cluster_config& config) {
 
 void
 simple_state_mgr::save_state(const cs::srv_state& state) {
-   auto const state_file = fmt::format(FMT_STRING("s{}.state"), _srv_id);
+   auto const state_file = fmt::format(FMT_STRING("s{}.store/state.json"), _srv_id);
    auto json_obj = json{
        { "term", state.get_term() },
        { "voted_for", state.get_voted_for() }
