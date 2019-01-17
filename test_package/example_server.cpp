@@ -44,7 +44,7 @@ int main(int argc, char** argv) {
         .with_election_timeout_lower(400)
         .with_election_timeout_upper(800)
         .with_hb_interval(200)
-        .with_max_append_size(500)
+        .with_max_append_size(50)
         .with_rpc_failure_backoff(100);
 
     ptr<logger> l = std::make_shared<sds_logger>();

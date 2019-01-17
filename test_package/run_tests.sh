@@ -27,7 +27,7 @@ do
 done
 
 echo "[          ] Settling members"
-sleep 3
+sleep 4
 
 for i in $(seq 1 $((${SERVER_COUNT} - 2)))
 do
