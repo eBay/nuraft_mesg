@@ -2,7 +2,7 @@
 
 set -eu
 export ASAN_OPTIONS=detect_leaks=0
-LOG_MODS="raft_core"
+LOG_MODS="raft_core:2"
 CLIENT_VERBOSITY=1
 SERVER_VERBOSITY=1
 
@@ -27,7 +27,7 @@ do
 done
 
 echo "[          ] Settling members"
-sleep 4
+sleep 5
 
 for i in $(seq 1 $((${SERVER_COUNT} - 2)))
 do
@@ -37,14 +37,13 @@ do
 done
 
 echo "[          ] Settling group"
-sleep 3
 
 echo "[          ] Writing Message"
 ./bin/raft_client ${CLIENT_CLI_OPTS} -m 'test::message' --server 1
 echo "[          ] Adding Server $((${SERVER_COUNT} - 1))"
 ./bin/raft_client ${CLIENT_CLI_OPTS} --add $((${SERVER_COUNT} - 1)) --server 2
 echo "[          ] Letting new member sync"
-sleep 3
+sleep 5
 echo "[          ] Counting Server Processes"
 alive_servers="$(ps -ef | grep -E '\./bin/raft_server' | grep -v grep | wc -l)"
 

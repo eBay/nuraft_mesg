@@ -13,23 +13,24 @@ SDS_LOGGING_DECL(raft_core)
 
 struct sds_logger : ::cornerstone::logger {
     void debug(const std::string& log_line) override {
-        LOGDEBUG("{}", log_line);
+        LOGDEBUGMOD(raft_core, "{}", log_line);
     }
 
     void info(const std::string& log_line) override {
-        LOGINFO("{}", log_line);
+        LOGINFOMOD(raft_core, "{}", log_line);
     }
 
     void warn(const std::string& log_line) override {
-        LOGWARN("{}", log_line);
+        LOGWARNMOD(raft_core, "{}", log_line);
     }
 
     void err(const std::string& log_line) override {
-       LOGERROR("{}", log_line);
+       LOGERRORMOD(raft_core, "{}", log_line);
     }
 
     void set_level(int l) override {
-        spdlog::set_level((spdlog::level::level_enum)l);
+        LOGINFOMOD(raft_core, "Updating level to: {}", l);
+        SDS_LOG_LEVEL(raft_core, static_cast<spdlog::level::level_enum>(abs(l - 6)));
     }
 
     void put_details(int level,

@@ -5,7 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### None
+### Changed
+- FIX: Renamed `grpc_server::shutdown()` to `gprc_server::raft_server()`.
+- FIX: Cast server_id to `int32_t` when removing a member.
 
 ## [0.8.3] - 2019.01.15
 ### Changed

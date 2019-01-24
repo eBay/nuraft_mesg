@@ -33,7 +33,7 @@ class grpc_server {
     grpc_server& operator=(const grpc_server&) = delete;
 
     ::grpc::Status step(RaftMessage& request, RaftMessage& reply);
-    shared<cstn::raft_server> shutdown() { return _raft_server; }
+    shared<cstn::raft_server> raft_server() { return _raft_server; }
 
     // Setup the RPC call backs
     virtual void associate(sds::grpc::GrpcServer* server) = 0;

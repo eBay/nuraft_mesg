@@ -197,7 +197,7 @@ grpc_factory::rem_server(uint32_t const srv_id, cstn::srv_config const& dest_cfg
          respHandler(ctx, rsp, err);
       });
 
-   auto msg = createMessage(srv_id);
+   auto msg = createMessage(static_cast<int32_t>(srv_id));
    client->send(msg, handler);
    return ctx->future();
 }

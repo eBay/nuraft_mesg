@@ -9,6 +9,7 @@
 #include <cassert>
 
 #include <cornerstone.hxx>
+#include <sds_logging/logging.h>
 #include <sds_options/options.h>
 
 #include "example_factory.h"
@@ -73,10 +74,9 @@ int main(int argc, char** argv) {
     auto const server_id = SDS_OPTIONS["server"].as<uint32_t>();
 
     if (SDS_OPTIONS.count("echo")) {
-        send_message(server_id, SDS_OPTIONS["echo"].as<std::string>());
+        return send_message(server_id, SDS_OPTIONS["echo"].as<std::string>());
     } else if (SDS_OPTIONS.count("add")) {
         return add_new_server(server_id, SDS_OPTIONS["add"].as<uint32_t>());
-
     } else if (SDS_OPTIONS.count("remove")) {
         return remove_server(server_id, SDS_OPTIONS["remove"].as<uint32_t>());
     } else {
