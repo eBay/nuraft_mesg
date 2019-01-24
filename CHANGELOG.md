@@ -5,7 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### None
+
+## [0.9.0] - 2019.01.24
 ### Changed
+- Upgraded [raft_core](https://github.corp.ebay.com/SDS/raft_core) to _2019.01.24_
 - FIX: Renamed `grpc_server::shutdown()` to `gprc_server::raft_server()`.
 - FIX: Cast server_id to `int32_t` when removing a member.
 
@@ -45,7 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded [sds_logging](https://github.corp.ebay.com/SDS/sds_logging) to 3.6.0
 
 [Unreleased]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/testing/v0.x...develop
-[0.8.3]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/8ea30ea...testing/v0.x
+[0.9.0]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/f130d89...v0.9.0
+[0.8.3]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/8ea30ea...f130d89
 [0.8.2]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/bf53a8f...8ea30ea
 [0.8.1]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/d12747d...bf53a8f
 [0.8.0]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/5e8915d...d12747d
