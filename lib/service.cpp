@@ -95,14 +95,34 @@ msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_name)
     if (_raft_servers.end() == it || !happened) return;
 
     cornerstone::context* ctx {nullptr};
-    if (auto err = _get_server_ctx(srv_id, group_name, ctx); err) {
+    if (auto err = _get_server_ctx(srv_id, group_name, ctx, this); err) {
         LOGERRORMOD(sds_msg,
                     "Error during RAFT server creation on group {}: {}",
                     group_name,
                     err.message());
         return;
     }
+    assert(ctx != nullptr);
+
     auto server = std::make_shared<cornerstone::raft_server>(ctx);
     it->second = std::make_shared<null_service>(server);
+}
+
+void
+msg_service::partRaftGroup(group_name_t const& group_name) {
+    LOGINFOMOD(sds_msg, "Parting RAFT group: {}", group_name);
+    shared<cornerstone::raft_server> server;
+
+    {   std::unique_lock<lock_type> lck(_raft_servers_lock);
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
+            server = it->second->raft_server();
+            _raft_servers.erase(it);
+        } else {
+            LOGWARNMOD(sds_msg, "Unknown RAFT group: {} cannot part.", group_name);
+            return;
+        }
+    }
+
+    server->shutdown();
 }
 }

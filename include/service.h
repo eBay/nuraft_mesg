@@ -16,7 +16,9 @@ namespace sds::messaging {
 template<typename T>
 using boxed = std::unique_ptr<T>;
 
-using get_server_ctx_cb = std::function<std::error_condition(int32_t srv_id, group_name_t const&, cornerstone::context*& ctx_out)>;
+class msg_service;
+
+using get_server_ctx_cb = std::function<std::error_condition(int32_t srv_id, group_name_t const&, cornerstone::context*& ctx_out, msg_service* sds_msg)>;
 using lock_type = std::shared_mutex;
 
 class msg_service
@@ -43,6 +45,8 @@ class msg_service
    { joinRaftGroup(0, group_name); }
 
    void joinRaftGroup(int32_t srv_id, group_name_t const& group_name);
+
+   void partRaftGroup(group_name_t const& group_name);
 };
 
 }
