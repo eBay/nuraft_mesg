@@ -5,7 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### None
+### Changed
+- Upgraded [sds_grpc](https://github.corp.ebay.com/SDS/sds_grpc) to _1.1.0_
+- Upgraded [sds_logging](https://github.corp.ebay.com/SDS/sds_grpc) to _3.8.1_
 
 ## [0.9.0] - 2019.01.24
 ### Changed
