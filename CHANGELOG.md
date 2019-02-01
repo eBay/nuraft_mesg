@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### None
 
+## [0.10.1]
+### Added
+- Added test to remove server from group.
+
+### Fixed
+- Fixed remove server factory function.
+
 ## [0.10.0] - 2019.01.28
 ### Changed
 - Upgraded [sds_grpc](https://github.corp.ebay.com/SDS/sds_grpc) to _1.1.0_
@@ -54,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded [sds_logging](https://github.corp.ebay.com/SDS/sds_logging) to 3.6.0
 
 [Unreleased]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/testing/v0.x...develop
+[0.10.1]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/f130d89...v0.9.0
 [0.8.3]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/8ea30ea...f130d89

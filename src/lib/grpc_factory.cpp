@@ -191,7 +191,7 @@ grpc_factory::rem_server(uint32_t const srv_id, cstn::srv_config const& dest_cfg
       return p.get_future();
    }
 
-   auto ctx = std::make_shared<client_ctx<uint32_t>>(srv_id, shared_from_this(), dest_cfg.get_id());
+   auto ctx = std::make_shared<client_ctx<int32_t>>(srv_id, shared_from_this(), dest_cfg.get_id());
    auto handler = static_cast<cstn::rpc_handler>([ctx] (shared<cstn::resp_msg>& rsp,
                                                         shared<cstn::rpc_exception>& err) {
          respHandler(ctx, rsp, err);
