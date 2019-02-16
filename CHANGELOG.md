@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Nothing
 
 ## [0.10.2]
+## [0.9.1] - 2019.02.16
 ### Changed
 - Upgraded [sds_grpc](https://github.corp.ebay.com/SDS/sds_grpc) to _1.1.1_
 
@@ -68,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.10.2]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/v0.9.0...v0.10.0
+[0.9.1]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/f130d89...v0.9.0
 [0.8.3]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/8ea30ea...f130d89
 [0.8.2]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/bf53a8f...8ea30ea
