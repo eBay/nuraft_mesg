@@ -24,10 +24,9 @@ class RaftCoreGRPCConan(ConanFile):
 
     requires = (
             "lzma/5.2.4@bincrafters/stable",
-            "protobuf/3.7.0@oss/stable",
             "raft_core/2019.03.13@oss/testing",
             "sds_grpc/1.1.1@sds/testing",
-            "sds_logging/4.1.0@sds/testing"
+            "sds_logging/4.0.0@sds/testing"
         )
 
     generators = "cmake"
