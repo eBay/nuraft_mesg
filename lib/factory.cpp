@@ -2,7 +2,10 @@
 #include <raft_core_grpc/grpc_client.hpp>
 
 #include "factory.h"
+#include "service.h"
 #include "messaging_service.grpc.pb.h"
+
+SDS_LOGGING_DECL(sds_msg)
 
 namespace sds::messaging {
 
@@ -36,13 +39,16 @@ class group_client :
 {
     shared<messaging_client> _client;
     group_name_t const _group_name;
+    shared<group_metrics> _metrics;
 
  public:
     group_client(shared<messaging_client> client,
-                 group_name_t const& grp_name) :
+                 group_name_t const& grp_name,
+                 shared<sisl::MetricsGroupWrapper> metrics) :
         raft_core::grpc_base_client(),
         _client(client),
-        _group_name(grp_name)
+        _group_name(grp_name),
+        _metrics(std::static_pointer_cast<group_metrics>(metrics))
     {}
 
     ~group_client() override = default;
@@ -57,6 +63,9 @@ class group_client :
                 message.base().src(),
                 message.base().dest(),
                 _group_name);
+        if (_metrics) {
+            COUNTER_INCREMENT(*_metrics, group_sends, 1);
+        }
         group_msg.set_group_name(_group_name);
         group_msg.mutable_message()->CopyFrom(message);
         _client->send(group_msg, complete);
@@ -67,7 +76,7 @@ std::error_condition
 mesg_factory::create_client(const std::string &client, cstn::ptr<cstn::rpc_client>& raft_client) {
     // Re-direct this call to a global factory so we can re-use clients to the same endpoints
     auto m_client = std::dynamic_pointer_cast<messaging_client>(_group_factory->create_client(client));
-    raft_client = std::make_shared<group_client>(m_client, _group_name);
+    raft_client = std::make_shared<group_client>(m_client, _group_name, _metrics);
     return (!raft_client) ?
         std::make_error_condition(std::errc::invalid_argument) :
         std::error_condition();

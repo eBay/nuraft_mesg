@@ -7,8 +7,7 @@
 
 #include <raft_core_grpc/grpc_factory.hpp>
 #include <sds_logging/logging.h>
-
-SDS_LOGGING_DECL(sds_msg)
+#include <metrics/metrics.hpp>
 
 namespace cstn = ::cornerstone;
 
@@ -39,12 +38,16 @@ class group_factory : public raft_core::grpc_factory {
 class mesg_factory final : public raft_core::grpc_factory {
    shared<group_factory> _group_factory;
    group_name_t const    _group_name;
+   shared<sisl::MetricsGroupWrapper> _metrics;
 
  public:
-   mesg_factory(shared<group_factory> g_factory, group_name_t const& grp_id) :
+   mesg_factory(shared<group_factory> g_factory,
+                group_name_t const& grp_id,
+                shared<sisl::MetricsGroupWrapper> metrics = nullptr) :
          raft_core::grpc_factory(0, grp_id),
          _group_factory(g_factory),
-         _group_name(grp_id)
+         _group_name(grp_id),
+         _metrics(metrics)
    { }
 
    group_name_t group_name() const { return _group_name; }

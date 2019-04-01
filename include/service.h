@@ -9,7 +9,6 @@
 #include <raft_core_grpc/grpc_server.hpp>
 #include <metrics/metrics.hpp>
 
-#include "factory.h"
 #include "messaging_service.grpc.pb.h"
 
 namespace sds::messaging {
@@ -17,27 +16,34 @@ namespace sds::messaging {
 template<typename T>
 using boxed = std::unique_ptr<T>;
 
+template<typename T>
+using shared = std::shared_ptr<T>;
+
+using group_name_t = std::string;
+
 class msg_service;
 
-using get_server_ctx_cb = std::function<std::error_condition(int32_t srv_id, group_name_t const&, cornerstone::context*& ctx_out, msg_service* sds_msg)>;
 using lock_type = std::shared_mutex;
 
 class group_metrics : public sisl::MetricsGroupWrapper {
 public:
     explicit group_metrics(group_name_t const& group_name) : sisl::MetricsGroupWrapper("RAFTGroup", group_name.c_str()) {
-        REGISTER_COUNTER(group_steps, "Total group steps made", "group", {"op", "step"});
+        REGISTER_COUNTER(group_steps, "Total group messages received", "group", {"op", "step"});
+        REGISTER_COUNTER(group_sends, "Total group messages sent", "group", {"op", "send"});
         register_me_to_farm();
     }
 };
 
+using get_server_ctx_cb = std::function<std::error_condition(int32_t srv_id, group_name_t const&, cornerstone::context*& ctx_out, shared<group_metrics> metrics, msg_service* sds_msg)>;
+
 struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name) :
         m_server(),
-        m_metrics(group_name)
+        m_metrics(std::make_shared<group_metrics>(group_name))
     { }
 
     shared<raft_core::grpc_server> m_server;
-    group_metrics m_metrics;
+    shared<group_metrics> m_metrics;
 };
 
 class msg_service

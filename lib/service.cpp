@@ -12,6 +12,8 @@
 
 #include "service.h"
 
+SDS_LOGGING_DECL(sds_msg)
+
 namespace sds::messaging {
 
 using AsyncRaftSvc = Messaging::AsyncService;
@@ -59,7 +61,7 @@ msg_service::raftStep(RaftGroupMsg& request, RaftGroupMsg& response) {
         std::shared_lock<lock_type> rl(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name);
                 _raft_servers.end() != it) {
-            COUNTER_INCREMENT(it->second.m_metrics, group_steps, 1);
+            COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
             server = it->second.m_server;
         }
     }
@@ -96,7 +98,7 @@ msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_name)
     if (_raft_servers.end() == it || !happened) return;
 
     cornerstone::context* ctx {nullptr};
-    if (auto err = _get_server_ctx(srv_id, group_name, ctx, this); err) {
+    if (auto err = _get_server_ctx(srv_id, group_name, ctx, it->second.m_metrics, this); err) {
         LOGERRORMOD(sds_msg,
                     "Error during RAFT server creation on group {}: {}",
                     group_name,
