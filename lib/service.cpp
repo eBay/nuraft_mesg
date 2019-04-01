@@ -59,7 +59,8 @@ msg_service::raftStep(RaftGroupMsg& request, RaftGroupMsg& response) {
         std::shared_lock<lock_type> rl(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name);
                 _raft_servers.end() != it) {
-            server = it->second;
+            COUNTER_INCREMENT(it->second.m_metrics, group_steps, 1);
+            server = it->second.m_server;
         }
     }
 
@@ -91,7 +92,7 @@ msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_name)
     LOGINFOMOD(sds_msg, "Joining RAFT group: {}", group_name);
 
     std::unique_lock<lock_type> lck(_raft_servers_lock);
-    auto [it, happened] = _raft_servers.emplace(std::make_pair(group_name, nullptr));
+    auto [it, happened] = _raft_servers.emplace(std::make_pair(group_name, group_name));
     if (_raft_servers.end() == it || !happened) return;
 
     cornerstone::context* ctx {nullptr};
@@ -105,7 +106,7 @@ msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_name)
     assert(ctx != nullptr);
 
     auto server = std::make_shared<cornerstone::raft_server>(ctx);
-    it->second = std::make_shared<null_service>(server);
+    it->second.m_server = std::make_shared<null_service>(server);
 }
 
 void
@@ -115,7 +116,7 @@ msg_service::partRaftGroup(group_name_t const& group_name) {
 
     {   std::unique_lock<lock_type> lck(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
-            server = it->second->raft_server();
+            server = it->second.m_server->raft_server();
             _raft_servers.erase(it);
         } else {
             LOGWARNMOD(sds_msg, "Unknown RAFT group: {} cannot part.", group_name);

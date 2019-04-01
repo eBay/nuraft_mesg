@@ -7,6 +7,7 @@
 #include <map>
 #include <shared_mutex>
 #include <raft_core_grpc/grpc_server.hpp>
+#include <metrics/metrics.hpp>
 
 #include "factory.h"
 #include "messaging_service.grpc.pb.h"
@@ -21,11 +22,29 @@ class msg_service;
 using get_server_ctx_cb = std::function<std::error_condition(int32_t srv_id, group_name_t const&, cornerstone::context*& ctx_out, msg_service* sds_msg)>;
 using lock_type = std::shared_mutex;
 
+class group_metrics : public sisl::MetricsGroupWrapper {
+public:
+    explicit group_metrics(group_name_t const& group_name) : sisl::MetricsGroupWrapper("RAFTGroup", group_name.c_str()) {
+        REGISTER_COUNTER(group_steps, "Total group steps made", "group", {"op", "step"});
+        register_me_to_farm();
+    }
+};
+
+struct grpc_server_wrapper {
+    explicit grpc_server_wrapper(group_name_t const& group_name) :
+        m_server(),
+        m_metrics(group_name)
+    { }
+
+    shared<raft_core::grpc_server> m_server;
+    group_metrics m_metrics;
+};
+
 class msg_service
 {
    get_server_ctx_cb                                            _get_server_ctx;
    lock_type                                                    _raft_servers_lock;
-   std::map<group_name_t, shared<raft_core::grpc_server>>       _raft_servers;
+   std::map<group_name_t, grpc_server_wrapper>                  _raft_servers;
 
  public:
    explicit msg_service(get_server_ctx_cb get_server_ctx) :
