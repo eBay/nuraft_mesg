@@ -76,14 +76,9 @@ cs::ptr<cs::cluster_config>
 fromClusterConfig(json const& cluster_config) {
    auto const& log_idx = cluster_config["log_idx"];
    auto const& prev_log_idx = cluster_config["prev_log_idx"];
-   bool async_repl {false};
-   if (0 < cluster_config.count("eventual_consistency")) {
-      async_repl = cluster_config["eventual_consistency"];
-   } else {
-      async_repl = cluster_config["async_replication"];
-   }
+   auto const& eventual = cluster_config["eventual_consistency"];
 
-   auto raft_config = cs::cs_new<cs::cluster_config>(log_idx, prev_log_idx, async_repl);
+   auto raft_config = cs::cs_new<cs::cluster_config>(log_idx, prev_log_idx, eventual);
    fromServers(cluster_config["servers"], raft_config->get_servers());
    return raft_config;
 }
@@ -132,7 +127,7 @@ simple_state_mgr::save_config(const cs::cluster_config& config) {
    auto json_obj = json {
        { "log_idx", config.get_log_idx() },
        { "prev_log_idx", config.get_prev_log_idx() },
-       { "async_replication", config.is_async_replication() },
+       { "eventual_consistency", config.is_eventual_consistency() },
        { "user_ctx", config.get_user_ctx() },
        { "servers", toServers(const_cast<cs::cluster_config&>(config).get_servers()) }
    };
