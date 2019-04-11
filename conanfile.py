@@ -24,7 +24,7 @@ class RaftCoreGRPCConan(ConanFile):
 
     requires = (
             "lzma/5.2.4@bincrafters/stable",
-            "raft_core/2019.03.13@oss/testing",
+            "raft_core/2019.04.11@oss/testing",
             "sds_grpc/1.1.1@sds/testing",
             "sds_logging/4.0.0@sds/testing"
         )
