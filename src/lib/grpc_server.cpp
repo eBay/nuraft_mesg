@@ -60,6 +60,9 @@ grpc_server::step(RaftMessage& request, RaftMessage& reply) {
             );
     auto rcreq = toRequest(request);
     auto resp = _raft_server->process_req(*rcreq);
+    if (!resp) {
+        return ::grpc::Status(::grpc::StatusCode::CANCELLED, "Server rejected request");
+    }
     assert(resp);
     reply.set_allocated_base(fromBaseRequest(*resp));
     reply.set_allocated_rc_response(fromRCResponse(*resp));
