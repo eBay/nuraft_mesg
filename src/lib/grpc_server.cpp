@@ -21,7 +21,7 @@ fromRCResponse(cstn::resp_msg& rcmsg) {
    req->set_accepted(rcmsg.get_accepted());
    auto ctx = rcmsg.get_ctx();
    if (ctx) {
-      req->set_context(ctx->data(), ctx->length());
+      req->set_context(ctx->data(), ctx->container_size());
    }
    return req;
 }

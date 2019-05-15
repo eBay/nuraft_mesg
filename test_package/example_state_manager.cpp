@@ -3,6 +3,8 @@
 //
 #include "example_state_manager.h"
 
+#include <fstream>
+
 #include <jungle_log_store.h>
 #include <nlohmann/json.hpp>
 
@@ -127,7 +129,7 @@ simple_state_mgr::save_config(const cs::cluster_config& config) {
    auto json_obj = json {
        { "log_idx", config.get_log_idx() },
        { "prev_log_idx", config.get_prev_log_idx() },
-       { "eventual_consistency", config.is_eventual_consistency() },
+       { "eventual_consistency", config.is_async_replication() },
        { "user_ctx", config.get_user_ctx() },
        { "servers", toServers(const_cast<cs::cluster_config&>(config).get_servers()) }
    };
