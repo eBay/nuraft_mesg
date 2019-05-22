@@ -4,7 +4,7 @@ from conans import ConanFile, CMake, tools
 
 class RaftCoreGRPCConan(ConanFile):
     name = "raft_core_grpc"
-    version = "0.10.5"
+    version = "0.10.6"
 
     license = "Apache 2.0"
     url = "https://github.corp.ebay.com/SDS/raft_core_grpc"
@@ -25,7 +25,7 @@ class RaftCoreGRPCConan(ConanFile):
     requires = (
             "lzma/5.2.4@bincrafters/stable",
             "raft_core/2019.05.14@oss/testing",
-            "sds_grpc/1.1.2@sds/testing",
+            "sds_grpc/1.1.3@sds/testing",
             "sds_logging/4.0.0@sds/testing"
         )
 
