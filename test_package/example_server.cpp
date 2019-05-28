@@ -7,7 +7,7 @@
 
 #include <cassert>
 
-#include <raft_core_grpc/simple_server.hpp>
+#include <nupillar_grpc/simple_server.hpp>
 #include <sds_logging/logging.h>
 #include <sds_options/options.h>
 
@@ -16,12 +16,12 @@
 #include "example_state_machine.h"
 #include "example_state_manager.h"
 
-using namespace cornerstone;
+using namespace sds;
 
 SDS_OPTION_GROUP(server, (server_id, "", "server_id", "Servers ID", cxxopts::value<uint32_t>(), ""))
 
 SDS_OPTIONS_ENABLE(logging, server)
-SDS_LOGGING_INIT(raft_core)
+SDS_LOGGING_INIT(nupillar)
 
 int main(int argc, char** argv) {
     SDS_OPTIONS_LOAD(argc, argv, logging, server);
@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
                     rpc_cli_factory,
                     scheduler,
                     params));
-        auto grpc_svc_ = std::make_unique<raft_core::simple_server>(server);
+        auto grpc_svc_ = std::make_unique<sds::simple_server>(server);
 
         auto grpc_server = std::unique_ptr<sds::grpc::GrpcServer>(sds::grpc::GrpcServer::make(
                                                                     server_address, 2, "", ""));

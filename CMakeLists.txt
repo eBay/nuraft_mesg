@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(raft_core_grpc)
+project(nupillar_grpc)
 enable_testing()
 
 set(CMAKE_CXX_STANDARD 17)

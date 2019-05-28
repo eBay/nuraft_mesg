@@ -10,22 +10,21 @@
 
 #pragma once
 
-#include <cornerstone.hxx>
-#include <grpcpp/server.h>
-
 #include "common.hpp"
+
+#include <grpcpp/server.h>
 
 namespace sds::grpc {
 class GrpcServer;
 }
 
-namespace raft_core {
+namespace sds {
 
 class grpc_server {
-    shared<cstn::raft_server> _raft_server;
+    shared<nupillar::raft_server> _raft_server;
 
  public:
-    explicit grpc_server(shared<cstn::raft_server>& raft_server) :
+    explicit grpc_server(shared<nupillar::raft_server>& raft_server) :
         _raft_server(raft_server)
      { }
     virtual ~grpc_server() = default;
@@ -33,7 +32,7 @@ class grpc_server {
     grpc_server& operator=(const grpc_server&) = delete;
 
     ::grpc::Status step(RaftMessage& request, RaftMessage& reply);
-    shared<cstn::raft_server> raft_server() { return _raft_server; }
+    shared<nupillar::raft_server> raft_server() { return _raft_server; }
 
     // Setup the RPC call backs
     virtual void associate(sds::grpc::GrpcServer* server) = 0;

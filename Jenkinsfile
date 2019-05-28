@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        PROJECT = 'raft_core_grpc'
+        PROJECT = 'nupillar_grpc'
         CONAN_CHANNEL = 'testing'
         CONAN_USER = 'sds'
         CONAN_PASS = credentials('CONAN_PASS')

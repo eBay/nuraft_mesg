@@ -11,31 +11,30 @@
 
 #pragma once
 
-#include <cornerstone.hxx>
-#include <sds_grpc/client.h>
-
 #include "common.hpp"
 
-namespace raft_core {
+#include <sds_grpc/client.h>
 
-class grpc_resp : public cstn::resp_msg
+namespace sds {
+
+class grpc_resp : public nupillar::resp_msg
 {
  public:
-    using cstn::resp_msg::resp_msg;
+    using nupillar::resp_msg::resp_msg;
     ~grpc_resp() override = default;
 
     std::string dest_addr;
 };
 
-class grpc_base_client : public cstn::rpc_client
+class grpc_base_client : public nupillar::rpc_client
 {
  public:
     using handle_resp = std::function<void(RaftMessage&, ::grpc::Status&)>;
 
-    using cstn::rpc_client::rpc_client;
+    using nupillar::rpc_client::rpc_client;
     ~grpc_base_client() override = default;
 
-    void send(shared<cstn::req_msg>& req, cstn::rpc_handler& complete) override;
+    void send(shared<nupillar::req_msg>& req, nupillar::rpc_handler& complete) override;
 
  protected:
     virtual void send(RaftMessage const& message, handle_resp complete) = 0;
@@ -67,7 +66,7 @@ class grpc_client :
             }
             _stub = sds::grpc::GrpcAsyncClient::make_stub<TSERVICE>(_worker_name);
         } else {
-            LOGDEBUGMOD(raft_core, "Channel looks fine, re-using");
+            LOGDEBUGMOD(nupillar, "Channel looks fine, re-using");
         }
         return (!!_stub);
     }

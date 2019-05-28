@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cornerstone.hxx>
+#include <nupillar/nupillar.hxx>
 #include <sds_logging/logging.h>
 
-using namespace cornerstone;
+using namespace nupillar;
 
 class echo_state_machine : public state_machine {
  public:

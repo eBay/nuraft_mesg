@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 from conans import ConanFile, CMake, tools
 
-class RaftCoreGRPCConan(ConanFile):
-    name = "raft_core_grpc"
-    version = "0.10.7"
+class NuPillarGRPCConan(ConanFile):
+    name = "nupillar_grpc"
+    version = "0.10.8"
 
     license = "Apache 2.0"
-    url = "https://github.corp.ebay.com/SDS/raft_core_grpc"
-    description = "A gRPC service for raft_core"
+    url = "https://github.corp.ebay.com/SDS/nupillar_grpc"
+    description = "A gRPC service for nupillar"
 
     settings = "arch", "os", "compiler", "build_type", "sanitize"
     options = {
@@ -24,7 +24,7 @@ class RaftCoreGRPCConan(ConanFile):
 
     requires = (
             "lzma/5.2.4@bincrafters/stable",
-            "raft_core/2019.05.24@oss/testing",
+            "nupillar/2019.05.28@oss/testing",
             "sds_grpc/1.1.4@sds/testing",
             "sds_logging/4.1.1@sds/testing"
         )
@@ -64,8 +64,8 @@ class RaftCoreGRPCConan(ConanFile):
         self.copy("*.a", dst="lib", keep_path=False)
         self.copy("*.lib", dst="lib", keep_path=False)
         self.copy("*.proto", dst="proto/", keep_path=False)
-        self.copy("*.h", dst="include/raft_core_grpc", keep_path=False)
-        self.copy("*.hpp", dst="include/raft_core_grpc", keep_path=False)
+        self.copy("*.h", dst="include/nupillar_grpc", keep_path=False)
+        self.copy("*.hpp", dst="include/nupillar_grpc", keep_path=False)
 
     def package_info(self):
         self.cpp_info.libs = tools.collect_libs(self)

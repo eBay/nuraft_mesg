@@ -1,10 +1,10 @@
-# raft_core_grpc
+# nupillar_grpc
 
-RaftCoreGRPC is a gRPC service for [raft_core](https://github.corp.ebay.com/nukvengine/raft_core)
+RaftCoreGRPC is a gRPC service for [nupillar](https://github.corp.ebay.com/SDS/nupillar)
 
 ## Brief
 
-This project provides a custom RPC implementation for gRPC to raft_core as an alternative
+This project provides a custom RPC implementation for gRPC to nupillar as an alternative
 to the internal ASIO implementation.
 
 ## Changes
@@ -13,17 +13,17 @@ See the [Changelog](CHANGELOG.md) for release information.
 
 ## Usage
 
-This library only provides the RPC service for raft_core. It provides the following:
+This library only provides the RPC service for nupillar. It provides the following:
 
-* `raft_core::grpc_client : public raft_core::rpc_client`: Initiates RPC calls to remote members.
-* `raft_core::grpc_factory : public raft_core::rpc_client_factory`: Client creation factory.
-* `raft_core::grpc_server`: RPC handler
+* `sds::grpc_client : public nupillar::rpc_client`: Initiates RPC calls to remote members.
+* `sds::grpc_factory : public nupillar::rpc_client_factory`: Client creation factory.
+* `sds::grpc_server`: RPC handler
 
 You must still provide the following:
 
-* `raft_core::state_machine`: Provides hooks to implement `commit()`, `snapshot()`, `rollback()` etc.
-* `raft_core::state_mgr`: RAFT state persistence. Loads/Stores state for the state_machine.
-* `raft_core::logger`: Provides logging facility to raft_core for debugging.
+* `nupillar::state_machine`: Provides hooks to implement `commit()`, `snapshot()`, `rollback()` etc.
+* `nupillar::state_mgr`: RAFT state persistence. Loads/Stores state for the state_machine.
+* `nupillar::logger`: Provides logging facility to nupillar for debugging.
 
 A simple echo server can be found in `test_package/example_{client,server}.cpp`
 

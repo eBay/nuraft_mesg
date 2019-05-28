@@ -6,7 +6,7 @@ syntax = "proto3";
 
 import "raft_types.proto";
 
-package raft_core;
+package sds;
 
 /// This is a VERY basic service. A service might include this RPC as
 /// one of the calls in a greater service.

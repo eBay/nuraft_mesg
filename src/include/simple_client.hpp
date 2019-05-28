@@ -14,7 +14,7 @@
 #include "grpc_client.hpp"
 #include "raft_service.grpc.pb.h"
 
-namespace raft_core {
+namespace sds {
 
 class simple_grpc_client :
     public grpc_client<RaftSvc>

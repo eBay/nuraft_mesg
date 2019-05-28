@@ -12,16 +12,14 @@
 
 #include <memory>
 
-#include <cornerstone.hxx>
+#include <nupillar/nupillar.hxx>
 #include <sds_logging/logging.h>
 
 #include "raft_types.pb.h"
 
-SDS_LOGGING_DECL(raft_core)
+SDS_LOGGING_DECL(nupillar)
 
-namespace raft_core {
-
-namespace cstn = cornerstone;
+namespace sds {
 
 template<typename T>
 using boxed = std::unique_ptr<T>;

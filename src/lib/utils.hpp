@@ -12,11 +12,11 @@
 
 #include "common.hpp"
 
-namespace raft_core {
+namespace sds {
 
 inline
 RCMsgBase*
-fromBaseRequest(cstn::msg_base const& rcbase) {
+fromBaseRequest(nupillar::msg_base const& rcbase) {
    auto base = new RCMsgBase;
    base->set_term(rcbase.get_term());
    base->set_src(rcbase.get_src());

@@ -17,7 +17,7 @@
 #include "grpc_server.hpp"
 #include "raft_service.grpc.pb.h"
 
-namespace raft_core {
+namespace sds {
 
 using AsyncRaftSvc = RaftSvc::AsyncService;
 
@@ -28,7 +28,7 @@ class simple_server : public grpc_server {
     void associate(sds::grpc::GrpcServer* server) override {
         assert(server);
         if (!server->register_async_service<RaftSvc>()) {
-            LOGERRORMOD(raft_core, "Could not register RaftSvc with gRPC!");
+            LOGERRORMOD(nupillar, "Could not register RaftSvc with gRPC!");
             abort();
         }
     }
@@ -38,7 +38,7 @@ class simple_server : public grpc_server {
         if (!server->register_rpc<RaftSvc, RaftMessage, RaftMessage>(
             &AsyncRaftSvc::RequestStep,
             std::bind(&grpc_server::step, this, std::placeholders::_1, std::placeholders::_2))) {
-            LOGERRORMOD(raft_core, "Could not bind gRPC ::Step to routine!");
+            LOGERRORMOD(nupillar, "Could not bind gRPC ::Step to routine!");
             abort();
         }
     }

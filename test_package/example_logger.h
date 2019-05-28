@@ -9,28 +9,28 @@
 
 #include <sds_logging/logging.h>
 
-SDS_LOGGING_DECL(raft_core)
+SDS_LOGGING_DECL(nupillar)
 
-struct sds_logger : ::cornerstone::logger {
+struct sds_logger : ::nupillar::logger {
     void debug(const std::string& log_line) override {
-        LOGDEBUGMOD(raft_core, "{}", log_line);
+        LOGDEBUGMOD(nupillar, "{}", log_line);
     }
 
     void info(const std::string& log_line) override {
-        LOGINFOMOD(raft_core, "{}", log_line);
+        LOGINFOMOD(nupillar, "{}", log_line);
     }
 
     void warn(const std::string& log_line) override {
-        LOGWARNMOD(raft_core, "{}", log_line);
+        LOGWARNMOD(nupillar, "{}", log_line);
     }
 
     void err(const std::string& log_line) override {
-       LOGERRORMOD(raft_core, "{}", log_line);
+       LOGERRORMOD(nupillar, "{}", log_line);
     }
 
     void set_level(int l) override {
-        LOGINFOMOD(raft_core, "Updating level to: {}", l);
-        SDS_LOG_LEVEL(raft_core, static_cast<spdlog::level::level_enum>(abs(l - 6)));
+        LOGINFOMOD(nupillar, "Updating level to: {}", l);
+        SDS_LOG_LEVEL(nupillar, static_cast<spdlog::level::level_enum>(abs(l - 6)));
     }
 
     void put_details(int level,
@@ -39,12 +39,12 @@ struct sds_logger : ::cornerstone::logger {
                      size_t line_number,
                      const std::string& log_line) override {
         switch(level) {
-        case 1: { LOGCRITICALMOD(raft_core, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
-        case 2: { LOGERRORMOD(raft_core, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
-        case 3: { LOGWARNMOD(raft_core, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
-        case 4: { LOGINFOMOD(raft_core, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
-        case 5: { LOGDEBUGMOD(raft_core, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
-        default: { LOGTRACEMOD(raft_core, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
+        case 1: { LOGCRITICALMOD(nupillar, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
+        case 2: { LOGERRORMOD(nupillar, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
+        case 3: { LOGWARNMOD(nupillar, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
+        case 4: { LOGINFOMOD(nupillar, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
+        case 5: { LOGDEBUGMOD(nupillar, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
+        default: { LOGTRACEMOD(nupillar, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line); } break;;
         }
     }
 };

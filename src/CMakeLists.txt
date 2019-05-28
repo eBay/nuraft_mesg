@@ -23,5 +23,5 @@ set(LIBRARY_SOURCES
             ${GRPC_SRCS}
             ${GRPC_HDRS}
         )
-add_library(cornerstone_grpc ${LIBRARY_SOURCES})
-conan_target_link_libraries(cornerstone_grpc)
+add_library(nupillar_grpc ${LIBRARY_SOURCES})
+conan_target_link_libraries(nupillar_grpc)
