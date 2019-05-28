@@ -6,7 +6,7 @@
 
 #include <map>
 #include <shared_mutex>
-#include <raft_core_grpc/grpc_server.hpp>
+#include <nupillar_grpc/grpc_server.hpp>
 #include <metrics/metrics.hpp>
 
 #include "messaging_service.grpc.pb.h"
@@ -34,7 +34,7 @@ public:
     }
 };
 
-using get_server_ctx_cb = std::function<std::error_condition(int32_t srv_id, group_name_t const&, cornerstone::context*& ctx_out, shared<group_metrics> metrics, msg_service* sds_msg)>;
+using get_server_ctx_cb = std::function<std::error_condition(int32_t srv_id, group_name_t const&, nupillar::context*& ctx_out, shared<group_metrics> metrics, msg_service* sds_msg)>;
 
 struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name) :
@@ -42,7 +42,7 @@ struct grpc_server_wrapper {
         m_metrics(std::make_shared<group_metrics>(group_name))
     { }
 
-    shared<raft_core::grpc_server> m_server;
+    shared<sds::grpc_server> m_server;
     shared<group_metrics> m_metrics;
 };
 

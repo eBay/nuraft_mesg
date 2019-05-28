@@ -1,6 +1,6 @@
 
 list(APPEND PROTOBUF_IMPORT_DIRS
-          "${CONAN_RAFT_CORE_GRPC_ROOT}/proto"
+          "${CONAN_NUPILLAR_GRPC_ROOT}/proto"
         )
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
                             messaging_service.proto)

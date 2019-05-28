@@ -1,5 +1,5 @@
 
-#include <raft_core_grpc/grpc_client.hpp>
+#include <nupillar_grpc/grpc_client.hpp>
 
 #include "factory.h"
 #include "service.h"
@@ -10,13 +10,13 @@ SDS_LOGGING_DECL(sds_msg)
 namespace sds::messaging {
 
 class messaging_client :
-    public raft_core::grpc_client<Messaging>
+    public sds::grpc_client<Messaging>
 {
  public:
-    using raft_core::grpc_client<Messaging>::grpc_client;
+    using sds::grpc_client<Messaging>::grpc_client;
     ~messaging_client() override = default;
 
-    using raft_core::grpc_base_client::send;
+    using sds::grpc_base_client::send;
 
     void send(RaftGroupMsg const &message, handle_resp complete) {
         auto group_compl =
@@ -29,13 +29,13 @@ class messaging_client :
     }
 
  protected:
-    void send(raft_core::RaftMessage const &, handle_resp ) override {
+    void send(sds::RaftMessage const &, handle_resp ) override {
         throw std::runtime_error("Bad call!");
     }
 };
 
 class group_client :
-    public raft_core::grpc_base_client
+    public sds::grpc_base_client
 {
     shared<messaging_client> _client;
     group_name_t const _group_name;
@@ -45,7 +45,7 @@ class group_client :
     group_client(shared<messaging_client> client,
                  group_name_t const& grp_name,
                  shared<sisl::MetricsGroupWrapper> metrics) :
-        raft_core::grpc_base_client(),
+        sds::grpc_base_client(),
         _client(client),
         _group_name(grp_name),
         _metrics(std::static_pointer_cast<group_metrics>(metrics))
@@ -55,7 +55,7 @@ class group_client :
 
     shared<messaging_client> realClient() { return _client; }
 
-    void send(raft_core::RaftMessage const &message, handle_resp complete) override {
+    void send(sds::RaftMessage const &message, handle_resp complete) override {
         RaftGroupMsg group_msg;
 
         LOGTRACEMOD(sds_msg, "Sending [{}] from: [{}] to: [{}] Group: [{}]",
@@ -73,7 +73,7 @@ class group_client :
 };
 
 std::error_condition
-mesg_factory::create_client(const std::string &client, cstn::ptr<cstn::rpc_client>& raft_client) {
+mesg_factory::create_client(const std::string &client, nupillar::ptr<nupillar::rpc_client>& raft_client) {
     // Re-direct this call to a global factory so we can re-use clients to the same endpoints
     auto m_client = std::dynamic_pointer_cast<messaging_client>(_group_factory->create_client(client));
     raft_client = std::make_shared<group_client>(m_client, _group_name, _metrics);
@@ -83,14 +83,14 @@ mesg_factory::create_client(const std::string &client, cstn::ptr<cstn::rpc_clien
 }
 
 std::error_condition
-mesg_factory::reinit_client(raft_core::shared<cstn::rpc_client>& raft_client) {
+mesg_factory::reinit_client(sds::shared<nupillar::rpc_client>& raft_client) {
     auto client = std::dynamic_pointer_cast<group_client>(raft_client);
-    auto real_client = std::static_pointer_cast<cstn::rpc_client>(client->realClient());
+    auto real_client = std::static_pointer_cast<nupillar::rpc_client>(client->realClient());
     return _group_factory->reinit_client(real_client);
 }
 
 std::error_condition
-group_factory::create_client(const std::string &client, cstn::ptr<cstn::rpc_client>& raft_client) {
+group_factory::create_client(const std::string &client, nupillar::ptr<nupillar::rpc_client>& raft_client) {
     auto endpoint = lookupEndpoint(client);
     if (endpoint.empty()) {
         return std::make_error_condition(std::errc::invalid_argument);
@@ -104,7 +104,7 @@ group_factory::create_client(const std::string &client, cstn::ptr<cstn::rpc_clie
 }
 
 std::error_condition
-group_factory::reinit_client(raft_core::shared<cstn::rpc_client>& raft_client) {
+group_factory::reinit_client(sds::shared<nupillar::rpc_client>& raft_client) {
     assert(raft_client);
     auto grpc_client = std::dynamic_pointer_cast<messaging_client>(raft_client);
     return (!grpc_client->init()) ?

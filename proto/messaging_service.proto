@@ -10,7 +10,7 @@ package sds.messaging;
 
 message RaftGroupMsg {
     string                  group_name  = 1;
-    raft_core.RaftMessage   message     = 2;
+    sds.RaftMessage   message     = 2;
 }
 service Messaging {
     rpc RaftStep (RaftGroupMsg) returns (RaftGroupMsg);
