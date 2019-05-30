@@ -28,8 +28,8 @@ using lock_type = std::shared_mutex;
 class group_metrics : public sisl::MetricsGroupWrapper {
 public:
     explicit group_metrics(group_name_t const& group_name) : sisl::MetricsGroupWrapper("RAFTGroup", group_name.c_str()) {
-        REGISTER_COUNTER(group_steps, "Total group messages received", "group", {"op", "step"});
-        REGISTER_COUNTER(group_sends, "Total group messages sent", "group", {"op", "send"});
+        REGISTER_COUNTER(group_steps, "Total group messages received", "raft_group", {"op", "step"});
+        REGISTER_COUNTER(group_sends, "Total group messages sent", "raft_group", {"op", "send"});
         register_me_to_farm();
     }
 };
