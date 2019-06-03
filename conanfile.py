@@ -4,7 +4,7 @@ from conans import ConanFile, CMake, tools
 
 class NuPillarGRPCConan(ConanFile):
     name = "nupillar_grpc"
-    version = "0.10.8"
+    version = "0.10.9"
 
     license = "Apache 2.0"
     url = "https://github.corp.ebay.com/SDS/nupillar_grpc"
@@ -26,7 +26,7 @@ class NuPillarGRPCConan(ConanFile):
             "lzma/5.2.4@bincrafters/stable",
             "nupillar/2019.05.28@oss/testing",
             "sds_grpc/1.1.4@sds/testing",
-            "sds_logging/4.1.1@sds/testing"
+            "sds_logging/5.0.0@sds/testing"
         )
 
     generators = "cmake"
