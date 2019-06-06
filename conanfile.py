@@ -10,16 +10,14 @@ class NuPillarGRPCConan(ConanFile):
     url = "https://github.corp.ebay.com/SDS/nupillar_grpc"
     description = "A gRPC service for nupillar"
 
-    settings = "arch", "os", "compiler", "build_type", "sanitize"
+    settings = "arch", "os", "compiler", "build_type"
     options = {
         "shared": ['True', 'False'],
         "fPIC": ['True', 'False'],
-        "coverage": ['True', 'False'],
         }
     default_options = (
         'shared=False',
         'fPIC=True',
-        'coverage=False',
         )
 
     requires = (
@@ -33,25 +31,12 @@ class NuPillarGRPCConan(ConanFile):
     exports = ["LICENSE.md"]
     exports_sources = "CMakeLists.txt", "cmake/*", "src/*"
 
-    def configure(self):
-        if not self.settings.compiler == "gcc":
-            del self.options.coverage
-        elif self.settings.sanitize != None:
-            self.options.coverage = 'False'
-
     def build(self):
         cmake = CMake(self)
 
         definitions = {'CONAN_BUILD_COVERAGE': 'OFF',
-                       'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON',
-                       'MEMORY_SANITIZER_ON': 'OFF'}
+                       'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON'}
         test_target = None
-
-        if self.settings.sanitize != None:
-            definitions['MEMORY_SANITIZER_ON'] = 'ON'
-        elif self.options.coverage == 'True':
-            definitions['CONAN_BUILD_COVERAGE'] = 'ON'
-            test_target = 'coverage'
 
         cmake.configure(defs=definitions)
         cmake.build()
@@ -69,10 +54,3 @@ class NuPillarGRPCConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = tools.collect_libs(self)
-        if self.settings.sanitize != None:
-            self.cpp_info.sharedlinkflags.append("-fsanitize=address")
-            self.cpp_info.exelinkflags.append("-fsanitize=address")
-            self.cpp_info.sharedlinkflags.append("-fsanitize=undefined")
-            self.cpp_info.exelinkflags.append("-fsanitize=undefined")
-        elif self.options.coverage == 'True':
-            self.cpp_info.libs.append('gcov')

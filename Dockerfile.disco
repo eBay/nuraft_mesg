@@ -19,7 +19,6 @@ COPY LICENSE.md ${SOURCE_PATH}
 
 RUN conan create -pr debug /tmp/source "${CONAN_USER}"/"${CONAN_CHANNEL}"
 RUN conan create /tmp/source "${CONAN_USER}"/"${CONAN_CHANNEL}"
-RUN conan create -pr nosanitize /tmp/source "${CONAN_USER}"/"${CONAN_CHANNEL}"
 
 CMD set -eux; \
     eval $(grep 'name =' ${SOURCE_PATH}conanfile.py | sed 's, ,,g' | sed 's,name,PKG_NAME,'); \
