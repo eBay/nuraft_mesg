@@ -104,7 +104,7 @@ simple_state_mgr::load_config() {
 
 nupillar::ptr<nupillar::log_store>
 simple_state_mgr::load_log_store() {
-   return nupillar::cs_new<sds::jungle_log_store>(fmt::format(FMT_STRING("s{}.store"), _srv_id));
+   return nupillar::cs_new<nupillar::jungle_log_store>(fmt::format(FMT_STRING("s{}.store"), _srv_id));
 }
 
 nupillar::ptr<nupillar::srv_state>
