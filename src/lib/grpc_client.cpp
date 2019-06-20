@@ -50,6 +50,10 @@ toResponse(RaftMessage const& raft_msg) {
                                               base.dest(),
                                               resp.next_index(),
                                               resp.accepted());
+   message->set_result_code((nupillar::cmd_result_code)(0 - resp.result_code()));
+   if (0 != resp.result_code()) {
+       LOGWARNMOD(nupillar, "Response was not 0: {}", (0 - resp.result_code()));
+   }
    if (!resp.accepted()) {
        message->dest_addr = resp.dest_addr();
    }
