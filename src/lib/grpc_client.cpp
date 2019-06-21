@@ -51,10 +51,8 @@ toResponse(RaftMessage const& raft_msg) {
                                               resp.next_index(),
                                               resp.accepted());
    message->set_result_code((nupillar::cmd_result_code)(0 - resp.result_code()));
-   if (0 != resp.result_code()) {
-       LOGWARNMOD(nupillar, "Response was not 0: {}", (0 - resp.result_code()));
-   }
-   if (!resp.accepted()) {
+   if (nupillar::cmd_result_code::NOT_LEADER == message->get_result_code()) {
+       LOGINFOMOD(nupillar, "Leader has changed!");
        message->dest_addr = resp.dest_addr();
    }
    if (0 < resp.context().length()) {
