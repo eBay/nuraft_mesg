@@ -7,6 +7,7 @@
 
 #include <cassert>
 
+#include <libjungle/jungle.h>
 #include <nupillar_grpc/simple_server.hpp>
 #include <sds_logging/logging.h>
 #include <sds_options/options.h>
@@ -31,6 +32,13 @@ int main(int argc, char** argv) {
     // Can start using LOG from this point onward.
     sds_logging::SetLogger(format(FMT_STRING("server_{}"), server_id));
     spdlog::set_pattern("[%D %T] [%^%l%$] [%n] [%t] %v");
+
+    jungle::GlobalConfig g_config;
+    g_config.numFlusherThreads = 0;
+    g_config.numCompactorThreads = 0;
+    g_config.numTableWriterGroups = 0;
+    g_config.logFileReclaimerSleep_sec = 60;
+    jungle::init(g_config);
 
     // State manager (RAFT log store, config).
     ptr<state_mgr> smgr = std::make_shared<simple_state_mgr>(server_id);
