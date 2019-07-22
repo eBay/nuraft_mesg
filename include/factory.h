@@ -5,7 +5,7 @@
 #include <mutex>
 #include <string>
 
-#include <nupillar_grpc/grpc_factory.hpp>
+#include <nuraft_grpc/grpc_factory.hpp>
 #include <sds_logging/logging.h>
 #include <metrics/metrics.hpp>
 
@@ -25,10 +25,10 @@ class group_factory : public sds::grpc_factory {
    using sds::grpc_factory::create_client;
 
    std::error_condition
-   create_client(const std::string &client, nupillar::ptr<nupillar::rpc_client>&) override;
+   create_client(const std::string &client, nuraft::ptr<nuraft::rpc_client>&) override;
 
    std::error_condition
-   reinit_client(sds::shared<nupillar::rpc_client>& raft_client) override;
+   reinit_client(sds::shared<nuraft::rpc_client>& raft_client) override;
 
    virtual std::string lookupEndpoint(std::string const& client) = 0;
 };
@@ -51,10 +51,10 @@ class mesg_factory final : public sds::grpc_factory {
    group_name_t group_name() const { return _group_name; }
 
    std::error_condition
-   create_client(const std::string &client, nupillar::ptr<nupillar::rpc_client>& rpc_ptr) override;
+   create_client(const std::string &client, nuraft::ptr<nuraft::rpc_client>& rpc_ptr) override;
 
    std::error_condition
-   reinit_client(sds::shared<nupillar::rpc_client>& raft_client) override;
+   reinit_client(sds::shared<nuraft::rpc_client>& raft_client) override;
 };
 
 

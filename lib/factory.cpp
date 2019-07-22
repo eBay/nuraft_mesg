@@ -1,5 +1,5 @@
 
-#include <nupillar_grpc/grpc_client.hpp>
+#include <nuraft_grpc/grpc_client.hpp>
 
 #include "factory.h"
 #include "service.h"
@@ -73,7 +73,7 @@ class group_client :
 };
 
 std::error_condition
-mesg_factory::create_client(const std::string &client, nupillar::ptr<nupillar::rpc_client>& raft_client) {
+mesg_factory::create_client(const std::string &client, nuraft::ptr<nuraft::rpc_client>& raft_client) {
     // Re-direct this call to a global factory so we can re-use clients to the same endpoints
     auto m_client = std::dynamic_pointer_cast<messaging_client>(_group_factory->create_client(client));
     raft_client = std::make_shared<group_client>(m_client, _group_name, _metrics);
@@ -83,14 +83,14 @@ mesg_factory::create_client(const std::string &client, nupillar::ptr<nupillar::r
 }
 
 std::error_condition
-mesg_factory::reinit_client(sds::shared<nupillar::rpc_client>& raft_client) {
+mesg_factory::reinit_client(sds::shared<nuraft::rpc_client>& raft_client) {
     auto client = std::dynamic_pointer_cast<group_client>(raft_client);
-    auto real_client = std::static_pointer_cast<nupillar::rpc_client>(client->realClient());
+    auto real_client = std::static_pointer_cast<nuraft::rpc_client>(client->realClient());
     return _group_factory->reinit_client(real_client);
 }
 
 std::error_condition
-group_factory::create_client(const std::string &client, nupillar::ptr<nupillar::rpc_client>& raft_client) {
+group_factory::create_client(const std::string &client, nuraft::ptr<nuraft::rpc_client>& raft_client) {
     auto endpoint = lookupEndpoint(client);
     if (endpoint.empty()) {
         return std::make_error_condition(std::errc::invalid_argument);
@@ -104,7 +104,7 @@ group_factory::create_client(const std::string &client, nupillar::ptr<nupillar::
 }
 
 std::error_condition
-group_factory::reinit_client(sds::shared<nupillar::rpc_client>& raft_client) {
+group_factory::reinit_client(sds::shared<nuraft::rpc_client>& raft_client) {
     assert(raft_client);
     auto grpc_client = std::dynamic_pointer_cast<messaging_client>(raft_client);
     return (!grpc_client->init()) ?
