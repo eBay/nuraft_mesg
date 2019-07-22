@@ -21,10 +21,10 @@ class GrpcServer;
 namespace sds {
 
 class grpc_server {
-    shared<nupillar::raft_server> _raft_server;
+    shared<nuraft::raft_server> _raft_server;
 
  public:
-    explicit grpc_server(shared<nupillar::raft_server>& raft_server) :
+    explicit grpc_server(shared<nuraft::raft_server>& raft_server) :
         _raft_server(raft_server)
      { }
     virtual ~grpc_server() = default;
@@ -32,7 +32,7 @@ class grpc_server {
     grpc_server& operator=(const grpc_server&) = delete;
 
     ::grpc::Status step(RaftMessage& request, RaftMessage& reply);
-    shared<nupillar::raft_server> raft_server() { return _raft_server; }
+    shared<nuraft::raft_server> raft_server() { return _raft_server; }
 
     // Setup the RPC call backs
     virtual void associate(sds::grpc::GrpcServer* server) = 0;

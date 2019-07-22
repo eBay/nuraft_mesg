@@ -8,7 +8,7 @@
 #include <iostream>
 #include <cassert>
 
-#include <nupillar/nupillar.hxx>
+#include <nuraft/nuraft.hxx>
 #include <sds_logging/logging.h>
 #include <sds_options/options.h>
 
@@ -21,7 +21,7 @@ SDS_OPTION_GROUP(client, (add, "a", "add", "Add a server to the cluster", cxxopt
                          (remove, "r","remove", "Remove server from cluster", cxxopts::value<uint32_t>(), "id"))
 
 SDS_OPTIONS_ENABLE(logging, client)
-SDS_LOGGING_INIT(nupillar)
+SDS_LOGGING_INIT(nuraft)
 using namespace sds;
 
 void cleanup(const std::string& prefix) {
@@ -30,9 +30,9 @@ void cleanup(const std::string& prefix) {
 
 int send_message(uint32_t leader_id, std::string const& message) {
     auto factory = std::make_shared<example_factory>(2, "raft_client");
-    auto const dest_cfg = nupillar::srv_config(leader_id, std::to_string(leader_id));
+    auto const dest_cfg = nuraft::srv_config(leader_id, std::to_string(leader_id));
 
-    auto buf = nupillar::buffer::alloc(message.length()+1);
+    auto buf = nuraft::buffer::alloc(message.length()+1);
     buf->put(message.c_str());
     buf->pos(0);
 
@@ -43,7 +43,7 @@ int send_message(uint32_t leader_id, std::string const& message) {
 
 int add_new_server(uint32_t leader_id, uint32_t srv_id) {
     auto factory = std::make_shared<example_factory>(2, "raft_client");
-    auto const dest_cfg = nupillar::srv_config(leader_id, std::to_string(leader_id));
+    auto const dest_cfg = nuraft::srv_config(leader_id, std::to_string(leader_id));
     int ret = factory->add_server(srv_id, fmt::format(FMT_STRING("{}"),srv_id), dest_cfg).get() ? 0 : -1;
     sds::grpc::GrpcAyncClientWorker::shutdown_all();
     return ret;
@@ -51,7 +51,7 @@ int add_new_server(uint32_t leader_id, uint32_t srv_id) {
 
 int remove_server(int leader_id, int srv_id) {
     auto factory = std::make_shared<example_factory>(2, "raft_client");
-    auto const dest_cfg = nupillar::srv_config(leader_id, std::to_string(leader_id));
+    auto const dest_cfg = nuraft::srv_config(leader_id, std::to_string(leader_id));
     int ret = factory->rem_server(srv_id, dest_cfg).get() ? 0 : -1;
     sds::grpc::GrpcAyncClientWorker::shutdown_all();
     return ret;

@@ -17,24 +17,24 @@
 
 namespace sds {
 
-class grpc_resp : public nupillar::resp_msg
+class grpc_resp : public nuraft::resp_msg
 {
  public:
-    using nupillar::resp_msg::resp_msg;
+    using nuraft::resp_msg::resp_msg;
     ~grpc_resp() override = default;
 
     std::string dest_addr;
 };
 
-class grpc_base_client : public nupillar::rpc_client
+class grpc_base_client : public nuraft::rpc_client
 {
  public:
     using handle_resp = std::function<void(RaftMessage&, ::grpc::Status&)>;
 
-    using nupillar::rpc_client::rpc_client;
+    using nuraft::rpc_client::rpc_client;
     ~grpc_base_client() override = default;
 
-    void send(shared<nupillar::req_msg>& req, nupillar::rpc_handler& complete) override;
+    void send(shared<nuraft::req_msg>& req, nuraft::rpc_handler& complete) override;
 
  protected:
     virtual void send(RaftMessage const& message, handle_resp complete) = 0;
@@ -66,7 +66,7 @@ class grpc_client :
             }
             _stub = sds::grpc::GrpcAsyncClient::make_stub<TSERVICE>(_worker_name);
         } else {
-            LOGDEBUGMOD(nupillar, "Channel looks fine, re-using");
+            LOGDEBUGMOD(nuraft, "Channel looks fine, re-using");
         }
         return (!!_stub);
     }

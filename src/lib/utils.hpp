@@ -16,7 +16,7 @@ namespace sds {
 
 inline
 RCMsgBase*
-fromBaseRequest(nupillar::msg_base const& rcbase) {
+fromBaseRequest(nuraft::msg_base const& rcbase) {
    auto base = new RCMsgBase;
    base->set_term(rcbase.get_term());
    base->set_src(rcbase.get_src());

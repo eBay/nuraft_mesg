@@ -2,7 +2,7 @@
 
 set -eu
 export ASAN_OPTIONS=detect_leaks=0
-LOG_MODS="nupillar:2"
+LOG_MODS="nuraft:2"
 CLIENT_VERBOSITY=3
 SERVER_VERBOSITY=1
 

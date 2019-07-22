@@ -8,7 +8,7 @@
 #include <cassert>
 
 #include <libjungle/jungle.h>
-#include <nupillar_grpc/simple_server.hpp>
+#include <nuraft_grpc/simple_server.hpp>
 #include <sds_logging/logging.h>
 #include <sds_options/options.h>
 
@@ -22,7 +22,7 @@ using namespace sds;
 SDS_OPTION_GROUP(server, (server_id, "", "server_id", "Servers ID", cxxopts::value<uint32_t>(), ""))
 
 SDS_OPTIONS_ENABLE(logging, server)
-SDS_LOGGING_INIT(nupillar)
+SDS_LOGGING_INIT(nuraft)
 
 int main(int argc, char** argv) {
     SDS_OPTIONS_LOAD(argc, argv, logging, server);

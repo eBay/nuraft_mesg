@@ -23,5 +23,5 @@ set(LIBRARY_SOURCES
             ${GRPC_SRCS}
             ${GRPC_HDRS}
         )
-add_library(nupillar_grpc ${LIBRARY_SOURCES})
-conan_target_link_libraries(nupillar_grpc)
+add_library(nuraft_grpc ${LIBRARY_SOURCES})
+conan_target_link_libraries(nuraft_grpc)

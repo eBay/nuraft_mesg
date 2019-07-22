@@ -12,12 +12,12 @@
 
 #include <memory>
 
-#include <nupillar/nupillar.hxx>
+#include <nuraft/nuraft.hxx>
 #include <sds_logging/logging.h>
 
 #include "raft_types.pb.h"
 
-SDS_LOGGING_DECL(nupillar)
+SDS_LOGGING_DECL(nuraft)
 
 namespace sds {
 

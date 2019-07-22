@@ -39,41 +39,41 @@ struct client_ctx {
 };
 
 template<typename PayloadType>
-shared<nupillar::req_msg>
+shared<nuraft::req_msg>
 createMessage(PayloadType payload, std::string const& srv_addr = "");
 
 template<>
-shared<nupillar::req_msg>
+shared<nuraft::req_msg>
 createMessage(uint32_t const srv_id, std::string const& srv_addr) {
    assert(!srv_addr.empty());
-   auto srv_conf = nupillar::srv_config(srv_id, srv_addr);
-   auto log = std::make_shared<nupillar::log_entry>(
+   auto srv_conf = nuraft::srv_config(srv_id, srv_addr);
+   auto log = std::make_shared<nuraft::log_entry>(
       0,
       srv_conf.serialize(),
-      nupillar::log_val_type::cluster_server
+      nuraft::log_val_type::cluster_server
       );
-   auto msg = std::make_shared<nupillar::req_msg>(0, nupillar::msg_type::add_server_request, 0, 0, 0, 0, 0);
+   auto msg = std::make_shared<nuraft::req_msg>(0, nuraft::msg_type::add_server_request, 0, 0, 0, 0, 0);
    msg->log_entries().push_back(log);
    return msg;
 }
 
 template<>
-shared<nupillar::req_msg>
-createMessage(shared<nupillar::buffer> buf, std::string const& ) {
-   auto log = std::make_shared<nupillar::log_entry>(0, buf);
-   auto msg = std::make_shared<nupillar::req_msg>(0, nupillar::msg_type::client_request, 0, 1, 0, 0, 0);
+shared<nuraft::req_msg>
+createMessage(shared<nuraft::buffer> buf, std::string const& ) {
+   auto log = std::make_shared<nuraft::log_entry>(0, buf);
+   auto msg = std::make_shared<nuraft::req_msg>(0, nuraft::msg_type::client_request, 0, 1, 0, 0, 0);
    msg->log_entries().push_back(log);
    return msg;
 }
 
 template<>
-shared<nupillar::req_msg>
+shared<nuraft::req_msg>
 createMessage(int32_t const srv_id, std::string const& ) {
-    auto buf = nupillar::buffer::alloc(sizeof(srv_id));
+    auto buf = nuraft::buffer::alloc(sizeof(srv_id));
     buf->put(srv_id);
     buf->pos(0);
-    auto log = std::make_shared<nupillar::log_entry>(0, buf, nupillar::log_val_type::cluster_server);
-    auto msg = std::make_shared<nupillar::req_msg>(0, nupillar::msg_type::remove_server_request, 0, 0, 0, 0, 0);
+    auto log = std::make_shared<nuraft::log_entry>(0, buf, nuraft::log_val_type::cluster_server);
+    auto msg = std::make_shared<nuraft::req_msg>(0, nuraft::msg_type::remove_server_request, 0, 0, 0, 0, 0);
     msg->log_entries().push_back(log);
     return msg;
 }
@@ -81,15 +81,15 @@ createMessage(int32_t const srv_id, std::string const& ) {
 template<typename ContextType>
 void
 respHandler(shared<ContextType> ctx,
-            shared<nupillar::resp_msg>& rsp,
-            shared<nupillar::rpc_exception>& err) {
+            shared<nuraft::resp_msg>& rsp,
+            shared<nuraft::rpc_exception>& err) {
    auto factory = ctx->cli_factory();
    if (err) {
       LOGERROR("{}", err->what());
       ctx->set(false);
       return;
    } else if (rsp->get_accepted()) {
-      LOGDEBUGMOD(nupillar, "Accepted response");
+      LOGDEBUGMOD(nuraft, "Accepted response");
       ctx->set(true);
       return;
    } else if (ctx->_cur_dest == rsp->get_dst()) {
@@ -104,7 +104,7 @@ respHandler(shared<ContextType> ctx,
 
    // Not accepted: means that `get_dst()` is a new leader.
    auto gresp = std::dynamic_pointer_cast<grpc_resp>(rsp);
-   LOGDEBUGMOD(nupillar, "Updating destination from {} to {}[{}]",
+   LOGDEBUGMOD(nuraft, "Updating destination from {} to {}[{}]",
                ctx->_cur_dest,
                rsp->get_dst(),
                gresp->dest_addr);
@@ -112,12 +112,12 @@ respHandler(shared<ContextType> ctx,
    auto client = factory->create_client(gresp->dest_addr);
 
    // We'll try again by forwarding the message
-   auto handler = static_cast<nupillar::rpc_handler>([ctx] (shared<nupillar::resp_msg>& rsp,
-                                                        shared<nupillar::rpc_exception>& err) {
+   auto handler = static_cast<nuraft::rpc_handler>([ctx] (shared<nuraft::resp_msg>& rsp,
+                                                        shared<nuraft::rpc_exception>& err) {
          respHandler(ctx, rsp, err);
       });
 
-   LOGDEBUGMOD(nupillar, "Creating new message: {}", ctx->_new_srv_addr);
+   LOGDEBUGMOD(nuraft, "Creating new message: {}", ctx->_new_srv_addr);
    auto msg = createMessage(ctx->payload(), ctx->_new_srv_addr);
    client->send(msg, handler);
 }
@@ -133,16 +133,16 @@ grpc_factory::grpc_factory(int const cli_thread_count, std::string const& name) 
     }
 }
 
-nupillar::ptr<nupillar::rpc_client>
+nuraft::ptr<nuraft::rpc_client>
 grpc_factory::create_client(const std::string &client) {
-    nupillar::ptr<nupillar::rpc_client> new_client;;
+    nuraft::ptr<nuraft::rpc_client> new_client;;
 
     // Protected section
     { std::lock_guard<std::mutex> lk(_client_lock);
     auto [it, happened] = _clients.emplace(client, nullptr);
     if (_clients.end() != it) {
         if (!happened) {
-            LOGDEBUGMOD(nupillar, "Re-creating client for {}", client);
+            LOGDEBUGMOD(nuraft, "Re-creating client for {}", client);
             if (auto err = reinit_client(it->second); err) {
                 LOGERROR("Failed to re-initialize client {}: {}", client, err.message());
             } else {
@@ -161,7 +161,7 @@ grpc_factory::create_client(const std::string &client) {
 }
 
 std::future<bool>
-grpc_factory::add_server(uint32_t const srv_id, std::string const& srv_addr, nupillar::srv_config const& dest_cfg) {
+grpc_factory::add_server(uint32_t const srv_id, std::string const& srv_addr, nuraft::srv_config const& dest_cfg) {
    auto client = create_client(dest_cfg.get_endpoint());
    assert(client);
    if (!client) {
@@ -171,8 +171,8 @@ grpc_factory::add_server(uint32_t const srv_id, std::string const& srv_addr, nup
    }
 
    auto ctx = std::make_shared<client_ctx<uint32_t>>(srv_id, shared_from_this(), dest_cfg.get_id(), srv_addr);
-   auto handler = static_cast<nupillar::rpc_handler>([ctx] (shared<nupillar::resp_msg>& rsp,
-                                                        shared<nupillar::rpc_exception>& err) {
+   auto handler = static_cast<nuraft::rpc_handler>([ctx] (shared<nuraft::resp_msg>& rsp,
+                                                        shared<nuraft::rpc_exception>& err) {
          respHandler(ctx, rsp, err);
       });
 
@@ -182,7 +182,7 @@ grpc_factory::add_server(uint32_t const srv_id, std::string const& srv_addr, nup
 }
 
 std::future<bool>
-grpc_factory::rem_server(uint32_t const srv_id, nupillar::srv_config const& dest_cfg) {
+grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg) {
    auto client = create_client(dest_cfg.get_endpoint());
    assert(client);
    if (!client) {
@@ -192,8 +192,8 @@ grpc_factory::rem_server(uint32_t const srv_id, nupillar::srv_config const& dest
    }
 
    auto ctx = std::make_shared<client_ctx<int32_t>>(srv_id, shared_from_this(), dest_cfg.get_id());
-   auto handler = static_cast<nupillar::rpc_handler>([ctx] (shared<nupillar::resp_msg>& rsp,
-                                                        shared<nupillar::rpc_exception>& err) {
+   auto handler = static_cast<nuraft::rpc_handler>([ctx] (shared<nuraft::resp_msg>& rsp,
+                                                        shared<nuraft::rpc_exception>& err) {
          respHandler(ctx, rsp, err);
       });
 
@@ -203,7 +203,7 @@ grpc_factory::rem_server(uint32_t const srv_id, nupillar::srv_config const& dest
 }
 
 std::future<bool>
-grpc_factory::client_request(shared<nupillar::buffer> buf, nupillar::srv_config const& dest_cfg) {
+grpc_factory::client_request(shared<nuraft::buffer> buf, nuraft::srv_config const& dest_cfg) {
    auto client = create_client(dest_cfg.get_endpoint());
    assert(client);
    if (!client) {
@@ -212,9 +212,9 @@ grpc_factory::client_request(shared<nupillar::buffer> buf, nupillar::srv_config 
       return p.get_future();
    }
 
-   auto ctx = std::make_shared<client_ctx<shared<nupillar::buffer>>>(buf, shared_from_this(), dest_cfg.get_id());
-   auto handler = static_cast<nupillar::rpc_handler>([ctx] (shared<nupillar::resp_msg>& rsp,
-                                                        shared<nupillar::rpc_exception>& err) {
+   auto ctx = std::make_shared<client_ctx<shared<nuraft::buffer>>>(buf, shared_from_this(), dest_cfg.get_id());
+   auto handler = static_cast<nuraft::rpc_handler>([ctx] (shared<nuraft::resp_msg>& rsp,
+                                                        shared<nuraft::rpc_exception>& err) {
          respHandler(ctx, rsp, err);
       });
 

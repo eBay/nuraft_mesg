@@ -1,10 +1,10 @@
-# nupillar_grpc
+# nuraft_grpc
 
-RaftCoreGRPC is a gRPC service for [nupillar](https://github.corp.ebay.com/SDS/nupillar)
+RaftCoreGRPC is a gRPC service for [nuraft](https://github.corp.ebay.com/SDS/nuraft)
 
 ## Brief
 
-This project provides a custom RPC implementation for gRPC to nupillar as an alternative
+This project provides a custom RPC implementation for gRPC to nuraft as an alternative
 to the internal ASIO implementation.
 
 ## Changes
@@ -13,17 +13,17 @@ See the [Changelog](CHANGELOG.md) for release information.
 
 ## Usage
 
-This library only provides the RPC service for nupillar. It provides the following:
+This library only provides the RPC service for nuraft. It provides the following:
 
-* `sds::grpc_client : public nupillar::rpc_client`: Initiates RPC calls to remote members.
-* `sds::grpc_factory : public nupillar::rpc_client_factory`: Client creation factory.
+* `sds::grpc_client : public nuraft::rpc_client`: Initiates RPC calls to remote members.
+* `sds::grpc_factory : public nuraft::rpc_client_factory`: Client creation factory.
 * `sds::grpc_server`: RPC handler
 
 You must still provide the following:
 
-* `nupillar::state_machine`: Provides hooks to implement `commit()`, `snapshot()`, `rollback()` etc.
-* `nupillar::state_mgr`: RAFT state persistence. Loads/Stores state for the state_machine.
-* `nupillar::logger`: Provides logging facility to nupillar for debugging.
+* `nuraft::state_machine`: Provides hooks to implement `commit()`, `snapshot()`, `rollback()` etc.
+* `nuraft::state_mgr`: RAFT state persistence. Loads/Stores state for the state_machine.
+* `nuraft::logger`: Provides logging facility to nuraft for debugging.
 
 A simple echo server can be found in `test_package/example_{client,server}.cpp`
 

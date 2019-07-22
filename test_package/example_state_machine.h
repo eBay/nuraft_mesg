@@ -1,9 +1,9 @@
 #pragma once
 
-#include <nupillar/nupillar.hxx>
+#include <nuraft/nuraft.hxx>
 #include <sds_logging/logging.h>
 
-using namespace nupillar;
+using namespace nuraft;
 
 class echo_state_machine : public state_machine {
  public:
