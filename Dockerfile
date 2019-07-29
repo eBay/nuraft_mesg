@@ -1,5 +1,5 @@
 # ##########   #######   ############
-FROM ecr.vip.ebayc3.com/sds/sds_cpp_base:2.8
+FROM ecr.vip.ebayc3.com/sds/sds_cpp_base:2.9
 LABEL description="Automated SDS compilation"
 
 ARG CONAN_CHANNEL
@@ -10,12 +10,8 @@ ENV CONAN_CHANNEL=${CONAN_CHANNEL:-dev}
 ENV CONAN_PASS=${CONAN_PASS:-password}
 ENV SOURCE_PATH=/tmp/source/
 
-COPY conanfile.py ${SOURCE_PATH}
-COPY cmake/ ${SOURCE_PATH}cmake
-COPY CMakeLists.txt ${SOURCE_PATH}
-COPY src/ ${SOURCE_PATH}src
-COPY test_package/ ${SOURCE_PATH}test_package
-COPY LICENSE.md ${SOURCE_PATH}
+COPY .git/ ${SOURCE_PATH}.git
+RUN cd ${SOURCE_PATH}; git reset --hard
 
 RUN conan create -pr debug /tmp/source "${CONAN_USER}"/"${CONAN_CHANNEL}"
 RUN conan create /tmp/source "${CONAN_USER}"/"${CONAN_CHANNEL}"
