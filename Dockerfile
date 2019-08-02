@@ -16,7 +16,7 @@ COPY .git/ ${SOURCE_PATH}.git
 RUN cd ${SOURCE_PATH}; git reset --hard
 
 WORKDIR /output
-ENV ASAN_OPTIONS=detect_leaks=0
+ENV ASAN_OPTIONS=detect_leaks=0:allocator_may_return_null=1
 
 RUN conan create -pr ${BUILD_TYPE} ${SOURCE_PATH} "${CONAN_USER}"/"${CONAN_CHANNEL}"
 
