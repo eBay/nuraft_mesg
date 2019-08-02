@@ -10,7 +10,7 @@ class NuRaftGRPCConan(ConanFile):
     url = "https://github.corp.ebay.com/SDS/nuraft_grpc"
     description = "A gRPC service for nuraft"
 
-    settings = "arch", "os", "compiler", "build_type", "sanitize"
+    settings = "arch", "os", "compiler", "build_type"
     options = {
         "shared": ['True', 'False'],
         "fPIC": ['True', 'False'],
@@ -35,12 +35,8 @@ class NuRaftGRPCConan(ConanFile):
         cmake = CMake(self)
 
         definitions = {'CONAN_BUILD_COVERAGE': 'OFF',
-                       'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON',
-                       'MEMORY_SANITIZER_ON': 'OFF'}
+                       'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON'}
         test_target = None
-
-        if self.settings.sanitize != None:
-            definitions['MEMORY_SANITIZER_ON'] = 'ON'
 
         cmake.configure(defs=definitions)
         cmake.build()
