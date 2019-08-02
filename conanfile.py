@@ -58,8 +58,3 @@ class NuRaftGRPCConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = tools.collect_libs(self)
-        if self.settings.sanitize != None:
-            self.cpp_info.sharedlinkflags.append("-fsanitize=address")
-            self.cpp_info.exelinkflags.append("-fsanitize=address")
-            self.cpp_info.sharedlinkflags.append("-fsanitize=undefined")
-            self.cpp_info.exelinkflags.append("-fsanitize=undefined")
