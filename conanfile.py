@@ -22,9 +22,9 @@ class NuRaftGRPCConan(ConanFile):
 
     requires = (
             "lzma/5.2.4@bincrafters/stable",
-            "nuraft/2019.08.01@oss/testing",
+            "nuraft/2019.08.01@oss/develop",
             "sds_grpc/1.1.7@sds/testing",
-            "sds_logging/5.3.2@sds/testing"
+            "sds_logging/5.3.2@sds/develop"
         )
 
     generators = "cmake"
