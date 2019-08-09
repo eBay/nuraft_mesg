@@ -14,7 +14,7 @@ class TestPackageConan(ConanFile):
 
     requires = (
             "jsonformoderncpp/3.6.1@vthiery/stable",
-            "jungle_logstore/2019.08.01@sds/develop",
+            "jungle_logstore/2019.08.09@sds/develop",
         )
 
     def build(self):

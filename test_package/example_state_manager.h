@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nuraft/nuraft.hxx>
+#include <libnuraft/nuraft.hxx>
 #include <sds_logging/logging.h>
 
 class simple_state_mgr : public nuraft::state_mgr {
