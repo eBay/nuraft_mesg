@@ -12,7 +12,7 @@
 
 #include <memory>
 
-#include <nuraft/nuraft.hxx>
+#include <libnuraft/nuraft.hxx>
 #include <sds_logging/logging.h>
 
 #include "raft_types.pb.h"

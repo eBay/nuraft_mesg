@@ -8,7 +8,7 @@
 #include <iostream>
 #include <cassert>
 
-#include <nuraft/nuraft.hxx>
+#include <libnuraft/nuraft.hxx>
 #include <sds_logging/logging.h>
 #include <sds_options/options.h>
 

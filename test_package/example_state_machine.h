@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nuraft/nuraft.hxx>
+#include <libnuraft/nuraft.hxx>
 #include <sds_logging/logging.h>
 
 using namespace nuraft;
