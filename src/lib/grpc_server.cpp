@@ -13,6 +13,10 @@
 
 namespace sds {
 
+grpc_server::~grpc_server()  {
+  if (_raft_server) _raft_server->shutdown();
+}
+
 static
 RCResponse*
 fromRCResponse(nuraft::resp_msg& rcmsg) {
