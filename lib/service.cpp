@@ -45,9 +45,7 @@ void msg_service::bind(::sds::grpc::GrpcServer* server) {
     LOGTRACEMOD(sds_msg, "Received [{}] from: [{}] to: [{}] Group: [{}]",
                 nuraft::msg_type_to_string(nuraft::msg_type(base.type())), base.src(), base.dest(), group_name);
 
-    if (nuraft::join_cluster_request == base.type()) {
-        joinRaftGroup(base.dest(), group_name);
-    }
+    if (nuraft::join_cluster_request == base.type()) { joinRaftGroup(base.dest(), group_name); }
 
     shared< sds::grpc_server > server;
     {
@@ -100,8 +98,7 @@ void msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_
             }
         }
     }
-    if (_raft_servers.end() == it || !happened)
-        return;
+    if (_raft_servers.end() == it || !happened) return;
 
     auto server = std::make_shared< nuraft::raft_server >(ctx);
     it->second.m_server = std::make_shared< null_service >(server);
