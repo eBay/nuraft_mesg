@@ -24,7 +24,7 @@ class NuRaftGRPCConan(ConanFile):
     requires = (
             "lzma/5.2.4@bincrafters/stable",
             "nuraft/1.1.7@oss/develop",
-            "sds_grpc/1.1.11@sds/develop",
+            "sds_grpc/1.1.10@sds/develop",
             "sds_logging/6.1.0@sds/develop"
         )
 
