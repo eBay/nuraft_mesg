@@ -37,7 +37,6 @@ int main(int argc, char** argv) {
   jungle::GlobalConfig g_config;
   g_config.numFlusherThreads = 0;
   g_config.numCompactorThreads = 0;
-  g_config.numTableWriterGroups = 0;
   g_config.logFileReclaimerSleep_sec = 60;
   jungle::init(g_config);
 
