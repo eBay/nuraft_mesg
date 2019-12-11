@@ -22,9 +22,6 @@ pipeline {
                 sh "docker build --rm --build-arg BUILD_TYPE=debug --build-arg CONAN_USER=${CONAN_USER} --build-arg CONAN_PASS=${CONAN_PASS} --build-arg CONAN_CHANNEL=${CONAN_CHANNEL} -t ${PROJECT}-${TAG}-debug ."
                 sh "docker build --rm --build-arg BUILD_TYPE=nosanitize --build-arg CONAN_USER=${CONAN_USER} --build-arg CONAN_PASS=${CONAN_PASS} --build-arg CONAN_CHANNEL=${CONAN_CHANNEL} -t ${PROJECT}-${TAG}-nosanitize ."
                 sh "docker build --rm --build-arg CONAN_USER=${CONAN_USER} --build-arg CONAN_PASS=${CONAN_PASS} --build-arg CONAN_CHANNEL=${CONAN_CHANNEL} -t ${PROJECT}-${TAG} ."
-
-                sh "docker build -f Dockerfile.eoan --rm --build-arg BUILD_TYPE=nosanitize --build-arg CONAN_USER=${CONAN_USER} --build-arg CONAN_PASS=${CONAN_PASS} --build-arg CONAN_CHANNEL=${CONAN_CHANNEL} -t ${PROJECT}-${TAG}-nosanitize-eoan ."
-                sh "docker build -f Dockerfile.eoan --rm --build-arg CONAN_USER=${CONAN_USER} --build-arg CONAN_PASS=${CONAN_PASS} --build-arg CONAN_CHANNEL=${CONAN_CHANNEL} -t ${PROJECT}-${TAG}-eoan ."
             }
         }
 
@@ -36,9 +33,6 @@ pipeline {
                 sh "docker run --rm ${PROJECT}-${TAG}"
                 sh "docker run --rm ${PROJECT}-${TAG}-debug"
                 sh "docker run --rm ${PROJECT}-${TAG}-nosanitize"
-
-                sh "docker run --rm ${PROJECT}-${TAG}-eoan"
-                sh "docker run --rm ${PROJECT}-${TAG}-nosanitize-eoan"
                 slackSend channel: '#conan-pkgs', message: "*${PROJECT}/${TAG}@${CONAN_USER}/${CONAN_CHANNEL}* has been uploaded to conan repo."
             }
         }
@@ -49,8 +43,6 @@ pipeline {
             sh "docker rmi -f ${PROJECT}-${TAG}"
             sh "docker rmi -f ${PROJECT}-${TAG}-debug"
             sh "docker rmi -f ${PROJECT}-${TAG}-nosanitize"
-            sh "docker rmi -f ${PROJECT}-${TAG}-eoan"
-            sh "docker rmi -f ${PROJECT}-${TAG}-nosanitize-eoan"
         }
     }
 }
