@@ -77,7 +77,7 @@ public:
     void bind(sds::grpc::GrpcServer*) override{};
 };
 
-void msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_name) {
+std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_name) {
     LOGINFOMOD(sds_msg, "Joining RAFT group: {}", group_name);
 
     nuraft::context* ctx{nullptr};
@@ -86,22 +86,16 @@ void msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_
     {
         std::unique_lock< lock_type > lck(_raft_servers_lock);
         std::tie(it, happened) = _raft_servers.emplace(std::make_pair(group_name, group_name));
-        if (_raft_servers.end() != it) {
-            RELEASE_ASSERT(happened, "Could not insert new RAFT group.");
-            if (happened) {
-                if (auto err = _get_server_ctx(srv_id, group_name, ctx, it->second.m_metrics, this); err) {
-                    LOGERRORMOD(sds_msg, "Error during RAFT server creation on group {}: {}", group_name,
-                                err.message());
-                    return;
-                }
-                RELEASE_ASSERT(ctx, "Could not retrieve RAFT context.");
+        if (_raft_servers.end() != it && happened) {
+            if (auto err = _get_server_ctx(srv_id, group_name, ctx, it->second.m_metrics, this); err) {
+                LOGERRORMOD(sds_msg, "Error during RAFT server creation on group {}: {}", group_name, err.message());
+                return err;
             }
+            auto server = std::make_shared< nuraft::raft_server >(ctx);
+            it->second.m_server = std::make_shared< null_service >(server);
         }
     }
-    if (_raft_servers.end() == it || !happened) return;
-
-    auto server = std::make_shared< nuraft::raft_server >(ctx);
-    it->second.m_server = std::make_shared< null_service >(server);
+    return std::error_condition();
 }
 
 void msg_service::partRaftGroup(group_name_t const& group_name) {

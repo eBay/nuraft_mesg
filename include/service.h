@@ -41,8 +41,7 @@ using get_server_ctx_cb =
 
 struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name) :
-            m_server(),
-            m_metrics(std::make_shared< group_metrics >(group_name)) {}
+            m_server(), m_metrics(std::make_shared< group_metrics >(group_name)) {}
 
     shared< sds::grpc_server > m_server;
     shared< group_metrics >    m_metrics;
@@ -64,9 +63,9 @@ public:
 
     ::grpc::Status raftStep(RaftGroupMsg& request, RaftGroupMsg& response);
 
-    void createRaftGroup(group_name_t const& group_name) { joinRaftGroup(0, group_name); }
+    std::error_condition createRaftGroup(group_name_t const& group_name) { return joinRaftGroup(0, group_name); }
 
-    void joinRaftGroup(int32_t srv_id, group_name_t const& group_name);
+    std::error_condition joinRaftGroup(int32_t srv_id, group_name_t const& group_name);
 
     void partRaftGroup(group_name_t const& group_name);
 };
