@@ -100,19 +100,17 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
 
 void msg_service::partRaftGroup(group_name_t const& group_name) {
     LOGINFOMOD(sds_msg, "Parting RAFT group: {}", group_name);
-    shared< nuraft::raft_server > server;
+    shared< grpc_server > server;
 
     {
         std::unique_lock< lock_type > lck(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
-            server = it->second.m_server->raft_server();
+            server = it->second.m_server;
             _raft_servers.erase(it);
         } else {
             LOGWARNMOD(sds_msg, "Unknown RAFT group: {} cannot part.", group_name);
             return;
         }
     }
-
-    server->shutdown();
 }
 } // namespace sds::messaging
