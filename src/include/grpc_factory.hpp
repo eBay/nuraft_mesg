@@ -35,7 +35,7 @@ public:
 
     virtual std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 
-    virtual std::error_condition reinit_client(nuraft::ptr< nuraft::rpc_client >&) = 0;
+    virtual std::error_condition reinit_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 
     // Construct and send an AddServer message to the cluster
     std::future< nuraft::cmd_result_code > add_server(uint32_t const srv_id, std::string const& srv_addr,

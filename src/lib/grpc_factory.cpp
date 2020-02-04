@@ -122,7 +122,7 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string&
         if (_clients.end() != it) {
             if (!happened) {
                 LOGDEBUGMOD(nuraft, "Re-creating client for {}", client);
-                if (auto err = reinit_client(it->second); err) {
+                if (auto err = reinit_client(client, it->second); err) {
                     LOGERROR("Failed to re-initialize client {}: {}", client, err.message());
                 } else {
                     new_client = it->second;
