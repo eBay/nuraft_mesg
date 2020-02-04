@@ -30,7 +30,8 @@ public:
 
     std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >&) override;
 
-    std::error_condition reinit_client(sds::shared< nuraft::rpc_client >& raft_client) override;
+    std::error_condition reinit_client(std::string const&                 client,
+                                       sds::shared< nuraft::rpc_client >& raft_client) override;
 
     virtual std::string lookupEndpoint(std::string const& client) = 0;
 };
@@ -43,16 +44,14 @@ class mesg_factory final : public sds::grpc_factory {
 public:
     mesg_factory(shared< group_factory > g_factory, group_name_t const& grp_id,
                  shared< sisl::MetricsGroupWrapper > metrics = nullptr) :
-            sds::grpc_factory(0, grp_id),
-            _group_factory(g_factory),
-            _group_name(grp_id),
-            _metrics(metrics) {}
+            sds::grpc_factory(0, grp_id), _group_factory(g_factory), _group_name(grp_id), _metrics(metrics) {}
 
     group_name_t group_name() const { return _group_name; }
 
     std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >& rpc_ptr) override;
 
-    std::error_condition reinit_client(sds::shared< nuraft::rpc_client >& raft_client) override;
+    std::error_condition reinit_client(const std::string&                 client,
+                                       sds::shared< nuraft::rpc_client >& raft_client) override;
 };
 
 } // namespace sds::messaging
