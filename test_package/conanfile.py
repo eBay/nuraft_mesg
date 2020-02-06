@@ -13,8 +13,8 @@ class TestPackageConan(ConanFile):
     abort_timeout = '35s'
 
     requires = (
-            "jsonformoderncpp/3.7.0@vthiery/stable",
-            "jungle_logstore/1.0.0@sds/develop",
+            "nlohmann_json/3.7.3",
+            "jungle_logstore/1.0.1@sds/testing",
         )
 
     def build(self):
