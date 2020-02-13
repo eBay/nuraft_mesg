@@ -51,11 +51,10 @@ public:
     void send(sds::RaftMessage const& message, handle_resp complete) override {
         RaftGroupMsg group_msg;
 
-        LOGTRACEMOD(sds_msg, "Sending [{}] from: [{}] to: [{}] Group: [{}]", message.base().type(),
-                    message.base().src(), message.base().dest(), _group_name);
-        if (_metrics) {
-            COUNTER_INCREMENT(*_metrics, group_sends, 1);
-        }
+        LOGTRACEMOD(sds_msg, "Sending [{}] from: [{}] to: [{}] Group: [{}]",
+                    nuraft::msg_type_to_string(nuraft::msg_type(message.base().type())), message.base().src(),
+                    message.base().dest(), _group_name);
+        if (_metrics) { COUNTER_INCREMENT(*_metrics, group_sends, 1); }
         group_msg.set_group_name(_group_name);
         group_msg.mutable_message()->CopyFrom(message);
         _client->send(group_msg, complete);
@@ -65,6 +64,7 @@ public:
 std::error_condition mesg_factory::create_client(const std::string&                 client,
                                                  nuraft::ptr< nuraft::rpc_client >& raft_client) {
     // Re-direct this call to a global factory so we can re-use clients to the same endpoints
+    LOGDEBUGMOD(sds_msg, "Creating client to {}", client);
     auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_client(client));
     raft_client = std::make_shared< group_client >(m_client, _group_name, _metrics);
     return (!raft_client) ? std::make_error_condition(std::errc::invalid_argument) : std::error_condition();
@@ -72,6 +72,7 @@ std::error_condition mesg_factory::create_client(const std::string&             
 
 std::error_condition mesg_factory::reinit_client(const std::string&                 client,
                                                  sds::shared< nuraft::rpc_client >& raft_client) {
+    LOGDEBUGMOD(sds_msg, "Re-init client to {}", client);
     auto g_client = std::dynamic_pointer_cast< group_client >(raft_client);
     auto real_client = std::static_pointer_cast< nuraft::rpc_client >(g_client->realClient());
     return _group_factory->reinit_client(client, real_client);
@@ -79,10 +80,9 @@ std::error_condition mesg_factory::reinit_client(const std::string&             
 
 std::error_condition group_factory::create_client(const std::string&                 client,
                                                   nuraft::ptr< nuraft::rpc_client >& raft_client) {
+    LOGDEBUGMOD(sds_msg, "Creating client to {}", client);
     auto endpoint = lookupEndpoint(client);
-    if (endpoint.empty()) {
-        return std::make_error_condition(std::errc::invalid_argument);
-    }
+    if (endpoint.empty()) { return std::make_error_condition(std::errc::invalid_argument); }
 
     LOGDEBUGMOD(sds_msg, "Creating client for [{}] @ [{}]", client, endpoint);
     raft_client = sds::grpc::GrpcAsyncClient::make< messaging_client >(workerName(), endpoint);
@@ -91,9 +91,13 @@ std::error_condition group_factory::create_client(const std::string&            
 
 std::error_condition group_factory::reinit_client(const std::string&                 client,
                                                   sds::shared< nuraft::rpc_client >& raft_client) {
+    LOGDEBUGMOD(sds_msg, "Re-init client to {}", client);
     assert(raft_client);
-    auto grpc_client = std::dynamic_pointer_cast< messaging_client >(raft_client);
-    return (!grpc_client->is_connection_ready()) ? create_client(client, raft_client) : std::error_condition();
+    auto const connection_ready = std::dynamic_pointer_cast< messaging_client >(raft_client)->is_connection_ready();
+    if (!connection_ready) {
+        return create_client(client, raft_client);
+    }
+    return std::error_condition();
 }
 
 } // namespace sds::messaging
