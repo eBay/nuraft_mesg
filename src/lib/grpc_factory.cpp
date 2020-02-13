@@ -113,29 +113,26 @@ grpc_factory::grpc_factory(int const cli_thread_count, std::string const& name) 
 
 nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string& client) {
     nuraft::ptr< nuraft::rpc_client > new_client;
-    ;
 
-    // Protected section
-    {
-        std::lock_guard< std::mutex > lk(_client_lock);
-        auto [it, happened] = _clients.emplace(client, nullptr);
-        if (_clients.end() != it) {
-            if (!happened) {
-                LOGDEBUGMOD(nuraft, "Re-creating client for {}", client);
-                if (auto err = reinit_client(client, it->second); err) {
-                    LOGERROR("Failed to re-initialize client {}: {}", client, err.message());
-                } else {
-                    new_client = it->second;
-                }
+    std::lock_guard< std::mutex > lk(_client_lock);
+    auto [it, happened] = _clients.emplace(client, nullptr);
+    if (_clients.end() != it) {
+        if (!happened) {
+            LOGDEBUGMOD(nuraft, "Re-creating client for {}", client);
+            if (auto err = reinit_client(client, it->second); err) {
+                LOGERROR("Failed to re-initialize client {}: {}", client, err.message());
             } else {
-                if (auto err = create_client(client, it->second); err) {
-                    LOGERROR("Failed to create client for {}: {}", client, err.message());
-                } else {
-                    new_client = it->second;
-                }
+                new_client = it->second;
+            }
+        } else {
+            LOGDEBUGMOD(nuraft, "Creating client for {}", client);
+            if (auto err = create_client(client, it->second); err) {
+                LOGERROR("Failed to create client for {}: {}", client, err.message());
+            } else {
+                new_client = it->second;
             }
         }
-    } // End of Protected section
+    }
     return new_client;
 }
 
