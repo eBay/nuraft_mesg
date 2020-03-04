@@ -26,13 +26,17 @@ public:
 };
 
 class grpc_base_client : public nuraft::rpc_client {
+    static std::atomic_uint64_t _client_counter;
+    uint64_t                    _client_id;
+
 public:
     using handle_resp = std::function< void(RaftMessage&, ::grpc::Status&) >;
 
-    using nuraft::rpc_client::rpc_client;
+    grpc_base_client() : nuraft::rpc_client::rpc_client(), _client_id(_client_counter++) {}
     ~grpc_base_client() override = default;
 
-    void send(shared< nuraft::req_msg >& req, nuraft::rpc_handler& complete) override;
+    void     send(shared< nuraft::req_msg >& req, nuraft::rpc_handler& complete) override;
+    uint64_t get_id() const override { return _client_id; }
 
 protected:
     virtual void send(RaftMessage const& message, handle_resp complete) = 0;
