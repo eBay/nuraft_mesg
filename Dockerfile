@@ -1,14 +1,18 @@
 # ##########   #######   ############
-FROM ecr.vip.ebayc3.com/sds/sds_cpp_base:3.0
+FROM ecr.vip.ebayc3.com/sds/sds_cpp_base:3.2-dev
 LABEL description="Automated SDS compilation"
 
+ARG BRANCH_NAME
 ARG BUILD_TYPE
+ARG COVERAGE_ON
 ARG CONAN_CHANNEL
 ARG CONAN_USER
 ARG CONAN_PASS=${CONAN_USER}
+ENV BRANCH_NAME=${BRANCH_NAME:-unknown}
 ENV BUILD_TYPE=${BUILD_TYPE:-default}
+ENV COVERAGE_ON=${COVERAGE_ON:-false}
 ENV CONAN_USER=${CONAN_USER:-sds}
-ENV CONAN_CHANNEL=${CONAN_CHANNEL:-testing}
+ENV CONAN_CHANNEL=${CONAN_CHANNEL:-develop}
 ENV CONAN_PASS=${CONAN_PASS:-password}
 ENV SOURCE_PATH=/tmp/source/
 

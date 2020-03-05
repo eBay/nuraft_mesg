@@ -2,7 +2,7 @@
 
 set -eu
 export ASAN_OPTIONS=detect_leaks=0
-LOG_MODS="nuraft:2"
+LOG_MODS="nuraft:1"
 CLIENT_VERBOSITY=3
 SERVER_VERBOSITY=1
 
@@ -74,7 +74,7 @@ fi
 echo "[          ] Checking Stores"
 for i in $(seq 0 $((${SERVER_COUNT} - 1)))
 do
-  if strings server_${i}_log | grep -q 'test::message'; then
+  if strings logs/*/server_${i}_log | grep -q 'test::message'; then
     echo "[       OK ]    Server:${i}"
   else
     echo "[   Failed ]    Server:${i}"
