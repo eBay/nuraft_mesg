@@ -74,7 +74,7 @@ fi
 echo "[          ] Checking Stores"
 for i in $(seq 0 $((${SERVER_COUNT} - 1)))
 do
-  if strings server_${i}_log | grep -q 'test::message'; then
+  if strings logs/*/server_${i}_log | grep -q 'test::message'; then
     echo "[       OK ]    Server:${i}"
   else
     echo "[   Failed ]    Server:${i}"

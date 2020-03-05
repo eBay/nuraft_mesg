@@ -24,7 +24,7 @@ class NuRaftGRPCConan(ConanFile):
     requires = (
             "nuraft/1.4.6@sds/develop",
             "sds_grpc/1.1.11@sds/master",
-            "sds_logging/6.1.2@sds/develop"
+            "sds_logging/6.1.3@sds/develop"
         )
 
     generators = "cmake"
