@@ -22,7 +22,7 @@ class NuRaftGRPCConan(ConanFile):
         )
 
     requires = (
-            "nuraft/1.4.6@sds/develop",
+            "nuraft/1.4.7@sds/develop",
             "sds_grpc/1.1.11@sds/master",
             "sds_logging/7.0.0@sds/develop"
         )
