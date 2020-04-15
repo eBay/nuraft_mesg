@@ -102,15 +102,22 @@ void msg_service::partRaftGroup(group_name_t const& group_name) {
     LOGINFOMOD(sds_msg, "Parting RAFT group: {}", group_name);
     shared< grpc_server > server;
 
+    // FIXME: Today we only stop the gRPC server, we do not destroy it...leaking it until
+    // the next restart of the process. This is to solve SDSTOR-2341 when we get
+    // responses on a gRPC client for a server tha no longer exists. All threads are stopped,
+    // I believe this to cause minimal leakage.
     {
         std::unique_lock< lock_type > lck(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
             server = it->second.m_server;
-            _raft_servers.erase(it);
         } else {
             LOGWARNMOD(sds_msg, "Unknown RAFT group: {} cannot part.", group_name);
             return;
         }
+    }
+    if (auto raft_server = server->raft_server(); raft_server) {
+        raft_server->stop_server();
+        raft_server->shutdown();
     }
 }
 } // namespace sds::messaging

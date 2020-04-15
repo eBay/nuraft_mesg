@@ -20,7 +20,7 @@ public:
     using sds::grpc_base_client::send;
 
     void send(RaftGroupMsg const& message, handle_resp complete) {
-        auto group_compl = [complete](RaftGroupMsg& response, ::grpc::Status& status) mutable -> void {
+        auto group_compl = [complete](auto response, auto status) mutable {
             complete(*response.mutable_message(), status);
         };
 
@@ -47,7 +47,7 @@ public:
     ~group_client() override = default;
 
     shared< messaging_client > realClient() { return _client; }
-    void setClient(shared< messaging_client > new_client) { _client = new_client; }
+    void                       setClient(shared< messaging_client > new_client) { _client = new_client; }
 
     void send(sds::RaftMessage const& message, handle_resp complete) override {
         RaftGroupMsg group_msg;
@@ -76,9 +76,7 @@ std::error_condition mesg_factory::reinit_client(const std::string&             
     LOGDEBUGMOD(sds_msg, "Re-init client to {}", client);
     auto g_client = std::dynamic_pointer_cast< group_client >(raft_client);
     auto new_raft_client = std::static_pointer_cast< nuraft::rpc_client >(g_client->realClient());
-    if (auto err = _group_factory->reinit_client(client, new_raft_client); err) {
-        return err;
-    }
+    if (auto err = _group_factory->reinit_client(client, new_raft_client); err) { return err; }
     g_client->setClient(std::dynamic_pointer_cast< messaging_client >(new_raft_client));
     return std::error_condition();
 }
@@ -99,9 +97,7 @@ std::error_condition group_factory::reinit_client(const std::string&            
     LOGDEBUGMOD(sds_msg, "Re-init client to {}", client);
     assert(raft_client);
     auto const connection_ready = std::dynamic_pointer_cast< messaging_client >(raft_client)->is_connection_ready();
-    if (!connection_ready) {
-        return create_client(client, raft_client);
-    }
+    if (!connection_ready) { return create_client(client, raft_client); }
     return std::error_condition();
 }
 
