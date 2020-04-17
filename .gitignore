@@ -5,3 +5,4 @@ test_package/build
 cmake-build*
 build/
 compile_commands*
+.clangd/
