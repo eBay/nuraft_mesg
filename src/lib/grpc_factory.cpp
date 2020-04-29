@@ -69,9 +69,9 @@ shared< nuraft::req_msg > createMessage(int32_t const srv_id, std::string const&
 template < typename ContextType >
 void respHandler(shared< ContextType > ctx, shared< nuraft::resp_msg >& rsp, shared< nuraft::rpc_exception >& err) {
     auto factory = ctx->cli_factory();
-    if (err) {
-        LOGERROR("{}", err->what());
-        ctx->set(rsp->get_result_code());
+    if (err || !rsp) {
+        LOGERROR("{}", (err ? err->what() : "No response."));
+        ctx->set((rsp ? rsp->get_result_code() : nuraft::cmd_result_code::SERVER_NOT_FOUND));
         return;
     } else if (rsp->get_accepted()) {
         LOGDEBUGMOD(nuraft, "Accepted response");
