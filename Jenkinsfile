@@ -30,7 +30,7 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                sh "docker run --rm ${PROJECT}-${GIT_COMMIT}-nosanitize"
+                sh "docker run --rm ${PROJECT}-${GIT_COMMIT}-debug"
                 sh "docker run --rm ${PROJECT}-${GIT_COMMIT}-release"
                 slackSend channel: '#conan-pkgs', message: "*${PROJECT}/${TAG}@${CONAN_USER}/${CONAN_CHANNEL}* has been uploaded to conan repo."
             }
@@ -39,7 +39,7 @@ pipeline {
 
     post {
         always {
-            sh "docker rmi -f ${PROJECT}-${GIT_COMMIT}-nosanitize"
+            sh "docker rmi -f ${PROJECT}-${GIT_COMMIT}-debug"
             sh "docker rmi -f ${PROJECT}-${GIT_COMMIT}-release"
         }
     }
