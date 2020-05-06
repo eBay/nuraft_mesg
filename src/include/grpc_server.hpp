@@ -21,22 +21,23 @@ class GrpcServer;
 namespace sds {
 
 class grpc_server {
-    shared<nuraft::raft_server> _raft_server;
+    shared< nuraft::raft_server > _raft_server;
 
- public:
-    explicit grpc_server(shared<nuraft::raft_server>& raft_server) :
-        _raft_server(raft_server)
-     { }
+public:
+    explicit grpc_server(shared< nuraft::raft_server >& raft_server) : _raft_server(raft_server) {}
     virtual ~grpc_server();
     grpc_server(const grpc_server&) = delete;
     grpc_server& operator=(const grpc_server&) = delete;
 
-    ::grpc::Status step(RaftMessage& request, RaftMessage& reply);
-    shared<nuraft::raft_server> raft_server() { return _raft_server; }
+    nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > >
+    append_entries(const std::vector< nuraft::ptr< nuraft::buffer > >& logs);
+
+    ::grpc::Status                step(RaftMessage& request, RaftMessage& reply);
+    shared< nuraft::raft_server > raft_server() { return _raft_server; }
 
     // Setup the RPC call backs
     virtual void associate(sds::grpc::GrpcServer* server) = 0;
     virtual void bind(sds::grpc::GrpcServer* server) = 0;
 };
 
-}
+} // namespace sds

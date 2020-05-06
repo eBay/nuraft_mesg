@@ -59,6 +59,11 @@ toRequest(RaftMessage const& raft_msg) {
     return message;
 }
 
+nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > >
+grpc_server::append_entries(std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
+    return _raft_server->append_entries(logs);
+}
+
 ::grpc::Status
 grpc_server::step(RaftMessage& request, RaftMessage& reply) {
     LOGTRACEMOD(nuraft, "Stepping [{}] from: [{}] to: [{}]",
