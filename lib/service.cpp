@@ -10,6 +10,7 @@
 
 #include <sds_grpc/server.h>
 
+#include "libnuraft/async.hxx"
 #include "service.h"
 
 SDS_LOGGING_DECL(sds_msg)
@@ -38,8 +39,8 @@ void msg_service::bind(::sds::grpc::GrpcServer* server) {
     }
 }
 
-nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > >
-msg_service::append_entries(group_name_t const& group_name, std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
+nuraft::cmd_result_code msg_service::append_entries(group_name_t const&                                 group_name,
+                                                    std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
     shared< sds::grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
@@ -47,10 +48,10 @@ msg_service::append_entries(group_name_t const& group_name, std::vector< nuraft:
     }
     if (server) {
         try {
-            return server->append_entries(logs);
+            return server->append_entries(logs)->get_result_code();
         } catch (std::runtime_error& rte) { LOGERRORMOD(sds_msg, "Caught exception during step(): {}", rte.what()); }
     }
-    return nullptr;
+    return nuraft::SERVER_NOT_FOUND;
 }
 
 ::grpc::Status msg_service::raftStep(RaftGroupMsg& request, RaftGroupMsg& response) {

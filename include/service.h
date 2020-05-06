@@ -58,8 +58,8 @@ public:
     msg_service(msg_service const&) = delete;
     msg_service& operator=(msg_service const&) = delete;
 
-    nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > >
-    append_entries(group_name_t const& group_name, std::vector< nuraft::ptr< nuraft::buffer > > const& logs);
+    nuraft::cmd_result_code append_entries(group_name_t const&                                 group_name,
+                                           std::vector< nuraft::ptr< nuraft::buffer > > const& logs);
 
     void associate(sds::grpc::GrpcServer* server);
     void bind(sds::grpc::GrpcServer* server);
