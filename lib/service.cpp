@@ -39,6 +39,20 @@ void msg_service::bind(::sds::grpc::GrpcServer* server) {
     }
 }
 
+nuraft::cmd_result_code msg_service::add_srv(group_name_t const& group_name, nuraft::srv_config const& cfg) {
+    shared< sds::grpc_server > server;
+    {
+        std::shared_lock< lock_type > rl(_raft_servers_lock);
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
+    }
+    if (server) {
+        try {
+            return server->add_srv(cfg)->get_result_code();
+        } catch (std::runtime_error& rte) { LOGERRORMOD(sds_msg, "Caught exception during step(): {}", rte.what()); }
+    }
+    return nuraft::SERVER_NOT_FOUND;
+}
+
 nuraft::cmd_result_code msg_service::append_entries(group_name_t const&                                 group_name,
                                                     std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
     shared< sds::grpc_server > server;
