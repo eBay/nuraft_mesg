@@ -30,6 +30,9 @@ public:
     grpc_server& operator=(const grpc_server&) = delete;
 
     nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > >
+    add_srv(const nuraft::srv_config& cfg);
+
+    nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > >
     append_entries(const std::vector< nuraft::ptr< nuraft::buffer > >& logs);
 
     ::grpc::Status                step(RaftMessage& request, RaftMessage& reply);
