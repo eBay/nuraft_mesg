@@ -44,23 +44,25 @@ struct grpc_server_wrapper {
             m_server(), m_metrics(std::make_shared< group_metrics >(group_name)) {}
 
     shared< sds::grpc_server > m_server;
-    shared< group_metrics >    m_metrics;
+    shared< group_metrics > m_metrics;
 };
 
 class msg_service {
-    get_server_ctx_cb                             _get_server_ctx;
-    lock_type                                     _raft_servers_lock;
+    get_server_ctx_cb _get_server_ctx;
+    lock_type _raft_servers_lock;
     std::map< group_name_t, grpc_server_wrapper > _raft_servers;
+    std::string const _service_address;
 
 public:
-    explicit msg_service(get_server_ctx_cb get_server_ctx) : _get_server_ctx(get_server_ctx) {}
+    msg_service(get_server_ctx_cb get_server_ctx, std::string const& service_address) :
+            _get_server_ctx(get_server_ctx), _service_address(service_address) {}
     ~msg_service();
     msg_service(msg_service const&) = delete;
     msg_service& operator=(msg_service const&) = delete;
 
     nuraft::cmd_result_code add_srv(group_name_t const& group_name, nuraft::srv_config const& cfg);
 
-    nuraft::cmd_result_code append_entries(group_name_t const&                                 group_name,
+    nuraft::cmd_result_code append_entries(group_name_t const& group_name,
                                            std::vector< nuraft::ptr< nuraft::buffer > > const& logs);
 
     void associate(sds::grpc::GrpcServer* server);
