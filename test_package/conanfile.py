@@ -14,7 +14,7 @@ class TestPackageConan(ConanFile):
 
     requires = (
             "nlohmann_json/3.7.3",
-            "jungle_logstore/1.1.5@sds/develop",
+            "jungle_logstore/1.1.6@sds/develop",
         )
 
     def build(self):
