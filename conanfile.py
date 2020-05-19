@@ -4,7 +4,7 @@ from conans import ConanFile, CMake, tools
 
 class NuRaftGRPCConan(ConanFile):
     name = "nuraft_grpc"
-    version = "1.1.0"
+    version = "1.1.2"
 
     license = "Apache 2.0"
     url = "https://github.corp.ebay.com/SDS/nuraft_grpc"
@@ -22,9 +22,11 @@ class NuRaftGRPCConan(ConanFile):
         )
 
     requires = (
-            "nuraft/1.4.9@sds/testing",
-            "sds_grpc/1.1.11@sds/testing",
-            "sds_logging/7.0.0@sds/testing"
+            "nuraft/1.4.11@sds/testing",
+            "sds_grpc/1.1.12@sds/testing",
+            "sds_logging/7.0.2@sds/testing",
+
+            "openssl/1.1.1g",
         )
 
     generators = "cmake"
