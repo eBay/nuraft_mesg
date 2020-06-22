@@ -59,8 +59,11 @@ pipeline {
     }
 
     post {
+        failure {
+            slackSend color: 'danger', channel: '#conan-pkgs', message: "*${PROJECT}/${TAG}@${CONAN_USER}/${CONAN_CHANNEL}* has a failure."
+        }
         success {
-            slackSend channel: '#conan-pkgs', message: "*${PROJECT}/${TAG}@${CONAN_USER}/${CONAN_CHANNEL}* has been uploaded to conan repo."
+            slackSend color: 'good', channel: '#conan-pkgs', message: "*${PROJECT}/${TAG}@${CONAN_USER}/${CONAN_CHANNEL}* has been uploaded to conan repo."
         }
         always {
             sh "docker rmi -f ${PROJECT}-${GIT_COMMIT}-debug"
