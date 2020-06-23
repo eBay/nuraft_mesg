@@ -132,6 +132,9 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string&
                 new_client = it->second;
             }
         }
+        if (!it->second) {
+            _clients.erase(it);
+        }
     }
     return new_client;
 }
