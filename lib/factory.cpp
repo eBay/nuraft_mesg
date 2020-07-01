@@ -20,8 +20,14 @@ public:
 
     using sds::grpc_base_client::send;
 
+    std::atomic_uint bad_service;
+
     void send(RaftGroupMsg const& message, handle_resp complete) {
-        auto group_compl = [complete](auto response, auto status) mutable {
+        auto group_compl = [this, complete](auto response, auto status) mutable {
+            if (::grpc::INVALID_ARGUMENT == status.error_code()) {
+                LOGERRORMOD(sds_msg, "Sent message to wrong service, need to disconnect!");
+                bad_service.fetch_add(1, std::memory_order_relaxed);
+            }
             complete(*response.mutable_message(), status);
         };
 
@@ -109,8 +115,8 @@ std::error_condition group_factory::reinit_client(const std::string& client,
                                                   sds::shared< nuraft::rpc_client >& raft_client) {
     LOGDEBUGMOD(sds_msg, "Re-init client to {}", client);
     assert(raft_client);
-    auto const connection_ready = std::dynamic_pointer_cast< messaging_client >(raft_client)->is_connection_ready();
-    if (!connection_ready) {
+    auto mesg_client = std::dynamic_pointer_cast< messaging_client >(raft_client);
+    if (!mesg_client->is_connection_ready() || 0 < mesg_client->bad_service.load(std::memory_order_relaxed)) {
         return create_client(client, raft_client);
     }
     return std::error_condition();
