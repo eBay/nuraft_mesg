@@ -21,22 +21,10 @@ pipeline {
         }
 
         stage('Build') {
-            parallel {
-                stage('Debug Build') {
-                    steps {
-                        sh "conan create -ne -ks -pr debug . ${PROJECT}/${TAG}@${CONAN_USER}/${CONAN_CHANNEL}"
-                    }
-                }
-                stage('Test Build') {
-                    steps {
-                        sh "conan create -ne -ks -pr test . ${PROJECT}/${TAG}@${CONAN_USER}/${CONAN_CHANNEL}"
-                    }
-                }
-                stage('Release Build') {
-                    steps {
-                        sh "conan create -ne -ks -pr release . ${PROJECT}/${TAG}@${CONAN_USER}/${CONAN_CHANNEL}"
-                    }
-                }
+            steps {
+                sh "conan create -ne -ks -pr debug . ${PROJECT}/${TAG}@${CONAN_USER}/${CONAN_CHANNEL}"
+                sh "conan create -ne -ks -pr test . ${PROJECT}/${TAG}@${CONAN_USER}/${CONAN_CHANNEL}"
+                sh "conan create -ne -ks -pr release . ${PROJECT}/${TAG}@${CONAN_USER}/${CONAN_CHANNEL}"
             }
         }
 
