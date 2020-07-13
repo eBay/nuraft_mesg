@@ -111,6 +111,14 @@ grpc_factory::grpc_factory(int const cli_thread_count, std::string const& name) 
     }
 }
 
+class grpc_error_client : public grpc_base_client {
+    void send(RaftMessage const &message, handle_resp complete) override {
+        auto null_msg = RaftMessage();
+        auto status = ::grpc::Status(::grpc::ABORTED, "Bad connection");
+        complete(null_msg, status);
+    }
+};
+
 nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string& client) {
     nuraft::ptr< nuraft::rpc_client > new_client;
 
@@ -121,6 +129,7 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string&
             LOGDEBUGMOD(nuraft, "Re-creating client for {}", client);
             if (auto err = reinit_client(client, it->second); err) {
                 LOGERROR("Failed to re-initialize client {}: {}", client, err.message());
+                new_client = std::make_shared<grpc_error_client>();
             } else {
                 new_client = it->second;
             }
@@ -128,6 +137,7 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string&
             LOGDEBUGMOD(nuraft, "Creating client for {}", client);
             if (auto err = create_client(client, it->second); err) {
                 LOGERROR("Failed to create client for {}: {}", client, err.message());
+                new_client = std::make_shared<grpc_error_client>();
             } else {
                 new_client = it->second;
             }
