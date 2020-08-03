@@ -6,8 +6,8 @@ pipeline {
         ARTIFACTORY_PASS = credentials('ARTIFACTORY_PASS')
         CONAN_USER = 'sds'
         MASTER_BRANCH = 'master'
-        DEVELOP_BRANCH = 'develop/v*'
-        STABLE_BRANCH = 'testing/v*'
+        DEVELOP_BRANCH = 'testing/v*'
+        STABLE_BRANCH = 'stable/v*'
     }
 
     stages {
@@ -17,7 +17,7 @@ pipeline {
                 branch "${STABLE_BRANCH}"
             } } }
             steps {
-                sh(script: "sed -Ei 's,version = .*\"([[:digit:]]+\\.[[:digit:]]+\\.[[:digit:]]+).*,version = \"\\1+b${env.BUILD_NUMBER}\",' conanfile.py")
+                sh(script: "sed -Ei 's,version = .*\"([[:digit:]]+\\.[[:digit:]]+\\.[[:digit:]]+).*,version = \"\\1-${env.BUILD_NUMBER}\",' conanfile.py")
             }
         }
 
@@ -63,7 +63,7 @@ pipeline {
                             branch "${STABLE_BRANCH}"
                         } } }
                         steps {
-                            sh(script: "sed -Ei 's,version = .*\"([[:digit:]]+\\.[[:digit:]]+\\.[[:digit:]]+).*,version = \"\\1+b${env.BUILD_NUMBER}\",' conanfile.py")
+                            sh(script: "sed -Ei 's,version = .*\"([[:digit:]]+\\.[[:digit:]]+\\.[[:digit:]]+).*,version = \"\\1-${env.BUILD_NUMBER}\",' conanfile.py")
                         }
                     }
 
