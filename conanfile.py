@@ -22,9 +22,9 @@ class NuRaftGRPCConan(ConanFile):
         )
 
     requires = (
-            "nuraft/1.5.2@sds/testing",
-            "sds_grpc/1.1.14@sds/testing",
-            "sds_logging/7.0.2@sds/testing",
+            "nuraft/[~=1.5]@sds/testing",
+            "sds_grpc/[~=1.1]@sds/testing",
+            "sds_logging/[~=7.0]@sds/testing",
 
             "openssl/1.1.1g",
         )
