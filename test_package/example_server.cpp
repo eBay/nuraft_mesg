@@ -23,7 +23,7 @@ SDS_OPTION_GROUP(server, (server_id, "", "server_id", "Servers ID",
                           cxxopts::value<uint32_t>(), ""))
 
 SDS_OPTIONS_ENABLE(logging, server)
-SDS_LOGGING_INIT(nuraft)
+SDS_LOGGING_INIT(nuraft, nublox_logstore)
 
 int main(int argc, char** argv) {
   SDS_OPTIONS_LOAD(argc, argv, logging, server);
