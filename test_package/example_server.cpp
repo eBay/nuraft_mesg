@@ -11,6 +11,8 @@
 #include <sds_logging/logging.h>
 #include <sds_options/options.h>
 #include <nuraft_grpc/simple_server.hpp>
+#include <iomgr/reactor.hpp>
+#include <engine/common/homestore_header.hpp>
 
 #include "example_factory.h"
 #include "example_logger.h"
@@ -23,7 +25,8 @@ SDS_OPTION_GROUP(server, (server_id, "", "server_id", "Servers ID",
                           cxxopts::value<uint32_t>(), ""))
 
 SDS_OPTIONS_ENABLE(logging, server)
-SDS_LOGGING_INIT(nuraft, nublox_logstore)
+SDS_LOGGING_INIT(nuraft, nublox_logstore, HOMESTORE_LOG_MODS)
+THREAD_BUFFER_INIT;
 
 int main(int argc, char** argv) {
   SDS_OPTIONS_LOAD(argc, argv, logging, server);
