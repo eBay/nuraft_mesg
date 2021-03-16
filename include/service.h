@@ -61,6 +61,7 @@ public:
     msg_service& operator=(msg_service const&) = delete;
 
     nuraft::cmd_result_code add_srv(group_name_t const& group_name, nuraft::srv_config const& cfg);
+    nuraft::cmd_result_code rm_srv(group_name_t const& group_name, int const member_id);
 
     nuraft::cmd_result_code append_entries(group_name_t const& group_name,
                                            std::vector< nuraft::ptr< nuraft::buffer > > const& logs);
