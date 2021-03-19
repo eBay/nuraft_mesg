@@ -71,7 +71,7 @@ public:
 
     ::grpc::Status raftStep(RaftGroupMsg& request, RaftGroupMsg& response);
 
-    std::error_condition createRaftGroup(group_name_t const& group_name) { return joinRaftGroup(0, group_name); }
+    std::error_condition createRaftGroup(int const srv_id, group_name_t const& group_name) { return joinRaftGroup(srv_id, group_name); }
 
     std::error_condition joinRaftGroup(int32_t srv_id, group_name_t const& group_name);
 
