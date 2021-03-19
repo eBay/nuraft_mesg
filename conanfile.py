@@ -4,7 +4,7 @@ from conans import ConanFile, CMake, tools
 
 class NuRaftGRPCConan(ConanFile):
     name = "nuraft_grpc"
-    version = "1.1.9"
+    version = "2.0.1"
 
     license = "Apache 2.0"
     url = "https://github.corp.ebay.com/SDS/nuraft_grpc"
