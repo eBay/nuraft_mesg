@@ -33,6 +33,8 @@ public:
         REGISTER_COUNTER(group_sends, "Total group messages sent", "raft_group", {"op", "send"});
         register_me_to_farm();
     }
+
+    ~group_metrics() { deregister_me_from_farm(); }
 };
 
 using get_server_ctx_cb =
@@ -71,7 +73,9 @@ public:
 
     ::grpc::Status raftStep(RaftGroupMsg& request, RaftGroupMsg& response);
 
-    std::error_condition createRaftGroup(int const srv_id, group_name_t const& group_name) { return joinRaftGroup(srv_id, group_name); }
+    std::error_condition createRaftGroup(int const srv_id, group_name_t const& group_name) {
+        return joinRaftGroup(srv_id, group_name);
+    }
 
     std::error_condition joinRaftGroup(int32_t srv_id, group_name_t const& group_name);
 
