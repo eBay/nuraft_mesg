@@ -14,7 +14,7 @@ class TestPackageConan(ConanFile):
 
     requires = (
             "nlohmann_json/3.8.0",
-            "nublox_logstore/[~=1, include_prerelease=True]@sds/master",
+            "jungle_logstore/[~=2, include_prerelease=True]@sds/master",
         )
 
     def build(self):

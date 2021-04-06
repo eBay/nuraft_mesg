@@ -11,8 +11,6 @@
 #include <libnuraft/nuraft.hxx>
 #include <sds_logging/logging.h>
 #include <sds_options/options.h>
-#include <iomgr/reactor.hpp>
-#include <engine/common/homestore_header.hpp>
 
 #include "example_factory.h"
 
@@ -24,8 +22,7 @@ SDS_OPTION_GROUP(client, (add, "a", "add", "Add a server to the cluster", cxxopt
                  (remove, "r", "remove", "Remove server from cluster", cxxopts::value< uint32_t >(), "id"))
 
 SDS_OPTIONS_ENABLE(logging, client)
-SDS_LOGGING_INIT(nuraft, HOMESTORE_LOG_MODS)
-THREAD_BUFFER_INIT;
+SDS_LOGGING_INIT(nuraft)
 
 using namespace sds;
 
