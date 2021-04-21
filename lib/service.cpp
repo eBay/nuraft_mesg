@@ -12,6 +12,7 @@
 
 #include "grpcpp/impl/codegen/status_code_enum.h"
 #include "libnuraft/async.hxx"
+#include "libnuraft/rpc_listener.hxx"
 #include "service.h"
 
 SDS_LOGGING_DECL(sds_msg)
@@ -20,7 +21,15 @@ namespace sds::messaging {
 
 using AsyncRaftSvc = Messaging::AsyncService;
 
-msg_service::~msg_service() = default;
+shared< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, std::string const& service_address) {
+    return std::shared_ptr< msg_service >(new msg_service(get_server_ctx, service_address),
+                                          [](msg_service* p) { delete p; });
+}
+
+msg_service::~msg_service() {
+    std::unique_lock< lock_type > lck(_raft_servers_lock);
+    DEBUG_ASSERT(_raft_servers.empty(), "RAFT servers not fully terminated!");
+}
 
 void msg_service::associate(::sds::grpc::GrpcServer* server) {
     RELEASE_ASSERT(server, "NULL server!");
@@ -115,7 +124,7 @@ nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_na
             return server->step(*request.mutable_message(), *response.mutable_message());
         } catch (std::runtime_error& rte) { LOGERRORMOD(sds_msg, "Caught exception during step(): {}", rte.what()); }
     } else {
-        LOGWARNMOD(sds_msg, "Missing RAFT group: {}", group_name);
+        LOGDEBUGMOD(sds_msg, "Missing RAFT group: {}", group_name);
     }
     return ::grpc::Status(::grpc::NOT_FOUND, "Missing RAFT group");
 }
@@ -129,6 +138,39 @@ public:
     void associate(sds::grpc::GrpcServer*) override{};
     void bind(sds::grpc::GrpcServer*) override{};
 };
+
+class msg_group_listner : public nuraft::rpc_listener {
+    shared< msg_service > _svc;
+    group_name_t _group;
+
+public:
+    msg_group_listner(shared< msg_service > svc, group_name_t const& group) : _svc(svc), _group(group) {}
+    ~msg_group_listner() {
+        _svc->shutdown_for(_group);
+    }
+
+    void listen(nuraft::ptr< nuraft::msg_handler >& handler) override {
+        LOGINFOMOD(sds_msg, "Begin listening on {}", _group);
+    }
+    void stop() override { LOGINFOMOD(sds_msg, "Stop {}", _group); }
+    void shutdown() override {
+        LOGINFOMOD(sds_msg, "Shutdown {}", _group);
+    }
+};
+
+void msg_service::shutdown_for(group_name_t const& group_name) {
+    {
+        std::unique_lock< lock_type > lck(_raft_servers_lock);
+        LOGDEBUGMOD(sds_msg, "Shutting down RAFT group: {}", group_name);
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
+            _raft_servers.erase(it);
+        } else {
+            LOGWARNMOD(sds_msg, "Unknown RAFT group: {} cannot shutdown.", group_name);
+            return;
+        }
+    }
+    _raft_servers_sync.notify_all();
+}
 
 std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_name) {
     LOGINFOMOD(sds_msg, "Joining RAFT group: {}", group_name);
@@ -144,6 +186,9 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
                 LOGERRORMOD(sds_msg, "Error during RAFT server creation on group {}: {}", group_name, err.message());
                 return err;
             }
+            DEBUG_ASSERT(!ctx->rpc_listener_, "RPC listner should not be set!");
+            auto new_listner = std::make_shared< msg_group_listner >(shared_from_this(), group_name);
+            ctx->rpc_listener_ = std::static_pointer_cast< nuraft::rpc_listener >(new_listner);
             auto server = std::make_shared< nuraft::raft_server >(ctx);
             it->second.m_server = std::make_shared< null_service >(server);
         }
@@ -152,14 +197,12 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
 }
 
 void msg_service::partRaftGroup(group_name_t const& group_name) {
-    LOGINFOMOD(sds_msg, "Parting RAFT group: {}", group_name);
     shared< grpc_server > server;
 
     {
         std::unique_lock< lock_type > lck(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
             server = it->second.m_server;
-            _raft_servers.erase(it);
         } else {
             LOGWARNMOD(sds_msg, "Unknown RAFT group: {} cannot part.", group_name);
             return;
@@ -167,8 +210,33 @@ void msg_service::partRaftGroup(group_name_t const& group_name) {
     }
 
     if (auto raft_server = server->raft_server(); raft_server) {
+        LOGINFOMOD(sds_msg, "Parting RAFT group: {}", group_name);
         raft_server->stop_server();
         raft_server->shutdown();
     }
 }
+
+void msg_service::shutdown() {
+    LOGINFOMOD(sds_msg, "MessagingService shutdown started.");
+    std::deque< shared< grpc_server > > servers;
+
+    {
+        std::unique_lock< lock_type > lck(_raft_servers_lock);
+        for (auto& [k, v] : _raft_servers) {
+            servers.push_back(v.m_server);
+        }
+    }
+
+    for (auto& server : servers) {
+        server->raft_server()->stop_server();
+        server->raft_server()->shutdown();
+    }
+
+    {
+        std::unique_lock< lock_type > lck(_raft_servers_lock);
+        _raft_servers_sync.wait(lck, [this]() { return _raft_servers.empty(); });
+    }
+    LOGINFOMOD(sds_msg, "MessagingService shutdown complete.");
+}
+
 } // namespace sds::messaging

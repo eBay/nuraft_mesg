@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <condition_variable>
 #include <map>
 #include <shared_mutex>
 #include <nuraft_grpc/grpc_server.hpp>
@@ -49,18 +50,25 @@ struct grpc_server_wrapper {
     shared< group_metrics > m_metrics;
 };
 
-class msg_service {
+class msg_service : public std::enable_shared_from_this< msg_service > {
     get_server_ctx_cb _get_server_ctx;
+    std::mutex _raft_sync_lock;
+    std::condition_variable_any _raft_servers_sync;
     lock_type _raft_servers_lock;
     std::map< group_name_t, grpc_server_wrapper > _raft_servers;
     std::string const _service_address;
 
-public:
     msg_service(get_server_ctx_cb get_server_ctx, std::string const& service_address) :
             _get_server_ctx(get_server_ctx), _service_address(service_address) {}
     ~msg_service();
+
+public:
+    static shared<msg_service> create(get_server_ctx_cb get_server_ctx, std::string const& service_address);
+
     msg_service(msg_service const&) = delete;
     msg_service& operator=(msg_service const&) = delete;
+
+    void shutdown();
 
     nuraft::cmd_result_code add_srv(group_name_t const& group_name, nuraft::srv_config const& cfg);
     nuraft::cmd_result_code rm_srv(group_name_t const& group_name, int const member_id);
@@ -80,6 +88,9 @@ public:
     std::error_condition joinRaftGroup(int32_t srv_id, group_name_t const& group_name);
 
     void partRaftGroup(group_name_t const& group_name);
+
+    // Internal intent only
+    void shutdown_for(group_name_t const&);
 };
 
 } // namespace sds::messaging
