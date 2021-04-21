@@ -26,7 +26,7 @@ class simple_server : public grpc_server {
     using grpc_server::grpc_server;
 
     ~simple_server() override {
-        if (auto srv = raft_server()) {
+        if (auto srv = raft_server(); srv) {
             srv->stop_server();
             srv->shutdown();
         }
