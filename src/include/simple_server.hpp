@@ -25,6 +25,14 @@ class simple_server : public grpc_server {
  public:
     using grpc_server::grpc_server;
 
+    ~simple_server() override {
+        if (auto srv = raft_server()) {
+            srv->stop_server();
+            srv->shutdown();
+        }
+    }
+
+
     void associate(sds::grpc::GrpcServer* server) override {
         assert(server);
         if (!server->register_async_service<RaftSvc>()) {

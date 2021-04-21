@@ -25,7 +25,7 @@ class grpc_server {
 
 public:
     explicit grpc_server(shared< nuraft::raft_server >& raft_server) : _raft_server(raft_server) {}
-    virtual ~grpc_server();
+    virtual ~grpc_server() = default;
     grpc_server(const grpc_server&) = delete;
     grpc_server& operator=(const grpc_server&) = delete;
 
