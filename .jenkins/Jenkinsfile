@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        ORG = 'sds'
         ARTIFACTORY_PASS = credentials('ARTIFACTORY_PASS')
         CONAN_USER = 'sds'
         MASTER_BRANCH = 'master'
@@ -63,7 +62,7 @@ pipeline {
                 axes {
                     axis {
                         name 'BUILD_TYPE'
-                        values 'debug', 'release', 'test'
+                        values 'sanitize', 'debug', 'test'
                     }
                     axis {
                         name 'COVERAGE'
@@ -72,7 +71,7 @@ pipeline {
                 excludes { exclude {
                     axis {
                         name 'BUILD_TYPE'
-                        values 'release', 'test'
+                        values 'sanitize', 'test'
                     }
                     axis {
                         name 'COVERAGE'
@@ -92,23 +91,36 @@ pipeline {
                     }
 
                     stage("Build") {
-                        when {
+                        when { allOf {
                             expression { "${COVERAGE}" == 'False' }
-                        }
+                            expression { "${BUILD_TYPE}" != 'sanitize' }
+                        } }
                         steps {
                             sh "conan create ${BUILD_MISSING} -pr ${BUILD_TYPE} . ${PROJECT}/${TAG}"
                         }
                     }
+
+                    stage("Sanitize") {
+                        when { allOf {
+                            expression { "${BUILD_TYPE}" == 'sanitize' }
+                        } }
+                        steps {
+                            sh "conan create ${BUILD_MISSING} -o ${PROJECT}:sanitize=True -pr debug . ${PROJECT}/${TAG}"
+                        }
+                    }
+
                     stage("Deploy") {
                         when { allOf {
                             expression { "${COVERAGE}" == 'False' }
-                            expression { not { branch "PR_*" } }
+                            expression { "${BUILD_TYPE}" != 'sanitize' }
+                            expression { !(env.BRANCH_NAME =~ /PR-/) }
                         } }
                         steps {
                             sh "conan user -r ebay-local -p ${ARTIFACTORY_PASS} _service_sds"
                             sh "conan upload ${PROJECT}/${TAG} -c --all -r ebay-local"
                         }
                     }
+
                     stage('Coverage') {
                         when { not { anyOf {
                             branch "${STABLE_BRANCH}"

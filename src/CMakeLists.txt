@@ -1,5 +1,4 @@
-set(CPP_WARNINGS "-Wall -Wextra -Werror -Wno-unused-parameter")
-set(CMAKE_CXX_FLAGS "${CPP_WARNINGS} ${CMAKE_CXX_FLAGS}")
+add_compile_options(-Wall -Wextra -Werror -Wno-unused-parameter)
 
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
                             proto/raft_types.proto

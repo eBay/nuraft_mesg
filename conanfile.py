@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from conans import ConanFile, CMake, tools
+import os
 
 class NuRaftGRPCConan(ConanFile):
     name = "nuraft_grpc"
@@ -9,33 +10,36 @@ class NuRaftGRPCConan(ConanFile):
     license = "Apache 2.0"
     url = "https://github.corp.ebay.com/SDS/nuraft_grpc"
     description = "A gRPC service for nuraft"
-    revision_mode = "scm"
 
     settings = "arch", "os", "compiler", "build_type"
-    options = {
-        "shared": ['True', 'False'],
-        "fPIC": ['True', 'False'],
-        "sanitize": ['True', 'False'],
-        }
-    default_options = (
-        'shared=False',
-        'fPIC=True',
-        'sanitize=False',
-        )
-
-    requires = (
-            "nuraft/[~=1.8, include_prerelease=True]@nudata/master",
-            "sds_grpc/[~=2, include_prerelease=True]@sds/master",
-            "sds_logging/[~=9, include_prerelease=True]@sds/master",
-        )
 
     generators = "cmake"
-    exports = ["LICENSE.md"]
-    exports_sources = "CMakeLists.txt", "cmake/*", "src/*"
+    requires = (
+                "nuraft/[~=1.8, include_prerelease=True]@nudata/master",
+                "sds_grpc/[~=2, include_prerelease=True]@sds/master",
+                "sds_logging/[~=9, include_prerelease=True]@sds/master",
+                )
+    options = {
+                "shared": ['True', 'False'],
+                "fPIC": ['True', 'False'],
+                "sanitize": ['True', 'False'],
+                }
+    default_options = (
+                        'shared=False',
+                        'fPIC=True',
+                        'sanitize=False',
+                        )
 
-    def configure(self):
-        if self.settings.build_type == "Debug":
-            self.options.sanitize = True
+    exports = ["LICENSE.md"]
+    exports_sources = (
+                        "CMakeLists.txt",
+                        "cmake/*",
+                        "src/*",
+                        )
+
+    def config_options(self):
+        if self.settings.build_type != "Debug":
+            del self.options.sanitize
 
     def build(self):
         cmake = CMake(self)
@@ -45,27 +49,34 @@ class NuRaftGRPCConan(ConanFile):
                        'MEMORY_SANITIZER_ON': 'OFF'}
         test_target = None
 
-        if self.options.sanitize:
-            definitions['MEMORY_SANITIZER_ON'] = 'ON'
+        run_tests = True
+        if self.settings.build_type == "Debug":
+            if self.options.sanitize:
+                definitions['MEMORY_SANITIZER_ON'] = 'ON'
+            else:
+                if (None == os.getenv("RUN_TESTS")):
+                    run_tests = False
 
         cmake.configure(defs=definitions)
         cmake.build()
-        cmake.test(target=test_target)
+        if run_tests:
+            cmake.test(target=test_target)
 
     def package(self):
+        self.copy("*.h", dst="include/nuraft_grpc", keep_path=False)
+        self.copy("*.hpp", dst="include/nuraft_grpc", keep_path=False)
         self.copy("*.dll", dst="bin", keep_path=False)
         self.copy("*.dylib*", dst="lib", keep_path=False)
         self.copy("*.so", dst="lib", keep_path=False)
         self.copy("*.a", dst="lib", keep_path=False)
         self.copy("*.lib", dst="lib", keep_path=False)
         self.copy("*.proto", dst="proto/", keep_path=False)
-        self.copy("*.h", dst="include/nuraft_grpc", keep_path=False)
-        self.copy("*.hpp", dst="include/nuraft_grpc", keep_path=False)
 
     def package_info(self):
         self.cpp_info.libs = tools.collect_libs(self)
-        if self.options.sanitize:
-            self.cpp_info.sharedlinkflags.append("-fsanitize=address")
-            self.cpp_info.exelinkflags.append("-fsanitize=address")
-            self.cpp_info.sharedlinkflags.append("-fsanitize=undefined")
-            self.cpp_info.exelinkflags.append("-fsanitize=undefined")
+        if self.settings.build_type == "Debug":
+            if self.options.sanitize:
+                self.cpp_info.sharedlinkflags.append("-fsanitize=address")
+                self.cpp_info.exelinkflags.append("-fsanitize=address")
+                self.cpp_info.sharedlinkflags.append("-fsanitize=undefined")
+                self.cpp_info.exelinkflags.append("-fsanitize=undefined")
