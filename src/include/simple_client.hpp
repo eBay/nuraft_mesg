@@ -16,18 +16,15 @@
 
 namespace sds {
 
-class simple_grpc_client :
-    public grpc_client<RaftSvc>
-{
- public:
-    using grpc_client<RaftSvc>::grpc_client;
+class simple_grpc_client : public grpc_client< RaftSvc > {
+public:
+    using grpc_client< RaftSvc >::grpc_client;
 
- protected:
-    void send(RaftMessage const &message, handle_resp complete) override {
-        _stub->call_unary<RaftMessage, RaftMessage>(message,
-                                                    &RaftSvc::StubInterface::AsyncStep,
-                                                    complete);
+protected:
+    void send(RaftMessage const& message, handle_resp complete) override {
+        _stub->call_unary< RaftMessage, RaftMessage >(message, &RaftSvc::StubInterface::AsyncStep, complete,
+                                                      2 /*second-deadline*/);
     }
 };
 
-}
+} // namespace sds
