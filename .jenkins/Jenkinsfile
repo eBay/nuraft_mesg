@@ -98,6 +98,14 @@ pipeline {
                         steps {
                             sh "conan create ${BUILD_MISSING} -pr ${BUILD_TYPE} . ${PROJECT}/${TAG}"
                         }
+                        post {
+                            failure {
+                                script {
+                                    sh "find . -name \"*_log\" -print | xargs tar cif logs.tar"
+                                }
+                                archiveArtifacts artifacts: "logs.tar", fingerprint: true
+                            }
+                        }
                     }
 
                     stage("Sanitize") {
@@ -106,6 +114,14 @@ pipeline {
                         } }
                         steps {
                             sh "conan create ${BUILD_MISSING} -o ${PROJECT}:sanitize=True -pr debug . ${PROJECT}/${TAG}"
+                        }
+                        post {
+                            failure {
+                                script {
+                                    sh "find . -name \"*_log\" -print | xargs tar cif logs.tar"
+                                }
+                                archiveArtifacts artifacts: "logs.tar", fingerprint: true
+                            }
                         }
                     }
 
