@@ -32,7 +32,8 @@ public:
             complete(*response.mutable_message(), status);
         };
 
-        _stub->call_unary< RaftGroupMsg, RaftGroupMsg >(message, &Messaging::StubInterface::AsyncRaftStep, group_compl);
+        _stub->call_unary< RaftGroupMsg, RaftGroupMsg >(message, &Messaging::StubInterface::AsyncRaftStep, group_compl,
+                                                        2 /* deadline in seconds */);
     }
 
 protected:
