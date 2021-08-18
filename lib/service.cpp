@@ -58,7 +58,7 @@ nuraft::cmd_result_code msg_service::add_srv(group_name_t const& group_name, nur
     if (server) {
         try {
             return server->add_srv(cfg)->get_result_code();
-        } catch (std::runtime_error& rte) { LOGERRORMOD(sds_msg, "Caught exception during step(): {}", rte.what()); }
+        } catch (std::runtime_error& rte) { LOGERRORMOD(sds_msg, "Caught exception during add_srv(): {}", rte.what()); }
     }
     return nuraft::SERVER_NOT_FOUND;
 }
@@ -72,9 +72,24 @@ nuraft::cmd_result_code msg_service::rm_srv(group_name_t const& group_name, int 
     if (server) {
         try {
             return server->rem_srv(member_id)->get_result_code();
-        } catch (std::runtime_error& rte) { LOGERRORMOD(sds_msg, "Caught exception during step(): {}", rte.what()); }
+        } catch (std::runtime_error& rte) { LOGERRORMOD(sds_msg, "Caught exception during rm_srv(): {}", rte.what()); }
     }
     return nuraft::SERVER_NOT_FOUND;
+}
+
+void msg_service::yield_leadership(group_name_t const& group_name) {
+    shared< sds::grpc_server > server;
+    {
+        std::shared_lock< lock_type > rl(_raft_servers_lock);
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
+    }
+    if (server) {
+        try {
+            server->yield_leadership();
+        } catch (std::runtime_error& rte) {
+            LOGERRORMOD(sds_msg, "Caught exception during yield_leadership(): {}", rte.what())
+        }
+    }
 }
 
 nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_name,
@@ -145,17 +160,13 @@ class msg_group_listner : public nuraft::rpc_listener {
 
 public:
     msg_group_listner(shared< msg_service > svc, group_name_t const& group) : _svc(svc), _group(group) {}
-    ~msg_group_listner() {
-        _svc->shutdown_for(_group);
-    }
+    ~msg_group_listner() { _svc->shutdown_for(_group); }
 
     void listen(nuraft::ptr< nuraft::msg_handler >& handler) override {
         LOGINFOMOD(sds_msg, "Begin listening on {}", _group);
     }
     void stop() override { LOGINFOMOD(sds_msg, "Stop {}", _group); }
-    void shutdown() override {
-        LOGINFOMOD(sds_msg, "Shutdown {}", _group);
-    }
+    void shutdown() override { LOGINFOMOD(sds_msg, "Shutdown {}", _group); }
 };
 
 void msg_service::shutdown_for(group_name_t const& group_name) {
