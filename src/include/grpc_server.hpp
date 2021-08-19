@@ -33,7 +33,7 @@ public:
 
     nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > > rem_srv(int const member_id);
 
-    void yield_leadership();
+    bool request_leadership();
 
     nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > >
     append_entries(const std::vector< nuraft::ptr< nuraft::buffer > >& logs);

@@ -44,8 +44,8 @@ nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > > grpc_server::
     return _raft_server->add_srv(cfg);
 }
 
-void grpc_server::yield_leadership() {
-    return _raft_server->yield_leadership();
+bool grpc_server::request_leadership() {
+    return _raft_server->request_leadership();
 }
 
 nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > > grpc_server::rem_srv(int const member_id) {
