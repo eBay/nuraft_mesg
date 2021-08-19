@@ -77,7 +77,7 @@ nuraft::cmd_result_code msg_service::rm_srv(group_name_t const& group_name, int 
     return nuraft::SERVER_NOT_FOUND;
 }
 
-void msg_service::yield_leadership(group_name_t const& group_name) {
+bool msg_service::request_leadership(group_name_t const& group_name) {
     shared< sds::grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
@@ -85,11 +85,12 @@ void msg_service::yield_leadership(group_name_t const& group_name) {
     }
     if (server) {
         try {
-            server->yield_leadership();
+            return server->request_leadership();
         } catch (std::runtime_error& rte) {
             LOGERRORMOD(sds_msg, "Caught exception during yield_leadership(): {}", rte.what())
         }
     }
+    return false;
 }
 
 nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_name,
