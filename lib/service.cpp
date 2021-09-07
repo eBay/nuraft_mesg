@@ -8,8 +8,6 @@
 //   Messaging service routines
 //
 
-#include <sds_grpc/server.h>
-
 #include "grpcpp/impl/codegen/status_code_enum.h"
 #include "libnuraft/async.hxx"
 #include "libnuraft/rpc_listener.hxx"
@@ -31,7 +29,7 @@ msg_service::~msg_service() {
     DEBUG_ASSERT(_raft_servers.empty(), "RAFT servers not fully terminated!");
 }
 
-void msg_service::associate(::sds::grpc::GrpcServer* server) {
+void msg_service::associate(::grpc_helper::GrpcServer* server) {
     RELEASE_ASSERT(server, "NULL server!");
     if (!server->register_async_service< Messaging >()) {
         LOGERRORMOD(nuraft, "Could not register RaftSvc with gRPC!");
@@ -39,18 +37,18 @@ void msg_service::associate(::sds::grpc::GrpcServer* server) {
     }
 }
 
-void msg_service::bind(::sds::grpc::GrpcServer* server) {
+void msg_service::bind(::grpc_helper::GrpcServer* server) {
     RELEASE_ASSERT(server, "NULL server!");
-    if (!server->register_rpc< Messaging, RaftGroupMsg, RaftGroupMsg >(
-            &AsyncRaftSvc::RequestRaftStep,
-            std::bind(&msg_service::raftStep, this, std::placeholders::_1, std::placeholders::_2))) {
+    if (!server->register_rpc< Messaging, RaftGroupMsg, RaftGroupMsg, false >(
+            "RaftStep", &AsyncRaftSvc::RequestRaftStep,
+            std::bind(&msg_service::raftStep, this, std::placeholders::_1))) {
         LOGERRORMOD(nuraft, "Could not bind gRPC ::RaftStep to routine!");
         abort();
     }
 }
 
 nuraft::cmd_result_code msg_service::add_srv(group_name_t const& group_name, nuraft::srv_config const& cfg) {
-    shared< sds::grpc_server > server;
+    shared< nuraft_grpc::grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
@@ -64,7 +62,7 @@ nuraft::cmd_result_code msg_service::add_srv(group_name_t const& group_name, nur
 }
 
 nuraft::cmd_result_code msg_service::rm_srv(group_name_t const& group_name, int const member_id) {
-    shared< sds::grpc_server > server;
+    shared< nuraft_grpc::grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
@@ -78,7 +76,7 @@ nuraft::cmd_result_code msg_service::rm_srv(group_name_t const& group_name, int 
 }
 
 bool msg_service::request_leadership(group_name_t const& group_name) {
-    shared< sds::grpc_server > server;
+    shared< nuraft_grpc::grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
@@ -95,7 +93,7 @@ bool msg_service::request_leadership(group_name_t const& group_name) {
 
 nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_name,
                                                     std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
-    shared< sds::grpc_server > server;
+    shared< nuraft_grpc::grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
@@ -108,7 +106,9 @@ nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_na
     return nuraft::SERVER_NOT_FOUND;
 }
 
-::grpc::Status msg_service::raftStep(RaftGroupMsg& request, RaftGroupMsg& response) {
+bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data) {
+    auto& request = rpc_data->request();
+    auto& response = rpc_data->response();
     auto const& group_name = request.group_name();
     auto const& intended_addr = request.intended_addr();
 
@@ -117,7 +117,8 @@ nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_na
     if (intended_addr != _service_address) {
         LOGWARNMOD(sds_msg, "Recieved mesg for {} intended for {}, we are {}",
                    nuraft::msg_type_to_string(nuraft::msg_type(base.type())), intended_addr, _service_address);
-        return ::grpc::Status(::grpc::INVALID_ARGUMENT, "Bad service address {}", intended_addr);
+        rpc_data->set_status(::grpc::Status(::grpc::INVALID_ARGUMENT, "Bad service address {}", intended_addr));
+        return true;
     }
 
     LOGTRACEMOD(sds_msg, "Received [{}] from: [{}] to: [{}] Group: [{}]",
@@ -125,7 +126,7 @@ nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_na
 
     if (nuraft::join_cluster_request == base.type()) { joinRaftGroup(base.dest(), group_name); }
 
-    shared< sds::grpc_server > server;
+    shared< nuraft_grpc::grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
@@ -137,22 +138,24 @@ nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_na
     response.set_group_name(group_name);
     if (server) {
         try {
-            return server->step(*request.mutable_message(), *response.mutable_message());
+            server->step(request.message(), *response.mutable_message());
+            return true;
         } catch (std::runtime_error& rte) { LOGERRORMOD(sds_msg, "Caught exception during step(): {}", rte.what()); }
     } else {
         LOGDEBUGMOD(sds_msg, "Missing RAFT group: {}", group_name);
     }
-    return ::grpc::Status(::grpc::NOT_FOUND, "Missing RAFT group");
+    rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND, "Missing RAFT group"));
+    return true;
 }
 
 // We've hooked the gRPC server up to our "super-server", so we
 // do not need to bind the grpc_servers to anything...just piggy-backing
 // on their ::step() and transformations.
-class null_service final : public sds::grpc_server {
+class null_service final : public nuraft_grpc::grpc_server {
 public:
-    using sds::grpc_server::grpc_server;
-    void associate(sds::grpc::GrpcServer*) override{};
-    void bind(sds::grpc::GrpcServer*) override{};
+    using nuraft_grpc::grpc_server::grpc_server;
+    void associate(grpc_helper::GrpcServer*) override{};
+    void bind(grpc_helper::GrpcServer*) override{};
 };
 
 class msg_group_listner : public nuraft::rpc_listener {
@@ -209,7 +212,7 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
 }
 
 void msg_service::partRaftGroup(group_name_t const& group_name) {
-    shared< grpc_server > server;
+    shared< nuraft_grpc::grpc_server > server;
 
     {
         std::unique_lock< lock_type > lck(_raft_servers_lock);
@@ -230,7 +233,7 @@ void msg_service::partRaftGroup(group_name_t const& group_name) {
 
 void msg_service::shutdown() {
     LOGINFOMOD(sds_msg, "MessagingService shutdown started.");
-    std::deque< shared< grpc_server > > servers;
+    std::deque< shared< nuraft_grpc::grpc_server > > servers;
 
     {
         std::unique_lock< lock_type > lck(_raft_servers_lock);
