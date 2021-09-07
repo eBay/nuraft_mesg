@@ -19,12 +19,12 @@
 
 SDS_LOGGING_DECL(nuraft)
 
-namespace sds {
+namespace nuraft_grpc {
 
-template<typename T>
-using boxed = std::unique_ptr<T>;
+template < typename T >
+using boxed = std::unique_ptr< T >;
 
-template<typename T>
-using shared = std::shared_ptr<T>;
+template < typename T >
+using shared = std::shared_ptr< T >;
 
-}
+} // namespace nuraft_grpc
