@@ -11,5 +11,8 @@ include_directories(BEFORE include ${GRPC_INC} "${CONAN_INCLUDE_DIRS_SDS_PROTO}/
 add_library(sds_messaging
               lib/factory.cpp
               lib/service.cpp
+              lib/messaging.cpp
               $<TARGET_OBJECTS:mesg_pb>
               $<TARGET_OBJECTS:mesg_rpc>)
+
+add_subdirectory(tests)
