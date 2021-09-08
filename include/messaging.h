@@ -1,55 +1,70 @@
-///
-// Copyright 2018, eBay Corporation
-///
-
 #pragma once
 
+#include <condition_variable>
+#include <future>
 #include <list>
-#include <memory>
+#include <map>
+#include <mutex>
 #include <string>
 #include <system_error>
 
-#include <libnuraft/nuraft.hxx>
+#include <sds_logging/logging.h>
+
+#include "messaging_if.h"
+
+namespace grpc_helper {
+class GrpcServer;
+} // namespace grpc_helper
 
 namespace sds::messaging {
+class group_factory;
+class msg_service;
+class group_metrics;
 
-class mesg_state_mgr : public nuraft::state_mgr {
+class consensus_impl : public consensus_component {
+    std::string _node_id;
+    int32_t _srv_id;
+
+    std::map< std::string, consensus_component::create_state_mgr_cb > _create_state_mgr_funcs;
+
+    std::shared_ptr<::sds::messaging::group_factory > _g_factory;
+    std::shared_ptr<::sds::messaging::msg_service > _mesg_service;
+    std::unique_ptr<::grpc_helper::GrpcServer > _grpc_server;
+
+    std::mutex mutable _manager_lock;
+    std::map< std::string, std::shared_ptr< mesg_state_mgr > > _state_managers;
+
+    std::condition_variable _leadership_change;
+    std::map< std::string, bool > _is_leader;
+
+    nuraft::ptr< nuraft::delayed_task_scheduler > _scheduler;
+    std::shared_ptr< sds_logging::logger_t > _custom_logger;
+
+    std::error_condition group_init(int32_t const srv_id, std::string const& group_id, std::string const& group_type, nuraft::context*& ctx,
+                                    std::shared_ptr< sds::messaging::group_metrics > metrics,
+                                    sds::messaging::msg_service* sds_msg);
+    nuraft::cb_func::ReturnCode callback_handler(std::string const& group_id, nuraft::cb_func::Type type,
+                                                 nuraft::cb_func::Param* param);
+
 public:
-    using nuraft::state_mgr::state_mgr;
+    consensus_impl();
+    ~consensus_impl() override;
 
-    virtual void become_ready() {}
-    virtual uint32_t get_logstore_id() const = 0;
-    virtual std::shared_ptr< nuraft::state_machine > get_state_machine() = 0;
-    virtual void permanent_destroy() = 0;
+    int32_t server_id() const override { return _srv_id; }
+
+    void register_mgr_type(std::string const& group_type, register_params& params) override;
+
+    std::error_condition create_group(std::string const& group_id, std::string const& group_type) override;
+    std::error_condition join_group(std::string const& group_id, std::string const& group_type, std::shared_ptr< mesg_state_mgr > smgr) override;
+
+    void start(consensus_component::params& start_params) override;
+    bool add_member(std::string const& group_id, std::string const& server_id) override;
+    bool rem_member(std::string const& group_id, std::string const& server_id) override;
+    void leave_group(std::string const& group_id) override;
+    bool request_leadership(std::string const& group_id) override;
+    std::error_condition client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >& buf) override;
+    uint32_t logstore_id(std::string const& group_id) const override;
+    void get_peers(std::string const& group_id, std::list< std::string >&) const override;
 };
 
-class consensus_component {
-public:
-    using lookup_peer_cb = std::function< std::string(std::string const&) >;
-    using create_state_mgr_cb =
-        std::function< std::shared_ptr< mesg_state_mgr >(int32_t const srv_id, std::string const& group_id) >;
-
-    struct params {
-        std::string server_uuid;
-        uint32_t mesg_port;
-        lookup_peer_cb lookup_peer;
-        create_state_mgr_cb create_state_mgr;
-    };
-    virtual ~consensus_component() = default;
-    virtual void start(consensus_component::params& start_params) = 0;
-
-    // Send a client request to the cluster
-    virtual bool add_member(std::string const& group_id, std::string const& server_id) = 0;
-    virtual bool rem_member(std::string const& group_id, std::string const& server_id) = 0;
-    virtual std::error_condition create_group(std::string const& group_id) = 0;
-    virtual void leave_group(std::string const& group_id) = 0;
-    virtual bool request_leadership(std::string const& group_id) = 0;
-    virtual std::error_condition join_group(std::string const& group_id, std::shared_ptr< mesg_state_mgr > smgr) = 0;
-    virtual std::error_condition client_request(std::string const& group_id,
-                                                std::shared_ptr< nuraft::buffer >& buf) = 0;
-    virtual void get_peers(std::string const& group_id, std::list< std::string >&) const = 0;
-    virtual uint32_t logstore_id(std::string const& group_id) const = 0;
-    virtual int32_t server_id() const = 0;
-};
-
-} // namespace access_mgr
+} // namespace sds::messaging

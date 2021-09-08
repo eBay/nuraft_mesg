@@ -16,7 +16,7 @@
 
 #include "libnuraft/cluster_config.hxx"
 #include "libnuraft/state_machine.hxx"
-#include "consensus_impl.h"
+#include "messaging.h"
 
 #include "test_state_manager.h"
 
@@ -74,34 +74,39 @@ protected:
                 return std::string();
         };
 
-        auto create_state_mgr = [this, srv_addr = id_1](int32_t const srv_id,
-                                                  std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
-            sm_int_1 = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
-            return std::static_pointer_cast< mesg_state_mgr >(sm_int_1);
-        };
-
-        auto params = consensus_component::params{id_1, 9001, lookup_callback, create_state_mgr};
+        auto params = consensus_component::params{id_1, 9001, lookup_callback};
         instance_1->start(params);
+
+        auto register_params = consensus_component::register_params {
+            [this, srv_addr = id_1](int32_t const srv_id,
+                                    std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
+                sm_int_1 = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
+                return std::static_pointer_cast< mesg_state_mgr >(sm_int_1);
+            }
+        };
+        instance_1->register_mgr_type("test_type", register_params);
 
         params.server_uuid = id_2;
         params.mesg_port = 9002;
-        params.create_state_mgr = [srv_addr = id_2](int32_t const srv_id,
+        register_params.create_state_mgr = [srv_addr = id_2](int32_t const srv_id,
                                                     std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
             auto new_sm = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
             return std::static_pointer_cast< mesg_state_mgr >(new_sm);
         };
         instance_2->start(params);
+        instance_2->register_mgr_type("test_type", register_params);
 
         params.server_uuid = id_3;
         params.mesg_port = 9003;
-        params.create_state_mgr = [srv_addr = id_3](int32_t const srv_id,
+        register_params.create_state_mgr = [srv_addr = id_3](int32_t const srv_id,
                                                     std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
             auto new_sm = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
             return std::static_pointer_cast< mesg_state_mgr >(new_sm);
         };
         instance_3->start(params);
+        instance_3->register_mgr_type("test_type", register_params);
 
-        instance_1->create_group("test_group");
+        instance_1->create_group("test_group", "test_type");
 
         EXPECT_TRUE(instance_1->add_member("test_group", id_2));
         EXPECT_TRUE(instance_1->add_member("test_group", id_3));

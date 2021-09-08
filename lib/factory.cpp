@@ -30,7 +30,7 @@ public:
                 LOGERRORMOD(sds_msg, "Sent message to wrong service, need to disconnect!");
                 if (auto mc = weak_this.lock(); mc) { mc->bad_service.fetch_add(1, std::memory_order_relaxed); }
             }
-            complete(*response.mutable_message(), status);
+            complete(*response.mutable_msg(), status);
         };
 
         _stub->call_unary< RaftGroupMsg, RaftGroupMsg >(message, &Messaging::StubInterface::AsyncRaftStep, group_compl,
@@ -44,15 +44,17 @@ protected:
 class group_client : public nuraft_grpc::grpc_base_client {
     shared< messaging_client > _client;
     group_name_t const _group_name;
+    group_type_t const _group_type;
     shared< group_metrics > _metrics;
     std::string const _client_addr;
 
 public:
     group_client(shared< messaging_client > client, std::string const& client_addr, group_name_t const& grp_name,
-                 shared< sisl::MetricsGroupWrapper > metrics) :
+                 group_type_t const& grp_type, shared< sisl::MetricsGroupWrapper > metrics) :
             nuraft_grpc::grpc_base_client(),
             _client(client),
             _group_name(grp_name),
+            _group_type(grp_type),
             _metrics(std::static_pointer_cast< group_metrics >(metrics)),
             _client_addr(client_addr) {}
 
@@ -70,7 +72,8 @@ public:
         if (_metrics) { COUNTER_INCREMENT(*_metrics, group_sends, 1); }
         group_msg.set_intended_addr(_client_addr);
         group_msg.set_group_name(_group_name);
-        group_msg.mutable_message()->CopyFrom(message);
+        group_msg.set_group_type(_group_type);
+        group_msg.mutable_msg()->CopyFrom(message);
         _client->send(group_msg, complete);
     }
 };
@@ -81,7 +84,7 @@ std::error_condition mesg_factory::create_client(const std::string& client,
     LOGDEBUGMOD(sds_msg, "Creating client to {}", client);
     auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_client(client));
     if (!m_client) { return std::make_error_condition(std::errc::connection_aborted); }
-    raft_client = std::make_shared< group_client >(m_client, client, _group_name, _metrics);
+    raft_client = std::make_shared< group_client >(m_client, client, _group_name, _group_type, _metrics);
     return (!raft_client) ? std::make_error_condition(std::errc::invalid_argument) : std::error_condition();
 }
 

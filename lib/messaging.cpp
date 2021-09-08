@@ -1,6 +1,6 @@
 /// Copyright 2018 (c) eBay Corporation
 //
-#include "consensus_impl.h"
+#include "messaging.h"
 
 #include <chrono>
 
@@ -58,7 +58,6 @@ void consensus_impl::start(consensus_component::params& start_params) {
     _node_id = start_params.server_uuid;
     boost::hash< boost::uuids::uuid > uuid_hasher;
     _srv_id = uuid_hasher(boost::uuids::string_generator()(_node_id)) >> 33;
-    _create_state_mgr_func = start_params.create_state_mgr;
 
     auto _listen_address = fmt::format(FMT_STRING("0.0.0.0:{}"), start_params.mesg_port);
     _g_factory = std::make_shared< engine_factory >(grpc_client_threads, start_params);
@@ -79,9 +78,9 @@ void consensus_impl::start(consensus_component::params& start_params) {
     // sharing of the Server and client amongst raft instances.
     _grpc_server.reset(grpc_helper::GrpcServer::make(_listen_address, grpc_server_threads, "", ""));
     _mesg_service = msg_service::create(
-        [this](int32_t const srv_id, group_name_t const& group_id, nuraft::context*& ctx,
+        [this](int32_t const srv_id, group_name_t const& group_id, group_type_t const& group_type, nuraft::context*& ctx,
                std::shared_ptr< group_metrics > metrics, msg_service* sds_msg) mutable -> std::error_condition {
-            return this->group_init(srv_id, group_id, ctx, metrics, sds_msg);
+            return this->group_init(srv_id, group_id, group_type, ctx, metrics, sds_msg);
         },
         _node_id);
 
@@ -89,6 +88,14 @@ void consensus_impl::start(consensus_component::params& start_params) {
     _grpc_server->run();
     _mesg_service->bind(_grpc_server.get());
 } // namespace sds::messaging
+
+
+void consensus_impl::register_mgr_type(std::string const& group_type, register_params& params) {
+    std::lock_guard< std::mutex > lg(_manager_lock);
+    auto [it, happened] = _create_state_mgr_funcs.emplace(std::make_pair(group_type, params.create_state_mgr));
+    DEBUG_ASSERT(_create_state_mgr_funcs.end() != it, "Out of memory?");
+    DEBUG_ASSERT(!!happened, "Re-register?");
+}
 
 nuraft::cb_func::ReturnCode consensus_impl::callback_handler(std::string const& group_id, nuraft::cb_func::Type type,
                                                         nuraft::cb_func::Param* param) {
@@ -125,7 +132,7 @@ nuraft::cb_func::ReturnCode consensus_impl::callback_handler(std::string const& 
     return nuraft::cb_func::Ok;
 }
 
-std::error_condition consensus_impl::group_init(int32_t const srv_id, std::string const& group_id, nuraft::context*& ctx,
+std::error_condition consensus_impl::group_init(int32_t const srv_id, std::string const& group_id, std::string const& group_type, nuraft::context*& ctx,
                                            std::shared_ptr< sds::messaging::group_metrics > metrics,
                                            sds::messaging::msg_service* sds_msg) {
     LOGDEBUG("Creating context for Group: {} as Member: {}", group_id, srv_id);
@@ -140,7 +147,7 @@ std::error_condition consensus_impl::group_init(int32_t const srv_id, std::strin
             if (happened) {
                 // A new logstore!
                 LOGDEBUG("Creating new State Manager for: {}", group_id);
-                it->second = _create_state_mgr_func(srv_id, group_id);
+                it->second = _create_state_mgr_funcs[group_type](srv_id, group_id);
             }
             it->second->become_ready();
             sm = it->second->get_state_machine();
@@ -162,7 +169,7 @@ std::error_condition consensus_impl::group_init(int32_t const srv_id, std::strin
 
     // RAFT client factory
     std::shared_ptr< nuraft::rpc_client_factory > rpc_cli_factory(
-        std::make_shared< sds::messaging::mesg_factory >(_g_factory, group_id, metrics));
+        std::make_shared< sds::messaging::mesg_factory >(_g_factory, group_id, group_type, metrics));
 
     // RAFT service interface (stops gRPC service etc...) (TODO)
     std::shared_ptr< nuraft::rpc_listener > listener;
@@ -216,13 +223,13 @@ bool consensus_impl::rem_member(std::string const& group_id, std::string const& 
     return nuraft::OK == rc;
 }
 
-std::error_condition consensus_impl::create_group(std::string const& group_id) {
+std::error_condition consensus_impl::create_group(std::string const& group_id, std::string const& group_type_name) {
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         _is_leader.insert(std::make_pair(group_id, false));
     }
 
-    if (auto const err = _mesg_service->createRaftGroup(_srv_id, group_id); err) { return err; }
+    if (auto const err = _mesg_service->createRaftGroup(_srv_id, group_id, group_type_name); err) { return err; }
 
     // Wait for the leader election timeout to make us the leader
     auto lk = std::unique_lock< std::mutex >(_manager_lock);
@@ -232,13 +239,13 @@ std::error_condition consensus_impl::create_group(std::string const& group_id) {
     return std::error_condition();
 }
 
-std::error_condition consensus_impl::join_group(std::string const& group_id, std::shared_ptr< mesg_state_mgr > smgr) {
+std::error_condition consensus_impl::join_group(std::string const& group_id, std::string const& group_type, std::shared_ptr< mesg_state_mgr > smgr) {
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         auto [it, happened] = _state_managers.emplace(group_id, smgr);
         if (_state_managers.end() == it) return std::make_error_condition(std::errc::not_enough_memory);
     }
-    if (auto const err = _mesg_service->joinRaftGroup(_srv_id, group_id); err) {
+    if (auto const err = _mesg_service->joinRaftGroup(_srv_id, group_id, group_type); err) {
         std::lock_guard< std::mutex > lg(_manager_lock);
         _state_managers.erase(group_id);
         return err;

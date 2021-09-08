@@ -113,7 +113,7 @@ bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGr
     auto const& intended_addr = request.intended_addr();
 
     // Verify this is for the service it was intended for
-    auto const& base = request.message().base();
+    auto const& base = request.msg().base();
     if (intended_addr != _service_address) {
         LOGWARNMOD(sds_msg, "Recieved mesg for {} intended for {}, we are {}",
                    nuraft::msg_type_to_string(nuraft::msg_type(base.type())), intended_addr, _service_address);
@@ -124,7 +124,10 @@ bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGr
     LOGTRACEMOD(sds_msg, "Received [{}] from: [{}] to: [{}] Group: [{}]",
                 nuraft::msg_type_to_string(nuraft::msg_type(base.type())), base.src(), base.dest(), group_name);
 
-    if (nuraft::join_cluster_request == base.type()) { joinRaftGroup(base.dest(), group_name); }
+    if (nuraft::join_cluster_request == base.type()) {
+        auto const& group_type = request.group_type();
+        joinRaftGroup(base.dest(), group_name, group_type);
+    }
 
     shared< nuraft_grpc::grpc_server > server;
     {
@@ -138,7 +141,7 @@ bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGr
     response.set_group_name(group_name);
     if (server) {
         try {
-            server->step(request.message(), *response.mutable_message());
+            server->step(request.msg(), *response.mutable_msg());
             return true;
         } catch (std::runtime_error& rte) { LOGERRORMOD(sds_msg, "Caught exception during step(): {}", rte.what()); }
     } else {
@@ -187,7 +190,8 @@ void msg_service::shutdown_for(group_name_t const& group_name) {
     _raft_servers_sync.notify_all();
 }
 
-std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_name) {
+std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_name,
+                                                group_type_t const& group_type) {
     LOGINFOMOD(sds_msg, "Joining RAFT group: {}", group_name);
 
     nuraft::context* ctx{nullptr};
@@ -197,7 +201,7 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
         std::unique_lock< lock_type > lck(_raft_servers_lock);
         std::tie(it, happened) = _raft_servers.emplace(std::make_pair(group_name, group_name));
         if (_raft_servers.end() != it && happened) {
-            if (auto err = _get_server_ctx(srv_id, group_name, ctx, it->second.m_metrics, this); err) {
+            if (auto err = _get_server_ctx(srv_id, group_name, group_type, ctx, it->second.m_metrics, this); err) {
                 LOGERRORMOD(sds_msg, "Error during RAFT server creation on group {}: {}", group_name, err.message());
                 return err;
             }

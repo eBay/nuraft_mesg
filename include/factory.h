@@ -16,6 +16,7 @@
 namespace sds::messaging {
 
 using group_name_t = std::string;
+using group_type_t = std::string;
 
 class mesg_client;
 
@@ -37,14 +38,15 @@ public:
 };
 
 class mesg_factory final : public nuraft_grpc::grpc_factory {
-    shared< group_factory > _group_factory;
-    group_name_t const _group_name;
+    shared< group_factory >             _group_factory;
+    group_name_t const                  _group_name;
+    group_type_t const                  _group_type;
     shared< sisl::MetricsGroupWrapper > _metrics;
 
 public:
-    mesg_factory(shared< group_factory > g_factory, group_name_t const& grp_id,
+    mesg_factory(shared< group_factory > g_factory, group_name_t const& grp_id, group_type_t const& grp_type,
                  shared< sisl::MetricsGroupWrapper > metrics = nullptr) :
-            nuraft_grpc::grpc_factory(0, grp_id), _group_factory(g_factory), _group_name(grp_id), _metrics(metrics) {}
+            nuraft_grpc::grpc_factory(0, grp_id), _group_factory(g_factory), _group_name(grp_id), _group_type(grp_type), _metrics(metrics) {}
 
     group_name_t group_name() const { return _group_name; }
 

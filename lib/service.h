@@ -22,6 +22,7 @@ template < typename T >
 using shared = std::shared_ptr< T >;
 
 using group_name_t = std::string;
+using group_type_t = std::string;
 
 class msg_service;
 
@@ -39,9 +40,9 @@ public:
     ~group_metrics() { deregister_me_from_farm(); }
 };
 
-using get_server_ctx_cb =
-    std::function< std::error_condition(int32_t srv_id, group_name_t const&, nuraft::context*& ctx_out,
-                                        shared< group_metrics > metrics, msg_service* sds_msg) >;
+using get_server_ctx_cb = std::function< std::error_condition(int32_t srv_id, group_name_t const&, group_type_t const&,
+                                                              nuraft::context*& ctx_out,
+                                                              shared< group_metrics > metrics, msg_service* sds_msg) >;
 
 struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name) :
@@ -84,11 +85,12 @@ public:
     //::grpc::Status raftStep(RaftGroupMsg& request, RaftGroupMsg& response);
     bool raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
 
-    std::error_condition createRaftGroup(int const srv_id, group_name_t const& group_name) {
-        return joinRaftGroup(srv_id, group_name);
+    std::error_condition createRaftGroup(int const srv_id, group_name_t const& group_name,
+                                         group_type_t const& group_type) {
+        return joinRaftGroup(srv_id, group_name, group_type);
     }
 
-    std::error_condition joinRaftGroup(int32_t srv_id, group_name_t const& group_name);
+    std::error_condition joinRaftGroup(int32_t srv_id, group_name_t const& group_name, group_type_t const&);
 
     void partRaftGroup(group_name_t const& group_name);
 

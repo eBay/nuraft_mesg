@@ -1,6 +1,6 @@
 #pragma once
 
-#include "messaging.h"
+#include "messaging_if.h"
 #include <sds_logging/logging.h>
 
 class test_state_machine;
