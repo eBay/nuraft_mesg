@@ -14,11 +14,11 @@
 
 #include <grpcpp/server.h>
 
-namespace sds::grpc {
+namespace grpc_helper {
 class GrpcServer;
 }
 
-namespace sds {
+namespace nuraft_grpc {
 
 class grpc_server {
     shared< nuraft::raft_server > _raft_server;
@@ -38,12 +38,12 @@ public:
     nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > >
     append_entries(const std::vector< nuraft::ptr< nuraft::buffer > >& logs);
 
-    ::grpc::Status step(RaftMessage& request, RaftMessage& reply);
+    ::grpc::Status step(const RaftMessage& request, RaftMessage& reply);
     shared< nuraft::raft_server > raft_server() { return _raft_server; }
 
     // Setup the RPC call backs
-    virtual void associate(sds::grpc::GrpcServer* server) = 0;
-    virtual void bind(sds::grpc::GrpcServer* server) = 0;
+    virtual void associate(grpc_helper::GrpcServer* server) = 0;
+    virtual void bind(grpc_helper::GrpcServer* server) = 0;
 };
 
-} // namespace sds
+} // namespace nuraft_grpc

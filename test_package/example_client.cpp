@@ -24,7 +24,7 @@ SDS_OPTION_GROUP(client, (add, "a", "add", "Add a server to the cluster", cxxopt
 SDS_OPTIONS_ENABLE(logging, client)
 SDS_LOGGING_INIT(nuraft)
 
-using namespace sds;
+using namespace nuraft_grpc;
 
 void cleanup(const std::string& prefix) { auto r = system(format(FMT_STRING("rm -rf {}"), prefix).data()); }
 
@@ -37,7 +37,7 @@ int send_message(uint32_t leader_id, std::string const& message) {
     buf->pos(0);
 
     int ret = nuraft::OK == factory->client_request(buf, dest_cfg).get() ? 0 : -1;
-    sds::grpc::GrpcAyncClientWorker::shutdown_all();
+    grpc_helper::GrpcAsyncClientWorker::shutdown_all();
     return ret;
 }
 
@@ -45,7 +45,7 @@ int add_new_server(uint32_t leader_id, uint32_t srv_id) {
     auto factory = std::make_shared< example_factory >(2, "raft_client");
     auto const dest_cfg = nuraft::srv_config(leader_id, std::to_string(leader_id));
     int ret = nuraft::OK == factory->add_server(srv_id, fmt::format(FMT_STRING("{}"), srv_id), dest_cfg).get() ? 0 : -1;
-    sds::grpc::GrpcAyncClientWorker::shutdown_all();
+    grpc_helper::GrpcAsyncClientWorker::shutdown_all();
     return ret;
 }
 
@@ -53,7 +53,7 @@ int remove_server(int leader_id, int srv_id) {
     auto factory = std::make_shared< example_factory >(2, "raft_client");
     auto const dest_cfg = nuraft::srv_config(leader_id, std::to_string(leader_id));
     int ret = nuraft::OK == factory->rem_server(srv_id, dest_cfg).get() ? 0 : -1;
-    sds::grpc::GrpcAyncClientWorker::shutdown_all();
+    grpc_helper::GrpcAsyncClientWorker::shutdown_all();
     return ret;
 }
 
