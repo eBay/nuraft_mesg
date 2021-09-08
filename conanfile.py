@@ -23,11 +23,13 @@ class NuRaftGRPCConan(ConanFile):
                 "shared": ['True', 'False'],
                 "fPIC": ['True', 'False'],
                 "sanitize": ['True', 'False'],
+                "prerelease": ['True', 'False'],
                 }
     default_options = (
                         'shared=False',
                         'fPIC=True',
                         'sanitize=False',
+                        'prerelease=True',
                         )
 
     exports = ["LICENSE.md"]
@@ -40,6 +42,9 @@ class NuRaftGRPCConan(ConanFile):
     def config_options(self):
         if self.settings.build_type != "Debug":
             del self.options.sanitize
+
+    def configure(self):
+        self.options['grpc_helper'].prerelease = self.options.prerelease
 
     def build(self):
         cmake = CMake(self)
