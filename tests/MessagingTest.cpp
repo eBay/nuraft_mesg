@@ -4,7 +4,7 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/string_generator.hpp>
-#include <sds_grpc/client.h>
+#include <grpc_helper/rpc_client.hpp>
 #include <sds_logging/logging.h>
 #include <sds_options/options.h>
 #include <nlohmann/json.hpp>
@@ -20,10 +20,8 @@
 
 #include "test_state_manager.h"
 
-SDS_LOGGING_INIT(nuraft, sds_msg)
+SDS_LOGGING_INIT(nuraft, sds_msg, grpc_server)
 SDS_OPTIONS_ENABLE(logging, messaging)
-
-THREAD_BUFFER_INIT;
 
 namespace sds::messaging {
 
@@ -147,7 +145,7 @@ int main(int argc, char* argv[]) {
     sds_logging::GetLogger()->flush_on(spdlog::level::level_enum::err);
 
     auto ret = RUN_ALL_TESTS();
-    sds::grpc::GrpcAyncClientWorker::shutdown_all();
+    grpc_helper::GrpcAsyncClientWorker::shutdown_all();
 
     return ret;
 }

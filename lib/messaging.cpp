@@ -11,7 +11,7 @@
 
 #include <libnuraft/async.hxx>
 #include <sds_options/options.h>
-#include <sds_grpc/server.h>
+#include <grpc_helper/rpc_server.hpp>
 
 #include "service.h"
 #include "factory.h"
@@ -77,7 +77,7 @@ void consensus_impl::start(consensus_component::params& start_params) {
     // Start a gRPC server and create and associate sds_messaging service. The function
     // passed to msg_service will be called each time a new group is joined, allowing
     // sharing of the Server and client amongst raft instances.
-    _grpc_server.reset(sds::grpc::GrpcServer::make(_listen_address, grpc_server_threads, "", ""));
+    _grpc_server.reset(grpc_helper::GrpcServer::make(_listen_address, grpc_server_threads, "", ""));
     _mesg_service = msg_service::create(
         [this](int32_t const srv_id, group_name_t const& group_id, nuraft::context*& ctx,
                std::shared_ptr< group_metrics > metrics, msg_service* sds_msg) mutable -> std::error_condition {

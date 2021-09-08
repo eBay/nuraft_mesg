@@ -13,12 +13,13 @@ SDS_LOGGING_DECL(sds_msg)
 
 namespace sds::messaging {
 
-class messaging_client : public sds::grpc_client< Messaging >, public std::enable_shared_from_this< messaging_client > {
+class messaging_client : public nuraft_grpc::grpc_client< Messaging >,
+                         public std::enable_shared_from_this< messaging_client > {
 public:
-    using sds::grpc_client< Messaging >::grpc_client;
+    using nuraft_grpc::grpc_client< Messaging >::grpc_client;
     ~messaging_client() override = default;
 
-    using sds::grpc_base_client::send;
+    using nuraft_grpc::grpc_base_client::send;
 
     std::atomic_uint bad_service;
 
@@ -37,10 +38,10 @@ public:
     }
 
 protected:
-    void send(sds::RaftMessage const&, handle_resp) override { throw std::runtime_error("Bad call!"); }
+    void send(nuraft_grpc::RaftMessage const&, handle_resp) override { throw std::runtime_error("Bad call!"); }
 };
 
-class group_client : public sds::grpc_base_client {
+class group_client : public nuraft_grpc::grpc_base_client {
     shared< messaging_client > _client;
     group_name_t const _group_name;
     shared< group_metrics > _metrics;
@@ -49,7 +50,7 @@ class group_client : public sds::grpc_base_client {
 public:
     group_client(shared< messaging_client > client, std::string const& client_addr, group_name_t const& grp_name,
                  shared< sisl::MetricsGroupWrapper > metrics) :
-            sds::grpc_base_client(),
+            nuraft_grpc::grpc_base_client(),
             _client(client),
             _group_name(grp_name),
             _metrics(std::static_pointer_cast< group_metrics >(metrics)),
@@ -60,7 +61,7 @@ public:
     shared< messaging_client > realClient() { return _client; }
     void setClient(shared< messaging_client > new_client) { _client = new_client; }
 
-    void send(sds::RaftMessage const& message, handle_resp complete) override {
+    void send(nuraft_grpc::RaftMessage const& message, handle_resp complete) override {
         RaftGroupMsg group_msg;
 
         LOGTRACEMOD(sds_msg, "Sending [{}] from: [{}] to: [{}] Group: [{}]",
@@ -85,7 +86,7 @@ std::error_condition mesg_factory::create_client(const std::string& client,
 }
 
 std::error_condition mesg_factory::reinit_client(const std::string& client,
-                                                 sds::shared< nuraft::rpc_client >& raft_client) {
+                                                 nuraft_grpc::shared< nuraft::rpc_client >& raft_client) {
     LOGDEBUGMOD(sds_msg, "Re-init client to {}", client);
     auto g_client = std::dynamic_pointer_cast< group_client >(raft_client);
     auto new_raft_client = std::static_pointer_cast< nuraft::rpc_client >(g_client->realClient());
@@ -101,12 +102,12 @@ std::error_condition group_factory::create_client(const std::string& client,
     if (endpoint.empty()) { return std::make_error_condition(std::errc::invalid_argument); }
 
     LOGDEBUGMOD(sds_msg, "Creating client for [{}] @ [{}]", client, endpoint);
-    raft_client = sds::grpc::GrpcAsyncClient::make< messaging_client >(workerName(), endpoint);
+    raft_client = grpc_helper::GrpcAsyncClient::make< messaging_client >(workerName(), endpoint);
     return (!raft_client) ? std::make_error_condition(std::errc::connection_aborted) : std::error_condition();
 }
 
 std::error_condition group_factory::reinit_client(const std::string& client,
-                                                  sds::shared< nuraft::rpc_client >& raft_client) {
+                                                  nuraft_grpc::shared< nuraft::rpc_client >& raft_client) {
     LOGDEBUGMOD(sds_msg, "Re-init client to {}", client);
     assert(raft_client);
     auto mesg_client = std::dynamic_pointer_cast< messaging_client >(raft_client);

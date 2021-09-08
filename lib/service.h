@@ -8,6 +8,7 @@
 #include <map>
 #include <shared_mutex>
 #include <nuraft_grpc/grpc_server.hpp>
+#include <grpc_helper/rpc_server.hpp>
 #include <metrics/metrics.hpp>
 
 #include "messaging_service.grpc.pb.h"
@@ -46,7 +47,7 @@ struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name) :
             m_server(), m_metrics(std::make_shared< group_metrics >(group_name)) {}
 
-    shared< sds::grpc_server > m_server;
+    shared< nuraft_grpc::grpc_server > m_server;
     shared< group_metrics > m_metrics;
 };
 
@@ -63,7 +64,7 @@ class msg_service : public std::enable_shared_from_this< msg_service > {
     ~msg_service();
 
 public:
-    static shared<msg_service> create(get_server_ctx_cb get_server_ctx, std::string const& service_address);
+    static shared< msg_service > create(get_server_ctx_cb get_server_ctx, std::string const& service_address);
 
     msg_service(msg_service const&) = delete;
     msg_service& operator=(msg_service const&) = delete;
@@ -77,10 +78,11 @@ public:
     nuraft::cmd_result_code append_entries(group_name_t const& group_name,
                                            std::vector< nuraft::ptr< nuraft::buffer > > const& logs);
 
-    void associate(sds::grpc::GrpcServer* server);
-    void bind(sds::grpc::GrpcServer* server);
+    void associate(grpc_helper::GrpcServer* server);
+    void bind(grpc_helper::GrpcServer* server);
 
-    ::grpc::Status raftStep(RaftGroupMsg& request, RaftGroupMsg& response);
+    //::grpc::Status raftStep(RaftGroupMsg& request, RaftGroupMsg& response);
+    bool raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
 
     std::error_condition createRaftGroup(int const srv_id, group_name_t const& group_name) {
         return joinRaftGroup(srv_id, group_name);
