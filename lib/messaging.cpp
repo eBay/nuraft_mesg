@@ -95,6 +95,9 @@ void consensus_impl::register_mgr_type(std::string const& group_type, register_p
     auto [it, happened] = _create_state_mgr_funcs.emplace(std::make_pair(group_type, params.create_state_mgr));
     DEBUG_ASSERT(_create_state_mgr_funcs.end() != it, "Out of memory?");
     DEBUG_ASSERT(!!happened, "Re-register?");
+    if (_create_state_mgr_funcs.end() == it) {
+        LOGERROR("Could not register group type: {}", group_type);
+    }
 }
 
 nuraft::cb_func::ReturnCode consensus_impl::callback_handler(std::string const& group_id, nuraft::cb_func::Type type,
