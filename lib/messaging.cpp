@@ -45,16 +45,16 @@ public:
     std::string lookupEndpoint(std::string const& client) override { return _lookup_endpoint_func(client); }
 };
 
-consensus_impl::consensus_impl() = default;
+service::service() = default;
 
-consensus_impl::~consensus_impl() {
+service::~service() {
     if (_mesg_service) {
         _grpc_server->shutdown();
         _mesg_service->shutdown();
     }
 }
 
-void consensus_impl::start(consensus_component::params& start_params) {
+void service::start(consensus_component::params& start_params) {
     _node_id = start_params.server_uuid;
     boost::hash< boost::uuids::uuid > uuid_hasher;
     _srv_id = uuid_hasher(boost::uuids::string_generator()(_node_id)) >> 33;
@@ -90,7 +90,7 @@ void consensus_impl::start(consensus_component::params& start_params) {
 } // namespace sds::messaging
 
 
-void consensus_impl::register_mgr_type(std::string const& group_type, register_params& params) {
+void service::register_mgr_type(std::string const& group_type, register_params& params) {
     std::lock_guard< std::mutex > lg(_manager_lock);
     auto [it, happened] = _create_state_mgr_funcs.emplace(std::make_pair(group_type, params.create_state_mgr));
     DEBUG_ASSERT(_create_state_mgr_funcs.end() != it, "Out of memory?");
@@ -100,7 +100,7 @@ void consensus_impl::register_mgr_type(std::string const& group_type, register_p
     }
 }
 
-nuraft::cb_func::ReturnCode consensus_impl::callback_handler(std::string const& group_id, nuraft::cb_func::Type type,
+nuraft::cb_func::ReturnCode service::callback_handler(std::string const& group_id, nuraft::cb_func::Type type,
                                                         nuraft::cb_func::Param* param) {
     switch (type) {
     case nuraft::cb_func::RemovedFromCluster: {
@@ -135,7 +135,7 @@ nuraft::cb_func::ReturnCode consensus_impl::callback_handler(std::string const& 
     return nuraft::cb_func::Ok;
 }
 
-std::error_condition consensus_impl::group_init(int32_t const srv_id, std::string const& group_id, std::string const& group_type, nuraft::context*& ctx,
+std::error_condition service::group_init(int32_t const srv_id, std::string const& group_id, std::string const& group_type, nuraft::context*& ctx,
                                            std::shared_ptr< sds::messaging::group_metrics > metrics,
                                            sds::messaging::msg_service* sds_msg) {
     LOGDEBUG("Creating context for Group: {} as Member: {}", group_id, srv_id);
@@ -186,7 +186,7 @@ std::error_condition consensus_impl::group_init(int32_t const srv_id, std::strin
     return std::error_condition();
 }
 
-bool consensus_impl::add_member(std::string const& group_id, std::string const& server_id) {
+bool service::add_member(std::string const& group_id, std::string const& server_id) {
     boost::hash< boost::uuids::uuid > uuid_hasher;
     int32_t const srv_id = uuid_hasher(boost::uuids::string_generator()(server_id)) >> 33;
     auto cfg = nuraft::srv_config(srv_id, server_id);
@@ -206,7 +206,7 @@ bool consensus_impl::add_member(std::string const& group_id, std::string const& 
     return nuraft::OK == rc;
 }
 
-bool consensus_impl::rem_member(std::string const& group_id, std::string const& server_id) {
+bool service::rem_member(std::string const& group_id, std::string const& server_id) {
     boost::hash< boost::uuids::uuid > uuid_hasher;
     int32_t const srv_id = uuid_hasher(boost::uuids::string_generator()(server_id)) >> 33;
 
@@ -226,7 +226,7 @@ bool consensus_impl::rem_member(std::string const& group_id, std::string const& 
     return nuraft::OK == rc;
 }
 
-std::error_condition consensus_impl::create_group(std::string const& group_id, std::string const& group_type_name) {
+std::error_condition service::create_group(std::string const& group_id, std::string const& group_type_name) {
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         _is_leader.insert(std::make_pair(group_id, false));
@@ -242,7 +242,7 @@ std::error_condition consensus_impl::create_group(std::string const& group_id, s
     return std::error_condition();
 }
 
-std::error_condition consensus_impl::join_group(std::string const& group_id, std::string const& group_type, std::shared_ptr< mesg_state_mgr > smgr) {
+std::error_condition service::join_group(std::string const& group_id, std::string const& group_type, std::shared_ptr< mesg_state_mgr > smgr) {
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         auto [it, happened] = _state_managers.emplace(group_id, smgr);
@@ -257,7 +257,7 @@ std::error_condition consensus_impl::join_group(std::string const& group_id, std
     return std::error_condition();
 }
 
-void consensus_impl::get_peers(std::string const& group_id, std::list< std::string >& servers) const {
+void service::get_peers(std::string const& group_id, std::list< std::string >& servers) const {
     auto res = std::list< std::string >();
     std::lock_guard< std::mutex > lg(_manager_lock);
     if (auto it = _state_managers.find(group_id); _state_managers.end() != it) {
@@ -269,14 +269,14 @@ void consensus_impl::get_peers(std::string const& group_id, std::list< std::stri
     }
 }
 
-bool consensus_impl::request_leadership(std::string const& group_id) {
+bool service::request_leadership(std::string const& group_id) {
     _mesg_service->request_leadership(group_id);
 
     auto lk = std::unique_lock< std::mutex >(_manager_lock);
     return _leadership_change.wait_for(lk, leader_change_timeout, [this, &group_id]() { return _is_leader[group_id]; });
 }
 
-void consensus_impl::leave_group(std::string const& group_id) {
+void service::leave_group(std::string const& group_id) {
     LOGINFO("Leaving group [vol={}]", group_id);
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
@@ -329,7 +329,7 @@ static std::error_condition convertToError(nuraft::cmd_result_code const& rc) {
     }
 }
 
-std::error_condition consensus_impl::client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >& buf) {
+std::error_condition service::client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >& buf) {
     auto rc = nuraft::SERVER_IS_JOINING;
     while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
         LOGDEBUG("Sending Client Request to {}", group_id);
@@ -341,7 +341,7 @@ std::error_condition consensus_impl::client_request(std::string const& group_id,
     }
     return convertToError(rc);
 }
-uint32_t consensus_impl::logstore_id(std::string const& group_id) const {
+uint32_t service::logstore_id(std::string const& group_id) const {
     std::lock_guard< std::mutex > lg(_manager_lock);
     if (auto it = _state_managers.find(group_id); _state_managers.end() != it) { return it->second->get_logstore_id(); }
     return UINT32_MAX;

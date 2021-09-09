@@ -44,9 +44,9 @@ using testing::Return;
 
 class MessagingFixture : public ::testing::Test {
 protected:
-    std::unique_ptr< consensus_impl > instance_1;
-    std::unique_ptr< consensus_impl > instance_2;
-    std::unique_ptr< consensus_impl > instance_3;
+    std::unique_ptr< service > instance_1;
+    std::unique_ptr< service > instance_2;
+    std::unique_ptr< service > instance_3;
 
     std::shared_ptr< test_state_mgr > sm_int_1;
 
@@ -59,9 +59,9 @@ protected:
         id_2 = to_string(boost::uuids::random_generator()());
         id_3 = to_string(boost::uuids::random_generator()());
 
-        instance_1 = std::make_unique< consensus_impl >();
-        instance_2 = std::make_unique< consensus_impl >();
-        instance_3 = std::make_unique< consensus_impl >();
+        instance_1 = std::make_unique< service >();
+        instance_2 = std::make_unique< service >();
+        instance_3 = std::make_unique< service >();
 
         auto lookup_callback = [srv_1 = id_1, srv_2 = id_2, srv_3 = id_3](std::string const& id) -> std::string {
             if (id == srv_1)

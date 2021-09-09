@@ -21,7 +21,7 @@ class group_factory;
 class msg_service;
 class group_metrics;
 
-class consensus_impl : public consensus_component {
+class service : public consensus_component {
     std::string _node_id;
     int32_t _srv_id;
 
@@ -47,8 +47,8 @@ class consensus_impl : public consensus_component {
                                                  nuraft::cb_func::Param* param);
 
 public:
-    consensus_impl();
-    ~consensus_impl() override;
+    service();
+    ~service() override;
 
     int32_t server_id() const override { return _srv_id; }
 
