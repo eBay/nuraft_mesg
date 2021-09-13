@@ -17,16 +17,8 @@
 #include "factory.h"
 #include "logger.h"
 
-SDS_OPTION_GROUP(messaging,
-                 (snapshot_period, "", "snapshot_period", "Number of journal entries per snapshot.",
-                  cxxopts::value< int32_t >()->default_value("1"), ""))
-
-constexpr auto rpc_backoff = 50;
-constexpr auto heartbeat_period = 100;
-constexpr auto elect_to_low = heartbeat_period * 2;
-constexpr auto elect_to_high = elect_to_low * 2;
-constexpr auto cfg_change_timeout = std::chrono::milliseconds(elect_to_low);
-constexpr auto leader_change_timeout = std::chrono::milliseconds(elect_to_high) * 8;
+constexpr auto cfg_change_timeout = std::chrono::milliseconds(200);
+constexpr auto leader_change_timeout = std::chrono::milliseconds(3200);
 constexpr auto grpc_client_threads = 1u;
 constexpr auto grpc_server_threads = 1u;
 
@@ -93,10 +85,10 @@ void service::start(consensus_component::params& start_params) {
 
 void service::register_mgr_type(std::string const& group_type, register_params& params) {
     std::lock_guard< std::mutex > lg(_manager_lock);
-    auto [it, happened] = _create_state_mgr_funcs.emplace(std::make_pair(group_type, params.create_state_mgr));
-    DEBUG_ASSERT(_create_state_mgr_funcs.end() != it, "Out of memory?");
+    auto [it, happened] = _state_mgr_types.emplace(std::make_pair(group_type, params));
+    DEBUG_ASSERT(_state_mgr_types.end() != it, "Out of memory?");
     DEBUG_ASSERT(!!happened, "Re-register?");
-    if (_create_state_mgr_funcs.end() == it) {
+    if (_state_mgr_types.end() == it) {
         LOGERROR("Could not register group type: {}", group_type);
     }
 }
@@ -144,6 +136,7 @@ std::error_condition service::group_init(int32_t const srv_id, std::string const
     // State manager (RAFT log store, config)
     std::shared_ptr< nuraft::state_mgr > smgr;
     std::shared_ptr< nuraft::state_machine > sm;
+    nuraft::raft_params params;
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         auto [it, happened] = _state_managers.emplace(group_id, nullptr);
@@ -151,7 +144,9 @@ std::error_condition service::group_init(int32_t const srv_id, std::string const
             if (happened) {
                 // A new logstore!
                 LOGDEBUG("Creating new State Manager for: {}", group_id);
-                it->second = _create_state_mgr_funcs[group_type](srv_id, group_id);
+                auto& type_params = _state_mgr_types[group_type];
+                it->second = type_params.create_state_mgr(srv_id, group_id);
+                params = type_params.raft_params;
             }
             it->second->become_ready();
             sm = it->second->get_state_machine();
@@ -160,16 +155,6 @@ std::error_condition service::group_init(int32_t const srv_id, std::string const
             return std::make_error_condition(std::errc::not_enough_memory);
         }
     }
-
-    // RAFT server parameters
-    nuraft::raft_params params;
-    params.with_election_timeout_lower(elect_to_low)
-        .with_election_timeout_upper(elect_to_high)
-        .with_hb_interval(heartbeat_period)
-        .with_max_append_size(10)
-        .with_rpc_failure_backoff(rpc_backoff)
-        .with_auto_forwarding(true)
-        .with_snapshot_enabled(SDS_OPTIONS["snapshot_period"].as< int32_t >());
 
     // RAFT client factory
     std::shared_ptr< nuraft::rpc_client_factory > rpc_cli_factory(

@@ -40,6 +40,7 @@ public:
 
     // Register a new state_mgr type
     struct register_params {
+        nuraft::raft_params raft_params;
         create_state_mgr_cb create_state_mgr;
     };
     virtual void register_mgr_type(std::string const& group_type, register_params& params) = 0;

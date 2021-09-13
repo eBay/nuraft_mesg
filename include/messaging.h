@@ -25,7 +25,7 @@ class service : public consensus_component {
     std::string _node_id;
     int32_t _srv_id;
 
-    std::map< std::string, consensus_component::create_state_mgr_cb > _create_state_mgr_funcs;
+    std::map< std::string, consensus_component::register_params > _state_mgr_types;
 
     std::shared_ptr<::sds::messaging::group_factory > _g_factory;
     std::shared_ptr<::sds::messaging::msg_service > _mesg_service;

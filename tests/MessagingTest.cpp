@@ -21,7 +21,13 @@
 #include "test_state_manager.h"
 
 SDS_LOGGING_INIT(nuraft, sds_msg, grpc_server)
-SDS_OPTIONS_ENABLE(logging, messaging)
+
+SDS_OPTIONS_ENABLE(logging )
+
+constexpr auto rpc_backoff = 50;
+constexpr auto heartbeat_period = 100;
+constexpr auto elect_to_low = heartbeat_period * 2;
+constexpr auto elect_to_high = elect_to_low * 2;
 
 namespace sds::messaging {
 
@@ -77,7 +83,18 @@ protected:
         auto params = consensus_component::params{id_1, 9001, lookup_callback, "none"};
         instance_1->start(params);
 
+        // RAFT server parameters
+        nuraft::raft_params r_params;
+        r_params.with_election_timeout_lower(elect_to_low)
+          .with_election_timeout_upper(elect_to_high)
+          .with_hb_interval(heartbeat_period)
+          .with_max_append_size(10)
+          .with_rpc_failure_backoff(rpc_backoff)
+          .with_auto_forwarding(true)
+          .with_snapshot_enabled(0);
+
         auto register_params = consensus_component::register_params {
+            r_params,
             [this, srv_addr = id_1](int32_t const srv_id,
                                     std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
                 sm_int_1 = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
@@ -143,7 +160,7 @@ TEST_F(MessagingFixture, UnknownGroup) {
 }
 
 int main(int argc, char* argv[]) {
-    SDS_OPTIONS_LOAD(argc, argv, logging, messaging)
+    SDS_OPTIONS_LOAD(argc, argv, logging)
     ::testing::InitGoogleTest(&argc, argv);
     sds_logging::SetLogger(std::string(argv[0]));
     spdlog::set_pattern("[%D %T.%f%z] [%^%l%$] [%t] %v");
