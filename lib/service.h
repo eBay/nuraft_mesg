@@ -59,6 +59,7 @@ class msg_service : public std::enable_shared_from_this< msg_service > {
     lock_type _raft_servers_lock;
     std::map< group_name_t, grpc_server_wrapper > _raft_servers;
     std::string const _service_address;
+    std::string _default_group_type;
 
     msg_service(get_server_ctx_cb get_server_ctx, std::string const& service_address) :
             _get_server_ctx(get_server_ctx), _service_address(service_address) {}
@@ -84,6 +85,8 @@ public:
 
     //::grpc::Status raftStep(RaftGroupMsg& request, RaftGroupMsg& response);
     bool raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
+
+    void setDefaultGroupType(std::string const& _type);
 
     std::error_condition createRaftGroup(int const srv_id, group_name_t const& group_name,
                                          group_type_t const& group_type) {

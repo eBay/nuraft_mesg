@@ -106,6 +106,11 @@ nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_na
     return nuraft::SERVER_NOT_FOUND;
 }
 
+void msg_service::setDefaultGroupType(std::string const& _type) {
+    std::shared_lock< lock_type > rl(_raft_servers_lock);
+    _default_group_type = _type;
+}
+
 bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data) {
     auto& request = rpc_data->request();
     auto& response = rpc_data->response();
@@ -125,8 +130,7 @@ bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGr
                 nuraft::msg_type_to_string(nuraft::msg_type(base.type())), base.src(), base.dest(), group_name);
 
     if (nuraft::join_cluster_request == base.type()) {
-        auto const& group_type = request.group_type();
-        joinRaftGroup(base.dest(), group_name, group_type);
+        joinRaftGroup(base.dest(), group_name, request.group_type());
     }
 
     shared< nuraft_grpc::grpc_server > server;
@@ -198,7 +202,12 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
     bool happened{false};
     auto it = _raft_servers.end();
     {
+        // This is for backwards compatibility for groups that had no type before.
+        auto g_type = group_type;
         std::unique_lock< lock_type > lck(_raft_servers_lock);
+        if (g_type.empty()) {
+            g_type = _default_group_type;
+        }
         std::tie(it, happened) = _raft_servers.emplace(std::make_pair(group_name, group_name));
         if (_raft_servers.end() != it && happened) {
             if (auto err = _get_server_ctx(srv_id, group_name, group_type, ctx, it->second.m_metrics, this); err) {
