@@ -17,6 +17,8 @@
 #include "factory.h"
 #include "logger.h"
 
+SDS_LOGGING_DECL(sds_msg)
+
 constexpr auto cfg_change_timeout = std::chrono::milliseconds(200);
 constexpr auto leader_change_timeout = std::chrono::milliseconds(3200);
 constexpr auto grpc_client_threads = 1u;
@@ -105,10 +107,10 @@ nuraft::cb_func::ReturnCode service::callback_handler(std::string const& group_i
         LOGINFO("Joined cluster: {}, [l_id:{},my_id:{}]", group_id, leader_id, my_id);
     } break;
     case nuraft::cb_func::NewConfig: {
-        LOGDEBUG("Cluster change for: {}", group_id);
+        LOGDEBUGMOD(sds_msg, "Cluster change for: {}", group_id);
     } break;
     case nuraft::cb_func::BecomeLeader: {
-        LOGDEBUG("I'm the leader of: {}!", group_id);
+        LOGDEBUGMOD(sds_msg, "I'm the leader of: {}!", group_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = true;
@@ -116,7 +118,7 @@ nuraft::cb_func::ReturnCode service::callback_handler(std::string const& group_i
         _leadership_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeFollower: {
-        LOGDEBUG("I'm a follower of: {}!", group_id);
+        LOGDEBUGMOD(sds_msg, "I'm a follower of: {}!", group_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = false;
@@ -131,7 +133,7 @@ nuraft::cb_func::ReturnCode service::callback_handler(std::string const& group_i
 std::error_condition service::group_init(int32_t const srv_id, std::string const& group_id, std::string const& group_type, nuraft::context*& ctx,
                                            std::shared_ptr< sds::messaging::group_metrics > metrics,
                                            sds::messaging::msg_service* sds_msg) {
-    LOGDEBUG("Creating context for Group: {} as Member: {}", group_id, srv_id);
+    LOGDEBUGMOD(sds_msg, "Creating context for Group: {} as Member: {}", group_id, srv_id);
 
     // State manager (RAFT log store, config)
     std::shared_ptr< nuraft::state_mgr > smgr;
@@ -143,7 +145,7 @@ std::error_condition service::group_init(int32_t const srv_id, std::string const
         if (it != _state_managers.end()) {
             if (happened) {
                 // A new logstore!
-                LOGDEBUG("Creating new State Manager for: {}", group_id);
+                LOGDEBUGMOD(sds_msg, "Creating new State Manager for: {}", group_id);
                 auto& type_params = _state_mgr_types[group_type];
                 it->second = type_params.create_state_mgr(srv_id, group_id);
                 params = type_params.raft_params;
@@ -180,7 +182,7 @@ bool service::add_member(std::string const& group_id, std::string const& server_
     while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
         rc = _mesg_service->add_srv(group_id, cfg);
         if (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-            LOGDEBUG("Server is busy, retrying...");
+            LOGDEBUGMOD(sds_msg, "Server is busy, retrying...");
             std::this_thread::sleep_for(cfg_change_timeout);
         }
     }
@@ -200,7 +202,7 @@ bool service::rem_member(std::string const& group_id, std::string const& server_
     while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
         rc = _mesg_service->rm_srv(group_id, srv_id);
         if (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-            LOGDEBUG("Server is busy, retrying...");
+            LOGDEBUGMOD(sds_msg, "Server is busy, retrying...");
             std::this_thread::sleep_for(cfg_change_timeout);
         }
     }
@@ -267,7 +269,7 @@ void service::leave_group(std::string const& group_id) {
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         if (0 == _state_managers.count(group_id)) {
-            LOGDEBUG("Asked to leave group {} which we are not part of!", group_id);
+            LOGDEBUGMOD(sds_msg, "Asked to leave group {} which we are not part of!", group_id);
             return;
         }
     }
@@ -318,10 +320,10 @@ static std::error_condition convertToError(nuraft::cmd_result_code const& rc) {
 std::error_condition service::client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >& buf) {
     auto rc = nuraft::SERVER_IS_JOINING;
     while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-        LOGDEBUG("Sending Client Request to {}", group_id);
+        LOGDEBUGMOD(sds_msg, "Sending Client Request to {}", group_id);
         rc = _mesg_service->append_entries(group_id, {buf});
         if (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-            LOGDEBUG("Server is busy, retrying...");
+            LOGDEBUGMOD(sds_msg, "Server is busy, retrying...");
             std::this_thread::sleep_for(cfg_change_timeout);
         }
     }

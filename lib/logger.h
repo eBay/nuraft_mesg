@@ -4,6 +4,7 @@
 #include <sds_logging/logging.h>
 
 SDS_LOGGING_DECL(nuraft)
+SDS_LOGGING_DECL(sds_msg)
 
 class sds_logger : public ::nuraft::logger {
     std::string const _group_id;
@@ -14,7 +15,7 @@ public:
             ::nuraft::logger(), _group_id(group_id), _custom_logger(custom_logger) {}
 
     void set_level(int l) override {
-        LOGDEBUG("Updating level to: {}", l);
+        LOGDEBUGMOD(sds_msg, "Updating level to: {}", l);
         SDS_LOG_LEVEL(nuraft, static_cast< spdlog::level::level_enum >(abs(l - 6)));
     }
 
