@@ -74,7 +74,7 @@ protected:
                 return std::string();
         };
 
-        auto params = consensus_component::params{id_1, 9001, lookup_callback};
+        auto params = consensus_component::params{id_1, 9001, lookup_callback, "none"};
         instance_1->start(params);
 
         auto register_params = consensus_component::register_params {

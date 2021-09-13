@@ -83,6 +83,7 @@ void service::start(consensus_component::params& start_params) {
             return this->group_init(srv_id, group_id, group_type, ctx, metrics, sds_msg);
         },
         _node_id);
+    _mesg_service->setDefaultGroupType(start_params.default_group_type);
 
     _mesg_service->associate(_grpc_server.get());
     _grpc_server->run();

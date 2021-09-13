@@ -33,6 +33,7 @@ public:
         std::string server_uuid;
         uint32_t mesg_port;
         lookup_peer_cb lookup_peer;
+        std::string default_group_type;
     };
     virtual ~consensus_component() = default;
     virtual void start(consensus_component::params& start_params) = 0;
