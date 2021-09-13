@@ -129,9 +129,7 @@ bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGr
     LOGTRACEMOD(sds_msg, "Received [{}] from: [{}] to: [{}] Group: [{}]",
                 nuraft::msg_type_to_string(nuraft::msg_type(base.type())), base.src(), base.dest(), group_name);
 
-    if (nuraft::join_cluster_request == base.type()) {
-        joinRaftGroup(base.dest(), group_name, request.group_type());
-    }
+    if (nuraft::join_cluster_request == base.type()) { joinRaftGroup(base.dest(), group_name, request.group_type()); }
 
     shared< nuraft_grpc::grpc_server > server;
     {
@@ -145,7 +143,7 @@ bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGr
     response.set_group_name(group_name);
     if (server) {
         try {
-            server->step(request.msg(), *response.mutable_msg());
+            rpc_data->set_status(server->step(request.msg(), *response.mutable_msg()));
             return true;
         } catch (std::runtime_error& rte) { LOGERRORMOD(sds_msg, "Caught exception during step(): {}", rte.what()); }
     } else {
@@ -205,9 +203,7 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
         // This is for backwards compatibility for groups that had no type before.
         auto g_type = group_type;
         std::unique_lock< lock_type > lck(_raft_servers_lock);
-        if (g_type.empty()) {
-            g_type = _default_group_type;
-        }
+        if (g_type.empty()) { g_type = _default_group_type; }
         std::tie(it, happened) = _raft_servers.emplace(std::make_pair(group_name, group_name));
         if (_raft_servers.end() != it && happened) {
             if (auto err = _get_server_ctx(srv_id, group_name, group_type, ctx, it->second.m_metrics, this); err) {
