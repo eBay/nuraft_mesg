@@ -17,7 +17,7 @@ class NuRaftGRPCConan(ConanFile):
     requires = (
                 "nuraft/[~=1.8, include_prerelease=True]@nudata/master",
                 "grpc_helper/[~=1, include_prerelease=True]@sisl/master",
-                "sds_logging/11.0.1-1@sds/develop",
+                "sds_logging/[~=11, include_prerelease=True]@sds/develop",
                 ("fmt/8.0.1",       "override"),
                 )
     options = {
