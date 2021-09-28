@@ -21,6 +21,7 @@ public:
     virtual uint32_t get_logstore_id() const = 0;
     virtual std::shared_ptr< nuraft::state_machine > get_state_machine() = 0;
     virtual void permanent_destroy() = 0;
+    virtual void leave() = 0;
 };
 
 class consensus_component {

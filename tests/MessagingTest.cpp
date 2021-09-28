@@ -127,6 +127,7 @@ protected:
 
         EXPECT_TRUE(instance_1->add_member("test_group", id_2));
         EXPECT_TRUE(instance_1->add_member("test_group", id_3));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
     }
 
     void TearDown() override {
@@ -138,6 +139,7 @@ protected:
 public:
 };
 
+// Basic client request (append_entries)
 TEST_F(MessagingFixture, ClientRequest) {
     auto buf = sds::messaging::create_message(nlohmann::json{
         {"op_type", 2},
@@ -148,6 +150,8 @@ TEST_F(MessagingFixture, ClientRequest) {
     instance_2->leave_group("test_group");
     instance_1->leave_group("test_group");
 }
+
+// Test sending a message for a group the messaging service is not aware of.
 TEST_F(MessagingFixture, UnknownGroup) {
     EXPECT_FALSE(instance_1->add_member("unknown_group", to_string(boost::uuids::random_generator()())));
 
@@ -157,6 +161,15 @@ TEST_F(MessagingFixture, UnknownGroup) {
         {"op_type", 2},
     });
     EXPECT_TRUE(instance_1->client_request("unknown_group", buf));
+}
+
+TEST_F(MessagingFixture, RemoveMember) {
+    EXPECT_TRUE(instance_1->rem_member("test_group", id_3));
+
+    auto buf = sds::messaging::create_message(nlohmann::json{
+        {"op_type", 2},
+    });
+    EXPECT_FALSE(instance_1->client_request("test_group", buf));
 }
 
 int main(int argc, char* argv[]) {

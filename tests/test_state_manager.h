@@ -21,6 +21,7 @@ public:
     uint32_t get_logstore_id() const override;
     std::shared_ptr< nuraft::state_machine > get_state_machine() override;
     void permanent_destroy() override;
+    void leave() override;
 
 private:
     int32_t const _srv_id;

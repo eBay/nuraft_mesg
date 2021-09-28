@@ -45,6 +45,7 @@ class service : public consensus_component {
                                     sds::messaging::msg_service* sds_msg);
     nuraft::cb_func::ReturnCode callback_handler(std::string const& group_id, nuraft::cb_func::Type type,
                                                  nuraft::cb_func::Param* param);
+    void exit_group(std::string const& group_id);
 
 public:
     service();

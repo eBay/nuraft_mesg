@@ -72,8 +72,9 @@ void service::start(consensus_component::params& start_params) {
     // sharing of the Server and client amongst raft instances.
     _grpc_server.reset(grpc_helper::GrpcServer::make(_listen_address, grpc_server_threads, "", ""));
     _mesg_service = msg_service::create(
-        [this](int32_t const srv_id, group_name_t const& group_id, group_type_t const& group_type, nuraft::context*& ctx,
-               std::shared_ptr< group_metrics > metrics, msg_service* sds_msg) mutable -> std::error_condition {
+        [this](int32_t const srv_id, group_name_t const& group_id, group_type_t const& group_type,
+               nuraft::context*& ctx, std::shared_ptr< group_metrics > metrics,
+               msg_service* sds_msg) mutable -> std::error_condition {
             return this->group_init(srv_id, group_id, group_type, ctx, metrics, sds_msg);
         },
         _node_id);
@@ -84,22 +85,20 @@ void service::start(consensus_component::params& start_params) {
     _mesg_service->bind(_grpc_server.get());
 } // namespace sds::messaging
 
-
 void service::register_mgr_type(std::string const& group_type, register_params& params) {
     std::lock_guard< std::mutex > lg(_manager_lock);
     auto [it, happened] = _state_mgr_types.emplace(std::make_pair(group_type, params));
     DEBUG_ASSERT(_state_mgr_types.end() != it, "Out of memory?");
     DEBUG_ASSERT(!!happened, "Re-register?");
-    if (_state_mgr_types.end() == it) {
-        LOGERROR("Could not register group type: {}", group_type);
-    }
+    if (_state_mgr_types.end() == it) { LOGERROR("Could not register group type: {}", group_type); }
 }
 
 nuraft::cb_func::ReturnCode service::callback_handler(std::string const& group_id, nuraft::cb_func::Type type,
-                                                        nuraft::cb_func::Param* param) {
+                                                      nuraft::cb_func::Param* param) {
     switch (type) {
     case nuraft::cb_func::RemovedFromCluster: {
         LOGINFO("Removed from cluster {}", group_id);
+        exit_group(group_id);
     } break;
     case nuraft::cb_func::JoinedCluster: {
         auto const my_id = param->myId;
@@ -130,9 +129,21 @@ nuraft::cb_func::ReturnCode service::callback_handler(std::string const& group_i
     return nuraft::cb_func::Ok;
 }
 
-std::error_condition service::group_init(int32_t const srv_id, std::string const& group_id, std::string const& group_type, nuraft::context*& ctx,
-                                           std::shared_ptr< sds::messaging::group_metrics > metrics,
-                                           sds::messaging::msg_service* sds_msg) {
+void service::exit_group(std::string const& group_id) {
+    std::shared_ptr< mesg_state_mgr > mgr;
+    {
+        std::lock_guard< std::mutex > lg(_manager_lock);
+        if (auto it = _state_managers.find(group_id); it != _state_managers.end()) {
+            mgr = it->second;
+        }
+    }
+    if (mgr) mgr->leave();
+}
+
+std::error_condition service::group_init(int32_t const srv_id, std::string const& group_id,
+                                         std::string const& group_type, nuraft::context*& ctx,
+                                         std::shared_ptr< sds::messaging::group_metrics > metrics,
+                                         sds::messaging::msg_service* sds_msg) {
     LOGDEBUGMOD(sds_msg, "Creating context for Group: {} as Member: {}", group_id, srv_id);
 
     // State manager (RAFT log store, config)
@@ -230,7 +241,8 @@ std::error_condition service::create_group(std::string const& group_id, std::str
     return std::error_condition();
 }
 
-std::error_condition service::join_group(std::string const& group_id, std::string const& group_type, std::shared_ptr< mesg_state_mgr > smgr) {
+std::error_condition service::join_group(std::string const& group_id, std::string const& group_type,
+                                         std::shared_ptr< mesg_state_mgr > smgr) {
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         auto [it, happened] = _state_managers.emplace(group_id, smgr);

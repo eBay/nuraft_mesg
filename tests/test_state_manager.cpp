@@ -142,3 +142,5 @@ std::shared_ptr< nuraft::state_machine > test_state_mgr::get_state_machine() {
 }
 
 void test_state_mgr::permanent_destroy() {}
+
+void test_state_mgr::leave() {}
