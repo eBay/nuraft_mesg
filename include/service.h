@@ -43,8 +43,7 @@ using get_server_ctx_cb =
                                         shared< group_metrics > metrics, msg_service* sds_msg) >;
 
 struct grpc_server_wrapper {
-    explicit grpc_server_wrapper(group_name_t const& group_name) :
-            m_server(), m_metrics(std::make_shared< group_metrics >(group_name)) {}
+    explicit grpc_server_wrapper(group_name_t const& group_name);
 
     shared< sds::grpc_server > m_server;
     shared< group_metrics > m_metrics;
