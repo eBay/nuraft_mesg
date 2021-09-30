@@ -8,6 +8,8 @@
 //   Messaging service routines
 //
 
+#include <sds_options/options.h>
+
 #include "grpcpp/impl/codegen/status_code_enum.h"
 #include "libnuraft/async.hxx"
 #include "libnuraft/rpc_listener.hxx"
@@ -15,9 +17,17 @@
 
 SDS_LOGGING_DECL(sds_msg)
 
+SDS_OPTION_GROUP(sds_messaging,
+                 (messaging_metrics, "", "msg_metrics", "Gather metrics from SD Messaging", cxxopts::value< bool >(),
+                  ""))
+
 namespace sds::messaging {
 
 using AsyncRaftSvc = Messaging::AsyncService;
+
+grpc_server_wrapper::grpc_server_wrapper(group_name_t const& group_name) : m_server() {
+    if (0 < SDS_OPTIONS.count("msg_metrics")) m_metrics = std::make_shared< group_metrics >(group_name);
+}
 
 shared< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, std::string const& service_address) {
     return std::shared_ptr< msg_service >(new msg_service(get_server_ctx, service_address),
@@ -135,7 +145,7 @@ bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGr
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
-            COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
+            if (it->second.m_metrics) COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
             server = it->second.m_server;
         }
     }
