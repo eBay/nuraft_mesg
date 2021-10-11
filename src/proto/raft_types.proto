@@ -4,66 +4,66 @@
 
 syntax = "proto3";
 
-package sds;
+package nuraft_grpc;
 
 enum LogType {
-    UNKNOWN     = 0;
-    APP         = 1;
-    CONFIG      = 2;
-    CLUSTER     = 3;
-    PACK        = 4;
-    SNAPSYNC    = 5;
-    CUSTOM      = 999;
+    UNKNOWN = 0;
+    APP = 1;
+    CONFIG = 2;
+    CLUSTER = 3;
+    PACK = 4;
+    SNAPSYNC = 5;
+    CUSTOM = 999;
 }
 
 enum ResultCode {
-    OK                          = 0;
-    CANCELLED                   = 1;
-    TIMEOUT                     = 2;
-    NOT_LEADER                  = 3;
-    BAD_REQUEST                 = 4;
-    SERVER_ALREADY_EXISTS       = 5;
-    CONFIG_CHANGING             = 6;
-    SERVER_IS_JOINING           = 7;
-    SERVER_NOT_FOUND            = 8;
-    CANNOT_REMOVE_LEADER        = 9;
-    SERVER_IS_LEAVING           = 10;
+    OK = 0;
+    CANCELLED = 1;
+    TIMEOUT = 2;
+    NOT_LEADER = 3;
+    BAD_REQUEST = 4;
+    SERVER_ALREADY_EXISTS = 5;
+    CONFIG_CHANGING = 6;
+    SERVER_IS_JOINING = 7;
+    SERVER_NOT_FOUND = 8;
+    CANNOT_REMOVE_LEADER = 9;
+    SERVER_IS_LEAVING = 10;
 
-    FAILED                      = 32768;
+    FAILED = 32768;
 }
 
 message LogEntry {
-    uint64  term    = 1;
-    LogType type    = 2;
-    bytes   buffer  = 3;
+    uint64 term = 1;
+    LogType type = 2;
+    bytes buffer = 3;
 }
 
 message RCMsgBase {
-    uint64  term    = 1;
-    uint32  type    = 2;
-    int32   src     = 3;
-    int32   dest    = 4;
+    uint64 term = 1;
+    uint32 type = 2;
+    int32 src = 3;
+    int32 dest = 4;
 }
 
 message RCRequest {
-    uint64              last_log_term   = 1;
-    uint64              last_log_index  = 2;
-    uint64              commit_index    = 3;
-    repeated LogEntry   log_entries     = 4;
+    uint64 last_log_term = 1;
+    uint64 last_log_index = 2;
+    uint64 commit_index = 3;
+    repeated LogEntry log_entries = 4;
 }
 
 message RCResponse {
-    uint64              next_index      = 1;
-    bool                accepted        = 2;
-    bytes               context         = 3;
-    string              dest_addr       = 4;
-    ResultCode          result_code     = 5;
+    uint64 next_index = 1;
+    bool accepted = 2;
+    bytes context = 3;
+    string dest_addr = 4;
+    ResultCode result_code = 5;
 }
 
 message RaftMessage {
-    RCMsgBase   base    = 1;
+    RCMsgBase base = 1;
     oneof req_resp {
-        RCRequest   rc_request  = 2;
-        RCResponse  rc_response = 3;
+        RCRequest rc_request = 2;
+        RCResponse rc_response = 3;
     }
 }

@@ -5,7 +5,7 @@
 //      Brian Szmyd <bszmyd@ebay.com>
 //
 // Brief:
-//   Implements cornerstone's rpc_client_factory providing sds::grpc::GrpcAsyncClient
+//   Implements cornerstone's rpc_client_factory providing grpc_helper::GrpcAsyncClient
 //   inherited rpc_client instances sharing a common worker pool.
 
 #pragma once
@@ -18,11 +18,11 @@
 
 SDS_LOGGING_DECL(nuraft)
 
-namespace sds {
+namespace nuraft_grpc {
 
 class grpc_factory : public nuraft::rpc_client_factory, public std::enable_shared_from_this< grpc_factory > {
-    std::string                                                    _worker_name;
-    std::mutex                                                     _client_lock;
+    std::string _worker_name;
+    std::mutex _client_lock;
     std::map< std::string, std::shared_ptr< nuraft::rpc_client > > _clients;
 
 public:
@@ -42,11 +42,11 @@ public:
                                                       nuraft::srv_config const& dest_cfg);
 
     // Send a client request to the cluster
-    std::future< nuraft::cmd_result_code > client_request(shared< nuraft::buffer >  buf,
+    std::future< nuraft::cmd_result_code > client_request(shared< nuraft::buffer > buf,
                                                           nuraft::srv_config const& dest_cfg);
 
     // Construct and send a RemoveServer message to the cluster
     std::future< nuraft::cmd_result_code > rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);
 };
 
-} // namespace sds
+} // namespace nuraft_grpc

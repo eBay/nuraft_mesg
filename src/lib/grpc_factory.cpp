@@ -8,29 +8,29 @@
 //   grpc_factory static functions that makes for easy client creation.
 //
 
-#include <sds_grpc/client.h>
+#include <grpc_helper/rpc_client.hpp>
 
 #include "grpc_client.hpp"
 #include "grpc_factory.hpp"
 
-namespace sds {
+namespace nuraft_grpc {
 
 template < typename Payload >
 struct client_ctx {
-    int32_t           _cur_dest;
+    int32_t _cur_dest;
     std::string const _new_srv_addr;
 
     client_ctx(Payload payload, shared< grpc_factory > factory, int32_t dest, std::string const& new_srv_addr = "") :
             _cur_dest(dest), _new_srv_addr(new_srv_addr), _payload(payload), _cli_factory(factory) {}
 
-    Payload                                payload() const { return _payload; }
-    shared< grpc_factory >                 cli_factory() const { return _cli_factory; }
+    Payload payload() const { return _payload; }
+    shared< grpc_factory > cli_factory() const { return _cli_factory; }
     std::future< nuraft::cmd_result_code > future() { return _promise.get_future(); }
-    void                                   set(nuraft::cmd_result_code const code) { return _promise.set_value(code); }
+    void set(nuraft::cmd_result_code const code) { return _promise.set_value(code); }
 
 private:
-    Payload const                           _payload;
-    shared< grpc_factory >                  _cli_factory;
+    Payload const _payload;
+    shared< grpc_factory > _cli_factory;
     std::promise< nuraft::cmd_result_code > _promise;
 };
 
@@ -105,14 +105,12 @@ void respHandler(shared< ContextType > ctx, shared< nuraft::resp_msg >& rsp, sha
 grpc_factory::grpc_factory(int const cli_thread_count, std::string const& name) :
         rpc_client_factory(), _worker_name(name) {
     if (0 < cli_thread_count) {
-        if (!sds::grpc::GrpcAyncClientWorker::create_worker(_worker_name.data(), cli_thread_count)) {
-            throw std::system_error(ENOTCONN, std::generic_category(), "Failed to create workers");
-        }
+        grpc_helper::GrpcAsyncClientWorker::create_worker(_worker_name.data(), cli_thread_count);
     }
 }
 
 class grpc_error_client : public grpc_base_client {
-    void send(RaftMessage const &message, handle_resp complete) override {
+    void send(RaftMessage const& message, handle_resp complete) override {
         auto null_msg = RaftMessage();
         auto status = ::grpc::Status(::grpc::ABORTED, "Bad connection");
         complete(null_msg, status);
@@ -129,7 +127,7 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string&
             LOGDEBUGMOD(nuraft, "Re-creating client for {}", client);
             if (auto err = reinit_client(client, it->second); err) {
                 LOGERROR("Failed to re-initialize client {}: {}", client, err.message());
-                new_client = std::make_shared<grpc_error_client>();
+                new_client = std::make_shared< grpc_error_client >();
             } else {
                 new_client = it->second;
             }
@@ -137,14 +135,12 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string&
             LOGDEBUGMOD(nuraft, "Creating client for {}", client);
             if (auto err = create_client(client, it->second); err) {
                 LOGERROR("Failed to create client for {}: {}", client, err.message());
-                new_client = std::make_shared<grpc_error_client>();
+                new_client = std::make_shared< grpc_error_client >();
             } else {
                 new_client = it->second;
             }
         }
-        if (!it->second) {
-            _clients.erase(it);
-        }
+        if (!it->second) { _clients.erase(it); }
     }
     return new_client;
 }
@@ -168,7 +164,7 @@ std::future< nuraft::cmd_result_code > grpc_factory::add_server(uint32_t const s
     return ctx->future();
 }
 
-std::future< nuraft::cmd_result_code > grpc_factory::rem_server(uint32_t const            srv_id,
+std::future< nuraft::cmd_result_code > grpc_factory::rem_server(uint32_t const srv_id,
                                                                 nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
     assert(client);
@@ -187,7 +183,7 @@ std::future< nuraft::cmd_result_code > grpc_factory::rem_server(uint32_t const  
     return ctx->future();
 }
 
-std::future< nuraft::cmd_result_code > grpc_factory::client_request(shared< nuraft::buffer >  buf,
+std::future< nuraft::cmd_result_code > grpc_factory::client_request(shared< nuraft::buffer > buf,
                                                                     nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
     assert(client);
@@ -206,4 +202,4 @@ std::future< nuraft::cmd_result_code > grpc_factory::client_request(shared< nura
     return ctx->future();
 }
 
-} // namespace sds
+} // namespace nuraft_grpc

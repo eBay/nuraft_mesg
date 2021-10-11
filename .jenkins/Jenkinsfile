@@ -65,10 +65,15 @@ pipeline {
                         values 'sanitize', 'debug', 'test'
                     }
                     axis {
+                        name 'PRERELEASE'
+                        values 'True', 'False'
+                    }
+                    axis {
                         name 'COVERAGE'
                         values 'False'
                 } }
-                excludes { exclude {
+                excludes {
+                  exclude {
                     axis {
                         name 'BUILD_TYPE'
                         values 'sanitize', 'test'
@@ -77,7 +82,18 @@ pipeline {
                         name 'COVERAGE'
                         values 'True'
                     }
-                } }
+                  }
+                  exclude {
+                    axis {
+                        name 'PRERELEASE'
+                        values 'False'
+                    }
+                    axis {
+                        name 'BUILD_TYPE'
+                        values 'debug', 'sanitize'
+                    }
+                  }
+                }
 
                 stages {
                     stage('Adjust Tag for Master/PR') {
@@ -96,7 +112,7 @@ pipeline {
                             expression { "${BUILD_TYPE}" != 'sanitize' }
                         } }
                         steps {
-                            sh "conan create ${BUILD_MISSING} -pr ${BUILD_TYPE} . ${PROJECT}/${TAG}"
+                            sh "conan create ${BUILD_MISSING} -o ${PROJECT}:prerelease=${PRERELEASE} -pr ${BUILD_TYPE} . ${PROJECT}/${TAG}"
                         }
                         post {
                             failure {
@@ -113,7 +129,7 @@ pipeline {
                             expression { "${BUILD_TYPE}" == 'sanitize' }
                         } }
                         steps {
-                            sh "conan create ${BUILD_MISSING} -o ${PROJECT}:sanitize=True -pr debug . ${PROJECT}/${TAG}"
+                            sh "conan create ${BUILD_MISSING} -o ${PROJECT}:prerelease=${PRERELEASE} -o ${PROJECT}:sanitize=True -pr debug . ${PROJECT}/${TAG}"
                         }
                         post {
                             failure {
@@ -158,7 +174,7 @@ pipeline {
                                 steps {
                                     slackSend channel: '#sds-ci', message: "*${PROJECT}:${TAG}* is undergoing Code Coverage."
                                     sh "echo \"sonar.branch.name=${BRANCH_NAME}\" >> sonar-project.properties"
-                                    sh "conan install -pr ${BUILD_TYPE} ${BUILD_MISSING} -o ${PROJECT}:coverage=True ."
+                                    sh "conan install -o ${PROJECT}:prerelease=${PRERELEASE} -pr ${BUILD_TYPE} ${BUILD_MISSING} -o ${PROJECT}:coverage=True ."
                                     sh "build-wrapper-linux-x86-64 --out-dir /tmp/sonar conan build ."
                                     sh "find . -name \"*.gcno\" -exec gcov {} \\;"
                                     withSonarQubeEnv('sds-sonar')  {

@@ -14,7 +14,7 @@
 #include "grpc_client.hpp"
 #include "raft_service.grpc.pb.h"
 
-namespace sds {
+namespace nuraft_grpc {
 
 class simple_grpc_client : public grpc_client< RaftSvc > {
 public:
@@ -27,4 +27,4 @@ protected:
     }
 };
 
-} // namespace sds
+} // namespace nuraft_grpc

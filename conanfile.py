@@ -5,7 +5,7 @@ import os
 
 class NuRaftGRPCConan(ConanFile):
     name = "nuraft_grpc"
-    version = "4.1.1"
+    version = "5.0.1"
 
     license = "Apache 2.0"
     url = "https://github.corp.ebay.com/SDS/nuraft_grpc"
@@ -16,18 +16,21 @@ class NuRaftGRPCConan(ConanFile):
     generators = "cmake"
     requires = (
                 "nuraft/[~=1.8, include_prerelease=True]@nudata/master",
-                "sds_grpc/[~=3, include_prerelease=True]@sds/master",
-                "sds_logging/[~=10, include_prerelease=True]@sds/master",
+                "grpc_helper/[~=1, include_prerelease=True]@sisl/master",
+                "sds_logging/[~=11, include_prerelease=True]@sds/master",
+                ("fmt/8.0.1",       "override"),
                 )
     options = {
                 "shared": ['True', 'False'],
                 "fPIC": ['True', 'False'],
                 "sanitize": ['True', 'False'],
+                "prerelease": ['True', 'False'],
                 }
     default_options = (
                         'shared=False',
                         'fPIC=True',
                         'sanitize=False',
+                        'prerelease=True',
                         )
 
     exports = ["LICENSE.md"]
@@ -40,6 +43,9 @@ class NuRaftGRPCConan(ConanFile):
     def config_options(self):
         if self.settings.build_type != "Debug":
             del self.options.sanitize
+
+    def configure(self):
+        self.options['grpc_helper'].prerelease = self.options.prerelease
 
     def build(self):
         cmake = CMake(self)
