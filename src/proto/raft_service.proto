@@ -6,10 +6,8 @@ syntax = "proto3";
 
 import "raft_types.proto";
 
-package sds;
+package nuraft_grpc;
 
 /// This is a VERY basic service. A service might include this RPC as
 /// one of the calls in a greater service.
-service RaftSvc {
-  rpc Step (RaftMessage)  returns (RaftMessage);
-}
+service RaftSvc { rpc Step(RaftMessage) returns (RaftMessage); }

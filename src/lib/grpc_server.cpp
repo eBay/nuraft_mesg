@@ -11,7 +11,7 @@
 #include "grpc_server.hpp"
 #include "utils.hpp"
 
-namespace sds {
+namespace nuraft_grpc {
 
 static RCResponse* fromRCResponse(nuraft::resp_msg& rcmsg) {
     auto req = new RCResponse;
@@ -44,9 +44,7 @@ nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > > grpc_server::
     return _raft_server->add_srv(cfg);
 }
 
-bool grpc_server::request_leadership() {
-    return _raft_server->request_leadership();
-}
+bool grpc_server::request_leadership() { return _raft_server->request_leadership(); }
 
 nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > > grpc_server::rem_srv(int const member_id) {
     return _raft_server->remove_srv(member_id);
@@ -57,7 +55,7 @@ grpc_server::append_entries(std::vector< nuraft::ptr< nuraft::buffer > > const& 
     return _raft_server->append_entries(logs);
 }
 
-::grpc::Status grpc_server::step(RaftMessage& request, RaftMessage& reply) {
+::grpc::Status grpc_server::step(const RaftMessage& request, RaftMessage& reply) {
     LOGTRACEMOD(nuraft, "Stepping [{}] from: [{}] to: [{}]",
                 nuraft::msg_type_to_string(nuraft::msg_type(request.base().type())), request.base().src(),
                 request.base().dest());
@@ -73,4 +71,4 @@ grpc_server::append_entries(std::vector< nuraft::ptr< nuraft::buffer > > const& 
     }
     return ::grpc::Status();
 }
-} // namespace sds
+} // namespace nuraft_grpc
