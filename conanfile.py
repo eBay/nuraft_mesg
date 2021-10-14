@@ -16,7 +16,7 @@ class NuRaftGRPCConan(ConanFile):
     generators = "cmake"
     requires = (
                 "nuraft/[~=1.8, include_prerelease=True]@nudata/master",
-                "grpc_helper/[~=1, include_prerelease=True]@sisl/master",
+                "grpc_helper/[~=2, include_prerelease=True]@sisl/master",
                 "sds_logging/[~=11, include_prerelease=True]@sds/master",
                 ("fmt/8.0.1",       "override"),
                 )
