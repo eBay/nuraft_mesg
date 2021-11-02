@@ -8,6 +8,7 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <ios>
 #include <spdlog/fmt/ostr.h>
+#include <spdlog/details/registry.h>
 
 #include <libnuraft/async.hxx>
 #include <sds_options/options.h>
@@ -55,8 +56,14 @@ void service::start(consensus_component::params& start_params) {
 
     auto _listen_address = fmt::format(FMT_STRING("0.0.0.0:{}"), start_params.mesg_port);
     _g_factory = std::make_shared< engine_factory >(grpc_client_threads, start_params);
-    _custom_logger = sds_logging::CreateCustomLogger(fmt::format("nuraft_{}", _node_id), "", false,
-                                                     false /* tee_to_stdout_stderr */);
+    auto logger_name = fmt::format("nuraft_{}", _node_id);
+    //
+    // NOTE: The Unit tests require this instance to be recreated with the same parameters.
+    // This exception is only expected in this case where we "restart" the server by just recreating the instance.
+    try {
+        _custom_logger = sds_logging::CreateCustomLogger(logger_name, "", false, false /* tee_to_stdout_stderr */);
+    } catch (spdlog::spdlog_ex const& e) { _custom_logger = spdlog::details::registry::instance().get(logger_name); }
+
     sds_logging::SetLogPattern("[%D %T.%f] [%^%L%$] [%t] %v", _custom_logger);
     nuraft::ptr< nuraft::logger > logger = std::make_shared< sds_logger >("scheduler", _custom_logger);
 
@@ -104,6 +111,10 @@ nuraft::cb_func::ReturnCode service::callback_handler(std::string const& group_i
         auto const my_id = param->myId;
         auto const leader_id = param->leaderId;
         LOGINFO("Joined cluster: {}, [l_id:{},my_id:{}]", group_id, leader_id, my_id);
+        {
+            std::lock_guard< std::mutex > lg(_manager_lock);
+            _is_leader[group_id] = (leader_id == my_id);
+        }
     } break;
     case nuraft::cb_func::NewConfig: {
         LOGDEBUGMOD(sds_msg, "Cluster change for: {}", group_id);
@@ -133,9 +144,7 @@ void service::exit_group(std::string const& group_id) {
     std::shared_ptr< mesg_state_mgr > mgr;
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
-        if (auto it = _state_managers.find(group_id); it != _state_managers.end()) {
-            mgr = it->second;
-        }
+        if (auto it = _state_managers.find(group_id); it != _state_managers.end()) { mgr = it->second; }
     }
     if (mgr) mgr->leave();
 }
@@ -152,14 +161,15 @@ std::error_condition service::group_init(int32_t const srv_id, std::string const
     nuraft::raft_params params;
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
+        auto const& type_params = _state_mgr_types[group_type];
+        params = type_params.raft_params;
+
         auto [it, happened] = _state_managers.emplace(group_id, nullptr);
         if (it != _state_managers.end()) {
             if (happened) {
                 // A new logstore!
-                LOGDEBUGMOD(sds_msg, "Creating new State Manager for: {}", group_id);
-                auto& type_params = _state_mgr_types[group_type];
+                LOGDEBUGMOD(sds_msg, "Creating new State Manager for: {}, type: {}", group_id, group_type);
                 it->second = type_params.create_state_mgr(srv_id, group_id);
-                params = type_params.raft_params;
             }
             it->second->become_ready();
             sm = it->second->get_state_machine();

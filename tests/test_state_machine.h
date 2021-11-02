@@ -49,7 +49,7 @@ public:
 
     virtual void create_snapshot(snapshot& s, async_result< bool >::handler_type& when_done) {}
 
-    virtual ulong last_commit_index() { return last_commit_idx_; }
+    virtual ulong last_commit_index() { auto_lock(lock_); return last_commit_idx_; }
 
 private:
     std::mutex lock_;

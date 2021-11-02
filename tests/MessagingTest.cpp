@@ -1,3 +1,4 @@
+#include <memory>
 #include <string>
 
 #include <boost/uuid/uuid.hpp>
@@ -22,7 +23,7 @@
 
 SDS_LOGGING_INIT(nuraft, sds_msg, grpc_server)
 
-SDS_OPTIONS_ENABLE(logging )
+SDS_OPTIONS_ENABLE(logging)
 
 constexpr auto rpc_backoff = 50;
 constexpr auto heartbeat_period = 100;
@@ -55,10 +56,15 @@ protected:
     std::unique_ptr< service > instance_3;
 
     std::shared_ptr< test_state_mgr > sm_int_1;
+    std::shared_ptr< test_state_mgr > sm_int_2;
+    std::shared_ptr< test_state_mgr > sm_int_3;
 
     std::string id_1;
     std::string id_2;
     std::string id_3;
+
+    std::function< std::string(std::string const&) > lookup_callback;
+    nuraft::raft_params r_params;
 
     void SetUp() override {
         id_1 = to_string(boost::uuids::random_generator()());
@@ -69,7 +75,7 @@ protected:
         instance_2 = std::make_unique< service >();
         instance_3 = std::make_unique< service >();
 
-        auto lookup_callback = [srv_1 = id_1, srv_2 = id_2, srv_3 = id_3](std::string const& id) -> std::string {
+        lookup_callback = [srv_1 = id_1, srv_2 = id_2, srv_3 = id_3](std::string const& id) -> std::string {
             if (id == srv_1)
                 return "127.0.0.1:9001";
             else if (id == srv_2)
@@ -80,45 +86,45 @@ protected:
                 return std::string();
         };
 
-        auto params = consensus_component::params{id_1, 9001, lookup_callback, "none"};
+        auto params = consensus_component::params{id_1, 9001, lookup_callback, "test_type"};
         instance_1->start(params);
 
         // RAFT server parameters
-        nuraft::raft_params r_params;
         r_params.with_election_timeout_lower(elect_to_low)
-          .with_election_timeout_upper(elect_to_high)
-          .with_hb_interval(heartbeat_period)
-          .with_max_append_size(10)
-          .with_rpc_failure_backoff(rpc_backoff)
-          .with_auto_forwarding(true)
-          .with_snapshot_enabled(0);
+            .with_election_timeout_upper(elect_to_high)
+            .with_hb_interval(heartbeat_period)
+            .with_max_append_size(10)
+            .with_rpc_failure_backoff(rpc_backoff)
+            .with_auto_forwarding(true)
+            .with_snapshot_enabled(0);
 
-        auto register_params = consensus_component::register_params {
+        auto register_params = consensus_component::register_params{
             r_params,
             [this, srv_addr = id_1](int32_t const srv_id,
                                     std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
                 sm_int_1 = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
                 return std::static_pointer_cast< mesg_state_mgr >(sm_int_1);
-            }
-        };
+            }};
         instance_1->register_mgr_type("test_type", register_params);
 
         params.server_uuid = id_2;
         params.mesg_port = 9002;
-        register_params.create_state_mgr = [srv_addr = id_2](int32_t const srv_id,
-                                                    std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
-            auto new_sm = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
-            return std::static_pointer_cast< mesg_state_mgr >(new_sm);
+        register_params.create_state_mgr =
+            [this, srv_addr = id_2](int32_t const srv_id,
+                                    std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
+            sm_int_2 = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
+            return std::static_pointer_cast< mesg_state_mgr >(sm_int_2);
         };
         instance_2->start(params);
         instance_2->register_mgr_type("test_type", register_params);
 
         params.server_uuid = id_3;
         params.mesg_port = 9003;
-        register_params.create_state_mgr = [srv_addr = id_3](int32_t const srv_id,
-                                                    std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
-            auto new_sm = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
-            return std::static_pointer_cast< mesg_state_mgr >(new_sm);
+        register_params.create_state_mgr =
+            [this, srv_addr = id_3](int32_t const srv_id,
+                                    std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
+            sm_int_3 = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
+            return std::static_pointer_cast< mesg_state_mgr >(sm_int_3);
         };
         instance_3->start(params);
         instance_3->register_mgr_type("test_type", register_params);
@@ -145,6 +151,44 @@ TEST_F(MessagingFixture, ClientRequest) {
         {"op_type", 2},
     });
     EXPECT_FALSE(instance_1->client_request("test_group", buf));
+
+    instance_3->leave_group("test_group");
+    instance_2->leave_group("test_group");
+    instance_1->leave_group("test_group");
+}
+
+// Basic resiliency test (append_entries)
+TEST_F(MessagingFixture, ClientReset) {
+    // Simulate a Member crash
+    instance_3 = std::make_unique< service >();
+
+    // Commit message
+    auto buf = sds::messaging::create_message(nlohmann::json{
+        {"op_type", 2},
+    });
+    EXPECT_FALSE(instance_1->client_request("test_group", buf));
+
+    auto register_params = consensus_component::register_params{
+        r_params, [](int32_t const srv_id, std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
+            throw std::logic_error("Not Supposed To Happen");
+        }};
+    instance_3->register_mgr_type("test_type", register_params);
+    auto params = consensus_component::params{id_3, 9003, lookup_callback, "test_type"};
+    instance_3->start(params);
+    instance_3->join_group("test_group", "test_type", std::dynamic_pointer_cast< mesg_state_mgr >(sm_int_3));
+
+    auto const sm1_idx = sm_int_1->get_state_machine()->last_commit_index();
+    auto sm3_idx = sm_int_3->get_state_machine()->last_commit_index();
+    LOGINFO("SM1: {} / SM3: {}", sm1_idx, sm3_idx);
+    while (sm1_idx > sm3_idx) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        sm3_idx = sm_int_3->get_state_machine()->last_commit_index();
+        LOGINFO("SM1: {} / SM3: {}", sm1_idx, sm3_idx);
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    auto err = instance_3->client_request("test_group", buf);
+    if (err) { LOGERROR("Failed to commit: {}", err.message()); }
+    EXPECT_FALSE(err);
 
     instance_3->leave_group("test_group");
     instance_2->leave_group("test_group");

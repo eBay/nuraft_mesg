@@ -204,7 +204,7 @@ void msg_service::shutdown_for(group_name_t const& group_name) {
 
 std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_name,
                                                 group_type_t const& group_type) {
-    LOGINFOMOD(sds_msg, "Joining RAFT group: {}", group_name);
+    LOGINFOMOD(sds_msg, "Joining RAFT group: {}, type: {}", group_name, group_type);
 
     nuraft::context* ctx{nullptr};
     bool happened{false};
@@ -216,7 +216,7 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
         if (g_type.empty()) { g_type = _default_group_type; }
         std::tie(it, happened) = _raft_servers.emplace(std::make_pair(group_name, group_name));
         if (_raft_servers.end() != it && happened) {
-            if (auto err = _get_server_ctx(srv_id, group_name, group_type, ctx, it->second.m_metrics, this); err) {
+            if (auto err = _get_server_ctx(srv_id, group_name, g_type, ctx, it->second.m_metrics, this); err) {
                 LOGERRORMOD(sds_msg, "Error during RAFT server creation on group {}: {}", group_name, err.message());
                 return err;
             }
