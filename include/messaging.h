@@ -8,7 +8,7 @@
 #include <string>
 #include <system_error>
 
-#include <sds_logging/logging.h>
+#include <sisl/logging/logging.h>
 
 #include "messaging_if.h"
 
@@ -27,9 +27,9 @@ class service : public consensus_component {
 
     std::map< std::string, consensus_component::register_params > _state_mgr_types;
 
-    std::shared_ptr<::sds::messaging::group_factory > _g_factory;
-    std::shared_ptr<::sds::messaging::msg_service > _mesg_service;
-    std::unique_ptr<::grpc_helper::GrpcServer > _grpc_server;
+    std::shared_ptr< ::sds::messaging::group_factory > _g_factory;
+    std::shared_ptr< ::sds::messaging::msg_service > _mesg_service;
+    std::unique_ptr< ::grpc_helper::GrpcServer > _grpc_server;
 
     std::mutex mutable _manager_lock;
     std::map< std::string, std::shared_ptr< mesg_state_mgr > > _state_managers;
@@ -38,10 +38,10 @@ class service : public consensus_component {
     std::map< std::string, bool > _is_leader;
 
     nuraft::ptr< nuraft::delayed_task_scheduler > _scheduler;
-    std::shared_ptr< sds_logging::logger_t > _custom_logger;
+    std::shared_ptr< sisl::logging::logger_t > _custom_logger;
 
-    std::error_condition group_init(int32_t const srv_id, std::string const& group_id, std::string const& group_type, nuraft::context*& ctx,
-                                    std::shared_ptr< sds::messaging::group_metrics > metrics,
+    std::error_condition group_init(int32_t const srv_id, std::string const& group_id, std::string const& group_type,
+                                    nuraft::context*& ctx, std::shared_ptr< sds::messaging::group_metrics > metrics,
                                     sds::messaging::msg_service* sds_msg);
     nuraft::cb_func::ReturnCode callback_handler(std::string const& group_id, nuraft::cb_func::Type type,
                                                  nuraft::cb_func::Param* param);
@@ -56,7 +56,8 @@ public:
     void register_mgr_type(std::string const& group_type, register_params& params) override;
 
     std::error_condition create_group(std::string const& group_id, std::string const& group_type) override;
-    std::error_condition join_group(std::string const& group_id, std::string const& group_type, std::shared_ptr< mesg_state_mgr > smgr) override;
+    std::error_condition join_group(std::string const& group_id, std::string const& group_type,
+                                    std::shared_ptr< mesg_state_mgr > smgr) override;
 
     void start(consensus_component::params& start_params) override;
     bool add_member(std::string const& group_id, std::string const& server_id) override;

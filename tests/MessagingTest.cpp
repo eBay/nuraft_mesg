@@ -6,8 +6,8 @@
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/string_generator.hpp>
 #include <grpc_helper/rpc_client.hpp>
-#include <sds_logging/logging.h>
-#include <sds_options/options.h>
+#include <sisl/logging/logging.h>
+#include <sisl/options/options.h>
 #include <nlohmann/json.hpp>
 
 #include <utility/thread_buffer.hpp>
@@ -21,9 +21,9 @@
 
 #include "test_state_manager.h"
 
-SDS_LOGGING_INIT(nuraft, sds_msg, grpc_server)
+SISL_LOGGING_INIT(nuraft, sds_msg, grpc_server)
 
-SDS_OPTIONS_ENABLE(logging)
+SISL_OPTIONS_ENABLE(logging)
 
 constexpr auto rpc_backoff = 50;
 constexpr auto heartbeat_period = 100;
@@ -217,11 +217,11 @@ TEST_F(MessagingFixture, RemoveMember) {
 }
 
 int main(int argc, char* argv[]) {
-    SDS_OPTIONS_LOAD(argc, argv, logging)
+    SISL_OPTIONS_LOAD(argc, argv, logging)
     ::testing::InitGoogleTest(&argc, argv);
-    sds_logging::SetLogger(std::string(argv[0]));
+    sisl::logging::SetLogger(std::string(argv[0]));
     spdlog::set_pattern("[%D %T.%f%z] [%^%l%$] [%t] %v");
-    sds_logging::GetLogger()->flush_on(spdlog::level::level_enum::err);
+    sisl::logging::GetLogger()->flush_on(spdlog::level::level_enum::err);
 
     auto ret = RUN_ALL_TESTS();
     grpc_helper::GrpcAsyncClientWorker::shutdown_all();

@@ -9,7 +9,7 @@
 #include "service.h"
 #include "messaging_service.grpc.pb.h"
 
-SDS_LOGGING_DECL(sds_msg)
+SISL_LOGGING_DECL(sds_msg)
 
 namespace sds::messaging {
 

@@ -11,14 +11,14 @@
 #include <spdlog/details/registry.h>
 
 #include <libnuraft/async.hxx>
-#include <sds_options/options.h>
+#include <sisl/options/options.h>
 #include <grpc_helper/rpc_server.hpp>
 
 #include "service.h"
 #include "factory.h"
 #include "logger.h"
 
-SDS_LOGGING_DECL(sds_msg)
+SISL_LOGGING_DECL(sds_msg)
 
 constexpr auto cfg_change_timeout = std::chrono::milliseconds(200);
 constexpr auto leader_change_timeout = std::chrono::milliseconds(3200);
@@ -61,10 +61,10 @@ void service::start(consensus_component::params& start_params) {
     // NOTE: The Unit tests require this instance to be recreated with the same parameters.
     // This exception is only expected in this case where we "restart" the server by just recreating the instance.
     try {
-        _custom_logger = sds_logging::CreateCustomLogger(logger_name, "", false, false /* tee_to_stdout_stderr */);
+        _custom_logger = sisl::logging::CreateCustomLogger(logger_name, "", false, false /* tee_to_stdout_stderr */);
     } catch (spdlog::spdlog_ex const& e) { _custom_logger = spdlog::details::registry::instance().get(logger_name); }
 
-    sds_logging::SetLogPattern("[%D %T.%f] [%^%L%$] [%t] %v", _custom_logger);
+    sisl::logging::SetLogPattern("[%D %T.%f] [%^%L%$] [%t] %v", _custom_logger);
     nuraft::ptr< nuraft::logger > logger = std::make_shared< sds_logger >("scheduler", _custom_logger);
 
     // RAFT request scheduler

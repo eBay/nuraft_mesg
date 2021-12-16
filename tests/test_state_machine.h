@@ -1,7 +1,7 @@
 #pragma once
 
 #include <libnuraft/nuraft.hxx>
-#include <sds_logging/logging.h>
+#include <sisl/logging/logging.h>
 
 using namespace nuraft;
 
@@ -22,7 +22,7 @@ public:
         auto_lock(lock_);
 
         auto j_obj = unwrap_buffer(data);
-        LOGINFO("Commit message [{}] op: {}", log_idx, j_obj.at("op_type").get<int>());
+        LOGINFO("Commit message [{}] op: {}", log_idx, j_obj.at("op_type").get< int >());
         last_commit_idx_ = log_idx;
         return nullptr;
     }
@@ -30,14 +30,14 @@ public:
     virtual ptr< buffer > pre_commit(const ulong log_idx, buffer& data) {
         auto_lock(lock_);
         auto j_obj = unwrap_buffer(data);
-        LOGINFO("Pre-Commit message [{}] op: {}", log_idx, j_obj.at("op_type").get<int>());
+        LOGINFO("Pre-Commit message [{}] op: {}", log_idx, j_obj.at("op_type").get< int >());
         return nullptr;
     }
 
     virtual void rollback(const ulong log_idx, buffer& data) {
         auto_lock(lock_);
         auto j_obj = unwrap_buffer(data);
-        LOGINFO("Rollback message [{}] op: {}", log_idx, j_obj.at("op_type").get<int>());
+        LOGINFO("Rollback message [{}] op: {}", log_idx, j_obj.at("op_type").get< int >());
     }
 
     virtual void save_snapshot_data(snapshot& s, const ulong offset, buffer& data) {}
@@ -49,10 +49,12 @@ public:
 
     virtual void create_snapshot(snapshot& s, async_result< bool >::handler_type& when_done) {}
 
-    virtual ulong last_commit_index() { auto_lock(lock_); return last_commit_idx_; }
+    virtual ulong last_commit_index() {
+        auto_lock(lock_);
+        return last_commit_idx_;
+    }
 
 private:
     std::mutex lock_;
     ulong last_commit_idx_;
 };
-

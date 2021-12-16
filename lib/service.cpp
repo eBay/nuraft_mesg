@@ -8,25 +8,25 @@
 //   Messaging service routines
 //
 
-#include <sds_options/options.h>
+#include <sisl/options/options.h>
 
 #include "grpcpp/impl/codegen/status_code_enum.h"
 #include "libnuraft/async.hxx"
 #include "libnuraft/rpc_listener.hxx"
 #include "service.h"
 
-SDS_LOGGING_DECL(sds_msg)
+SISL_LOGGING_DECL(sds_msg)
 
-SDS_OPTION_GROUP(sds_messaging,
-                 (messaging_metrics, "", "msg_metrics", "Gather metrics from SD Messaging", cxxopts::value< bool >(),
-                  ""))
+SISL_OPTION_GROUP(sds_messaging,
+                  (messaging_metrics, "", "msg_metrics", "Gather metrics from SD Messaging", cxxopts::value< bool >(),
+                   ""))
 
 namespace sds::messaging {
 
 using AsyncRaftSvc = Messaging::AsyncService;
 
 grpc_server_wrapper::grpc_server_wrapper(group_name_t const& group_name) : m_server() {
-    if (0 < SDS_OPTIONS.count("msg_metrics")) m_metrics = std::make_shared< group_metrics >(group_name);
+    if (0 < SISL_OPTIONS.count("msg_metrics")) m_metrics = std::make_shared< group_metrics >(group_name);
 }
 
 shared< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, std::string const& service_address) {
