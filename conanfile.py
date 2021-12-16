@@ -5,7 +5,7 @@ import os
 
 class NuRaftGRPCConan(ConanFile):
     name = "nuraft_grpc"
-    version = "5.0.1"
+    version = "5.1.0"
 
     license = "Apache 2.0"
     url = "https://github.corp.ebay.com/SDS/nuraft_grpc"
@@ -17,7 +17,7 @@ class NuRaftGRPCConan(ConanFile):
     requires = (
                 "nuraft/[~=1.8, include_prerelease=True]@nudata/master",
                 "grpc_helper/[~=2, include_prerelease=True]@sisl/master",
-                "sds_logging/[~=11, include_prerelease=True]@sds/master",
+                "sisl/[~=7, include_prerelease=True]@sisl/master",
                 ("fmt/8.0.1",       "override"),
                 )
     options = {

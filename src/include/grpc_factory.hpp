@@ -16,7 +16,7 @@
 
 #include "common.hpp"
 
-SDS_LOGGING_DECL(nuraft)
+SISL_LOGGING_DECL(nuraft)
 
 namespace nuraft_grpc {
 

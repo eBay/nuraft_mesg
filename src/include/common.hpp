@@ -13,11 +13,11 @@
 #include <memory>
 
 #include <libnuraft/nuraft.hxx>
-#include <sds_logging/logging.h>
+#include <sisl/logging/logging.h>
 
 #include "raft_types.pb.h"
 
-SDS_LOGGING_DECL(nuraft)
+SISL_LOGGING_DECL(nuraft)
 
 namespace nuraft_grpc {
 

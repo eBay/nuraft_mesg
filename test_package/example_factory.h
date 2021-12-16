@@ -9,7 +9,7 @@
 
 #include <string>
 
-#include <sds_logging/logging.h>
+#include <sisl/logging/logging.h>
 #include <nuraft_grpc/grpc_factory.hpp>
 #include <nuraft_grpc/simple_client.hpp>
 

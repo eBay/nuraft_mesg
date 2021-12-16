@@ -8,8 +8,8 @@
 #include <cassert>
 
 #include <libjungle/jungle.h>
-#include <sds_logging/logging.h>
-#include <sds_options/options.h>
+#include <sisl/logging/logging.h>
+#include <sisl/options/options.h>
 #include <nuraft_grpc/simple_server.hpp>
 
 #include "example_factory.h"
@@ -19,18 +19,18 @@
 
 using namespace nuraft_grpc;
 
-SDS_OPTION_GROUP(server, (server_id, "", "server_id", "Servers ID", cxxopts::value< uint32_t >(), ""))
+SISL_OPTION_GROUP(server, (server_id, "", "server_id", "Servers ID", cxxopts::value< uint32_t >(), ""))
 
-SDS_OPTIONS_ENABLE(logging, server)
-SDS_LOGGING_INIT(nuraft, nublox_logstore, HOMESTORE_LOG_MODS, grpc_server)
+SISL_OPTIONS_ENABLE(logging, server)
+SISL_LOGGING_INIT(nuraft, nublox_logstore, HOMESTORE_LOG_MODS, grpc_server)
 
 int main(int argc, char** argv) {
-    SDS_OPTIONS_LOAD(argc, argv, logging, server);
-    auto server_id = SDS_OPTIONS["server_id"].as< uint32_t >();
+    SISL_OPTIONS_LOAD(argc, argv, logging, server);
+    auto server_id = SISL_OPTIONS["server_id"].as< uint32_t >();
     auto server_address = format(FMT_STRING("0.0.0.0:{}"), 9000 + server_id);
 
     // Can start using LOG from this point onward.
-    sds_logging::SetLogger(format(FMT_STRING("server_{}"), server_id));
+    sisl::logging::SetLogger(format(FMT_STRING("server_{}"), server_id));
     spdlog::set_pattern("[%D %T] [%^%l%$] [%n] [%t] %v");
 
     jungle::GlobalConfig g_config;

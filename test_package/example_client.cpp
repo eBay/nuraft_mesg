@@ -9,20 +9,20 @@
 #include <cassert>
 
 #include <libnuraft/nuraft.hxx>
-#include <sds_logging/logging.h>
-#include <sds_options/options.h>
+#include <sisl/logging/logging.h>
+#include <sisl/options/options.h>
 
 #include "example_factory.h"
 
-SDS_OPTION_GROUP(client, (add, "a", "add", "Add a server to the cluster", cxxopts::value< uint32_t >(), "id"),
-                 (clean, "", "clean", "Reset all persistence", cxxopts::value< bool >(), ""),
-                 (server, "", "server", "Server to send message to", cxxopts::value< uint32_t >()->default_value("0"),
-                  "id"),
-                 (echo, "m", "echo", "Send message to echo service", cxxopts::value< std::string >(), "message"),
-                 (remove, "r", "remove", "Remove server from cluster", cxxopts::value< uint32_t >(), "id"))
+SISL_OPTION_GROUP(client, (add, "a", "add", "Add a server to the cluster", cxxopts::value< uint32_t >(), "id"),
+                  (clean, "", "clean", "Reset all persistence", cxxopts::value< bool >(), ""),
+                  (server, "", "server", "Server to send message to", cxxopts::value< uint32_t >()->default_value("0"),
+                   "id"),
+                  (echo, "m", "echo", "Send message to echo service", cxxopts::value< std::string >(), "message"),
+                  (remove, "r", "remove", "Remove server from cluster", cxxopts::value< uint32_t >(), "id"))
 
-SDS_OPTIONS_ENABLE(logging, client)
-SDS_LOGGING_INIT(nuraft)
+SISL_OPTIONS_ENABLE(logging, client)
+SISL_LOGGING_INIT(nuraft)
 
 using namespace nuraft_grpc;
 
@@ -58,29 +58,29 @@ int remove_server(int leader_id, int srv_id) {
 }
 
 int main(int argc, char** argv) {
-    SDS_OPTIONS_LOAD(argc, argv, logging, client)
+    SISL_OPTIONS_LOAD(argc, argv, logging, client)
 
     // Can start using LOG from this point onward.
-    sds_logging::SetLogger("raft_client");
+    sisl::logging::SetLogger("raft_client");
     spdlog::set_pattern("[%D %T%z] [%n] [%^%l%$] [%t] %v");
 
-    if (SDS_OPTIONS.count("clean")) {
+    if (SISL_OPTIONS.count("clean")) {
         cleanup("*.config");
         cleanup("*_log");
         cleanup("*.state");
         return 0;
     }
 
-    auto const server_id = SDS_OPTIONS["server"].as< uint32_t >();
+    auto const server_id = SISL_OPTIONS["server"].as< uint32_t >();
 
-    if (SDS_OPTIONS.count("echo")) {
-        return send_message(server_id, SDS_OPTIONS["echo"].as< std::string >());
-    } else if (SDS_OPTIONS.count("add")) {
-        return add_new_server(server_id, SDS_OPTIONS["add"].as< uint32_t >());
-    } else if (SDS_OPTIONS.count("remove")) {
-        return remove_server(server_id, SDS_OPTIONS["remove"].as< uint32_t >());
+    if (SISL_OPTIONS.count("echo")) {
+        return send_message(server_id, SISL_OPTIONS["echo"].as< std::string >());
+    } else if (SISL_OPTIONS.count("add")) {
+        return add_new_server(server_id, SISL_OPTIONS["add"].as< uint32_t >());
+    } else if (SISL_OPTIONS.count("remove")) {
+        return remove_server(server_id, SISL_OPTIONS["remove"].as< uint32_t >());
     } else {
-        std::cout << SDS_PARSER.help({}) << std::endl;
+        std::cout << SISL_PARSER.help({}) << std::endl;
     }
     return 0;
 }
