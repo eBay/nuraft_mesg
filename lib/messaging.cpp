@@ -280,10 +280,19 @@ void service::get_peers(std::string const& group_id, std::list< std::string >& s
 }
 
 bool service::request_leadership(std::string const& group_id) {
-    _mesg_service->request_leadership(group_id);
-
+    if (_is_leader[group_id]) { return true; }
+    bool request_success{false};
+    for (auto max_retries = 5ul; max_retries > 0; --max_retries) {
+        if (_mesg_service->request_leadership(group_id)) {
+            request_success = true;
+            break;
+        }
+        // Do not sleep on the last try
+        if (max_retries != 1) { std::this_thread::sleep_for(std::chrono::milliseconds(leader_change_timeout)); }
+    }
     auto lk = std::unique_lock< std::mutex >(_manager_lock);
-    return _leadership_change.wait_for(lk, leader_change_timeout, [this, &group_id]() { return _is_leader[group_id]; });
+    return request_success &&
+        _leadership_change.wait_for(lk, leader_change_timeout, [this, &group_id]() { return _is_leader[group_id]; });
 }
 
 void service::leave_group(std::string const& group_id) {

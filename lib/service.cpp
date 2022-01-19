@@ -95,7 +95,7 @@ bool msg_service::request_leadership(group_name_t const& group_name) {
         try {
             return server->request_leadership();
         } catch (std::runtime_error& rte) {
-            LOGERRORMOD(sds_msg, "Caught exception during yield_leadership(): {}", rte.what())
+            LOGERRORMOD(sds_msg, "Caught exception during request_leadership(): {}", rte.what())
         }
     }
     return false;
