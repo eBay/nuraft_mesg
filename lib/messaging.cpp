@@ -280,7 +280,11 @@ void service::get_peers(std::string const& group_id, std::list< std::string >& s
 }
 
 bool service::request_leadership(std::string const& group_id) {
-    if (_is_leader[group_id]) { return true; }
+    {
+        auto lk = std::unique_lock< std::mutex >(_manager_lock);
+        if (_is_leader[group_id]) { return true; }
+    }
+
     bool request_success{false};
     for (auto max_retries = 5ul; max_retries > 0; --max_retries) {
         if (_mesg_service->request_leadership(group_id)) {
