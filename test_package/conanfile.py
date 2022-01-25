@@ -35,4 +35,4 @@ class TestPackageConan(ConanFile):
                     self.run("DYLD_LIBRARY_PATH=%s %s" % (os.environ.get('DYLD_LIBRARY_PATH', ''), bin_path))
                 else:
                     bin_path = "timeout -k {} {} {}".format(self.abort_timeout, self.fail_timeout, bin_path)
-                self.run("LD_LIBRARY_PATH=%s %s" % (os.environ.get('LD_LIBRARY_PATH', ''), bin_path))
+                    self.run("LD_LIBRARY_PATH=%s %s" % (os.environ.get('LD_LIBRARY_PATH', ''), bin_path))
