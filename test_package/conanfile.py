@@ -26,7 +26,7 @@ class TestPackageConan(ConanFile):
         with tools.environment_append(RunEnvironment(self).vars):
             # TODO: Temporarily restricting tests to run for one build_type only, since running multiple
             # at the same time cause the tests and builds to fail
-            if self.settings.build_type == 'RelWithDebInfo':
+            if self.settings.build_type == 'Debug':
                 self.run("echo $(pwd)")
                 bin_path = os.path.join("../../", "run_tests.sh")
                 if self.settings.os == "Windows":

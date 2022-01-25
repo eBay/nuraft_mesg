@@ -62,7 +62,7 @@ pipeline {
                 axes {
                     axis {
                         name 'BUILD_TYPE'
-                        values 'sanitize', 'debug', 'test'
+                        values 'debug', 'test'
                     }
                     axis {
                         name 'PRERELEASE'
