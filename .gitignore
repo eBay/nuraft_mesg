@@ -6,3 +6,4 @@ cmake-build*
 build/
 compile_commands*
 .clangd/
+.cache/

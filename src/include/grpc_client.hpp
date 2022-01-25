@@ -35,7 +35,9 @@ public:
     grpc_base_client() : nuraft::rpc_client::rpc_client(), _client_id(_client_counter++) {}
     ~grpc_base_client() override = default;
 
-    void send(shared< nuraft::req_msg >& req, nuraft::rpc_handler& complete) override;
+    void send(shared< nuraft::req_msg >& req, nuraft::rpc_handler& complete, uint64_t timeout_ms = 0) override;
+    bool is_abandoned() const override { return false; }
+
     uint64_t get_id() const override { return _client_id; }
 
 protected:

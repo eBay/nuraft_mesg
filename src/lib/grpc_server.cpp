@@ -60,7 +60,7 @@ grpc_server::append_entries(std::vector< nuraft::ptr< nuraft::buffer > > const& 
                 nuraft::msg_type_to_string(nuraft::msg_type(request.base().type())), request.base().src(),
                 request.base().dest());
     auto rcreq = toRequest(request);
-    auto resp = _raft_server->process_req(*rcreq);
+    auto resp = nuraft::raft_server_handler::process_req(_raft_server.get(), *rcreq);
     if (!resp) { return ::grpc::Status(::grpc::StatusCode::CANCELLED, "Server rejected request"); }
     assert(resp);
     reply.set_allocated_base(fromBaseRequest(*resp));
