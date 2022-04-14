@@ -51,6 +51,8 @@ public:
 
     // Send a client request to the cluster
     virtual bool add_member(std::string const& group_id, std::string const& server_id) = 0;
+    virtual bool add_member(std::string const& group_id, std::string const& server_id,
+                            bool const wait_for_completion) = 0;
     virtual bool rem_member(std::string const& group_id, std::string const& server_id) = 0;
     virtual void leave_group(std::string const& group_id) = 0;
     virtual bool request_leadership(std::string const& group_id) = 0;

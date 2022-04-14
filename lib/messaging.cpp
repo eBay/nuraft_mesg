@@ -118,6 +118,7 @@ nuraft::cb_func::ReturnCode service::callback_handler(std::string const& group_i
     } break;
     case nuraft::cb_func::NewConfig: {
         LOGDEBUGMOD(sds_msg, "Cluster change for: {}", group_id);
+        _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeLeader: {
         LOGDEBUGMOD(sds_msg, "I'm the leader of: {}!", group_id);
@@ -125,7 +126,7 @@ nuraft::cb_func::ReturnCode service::callback_handler(std::string const& group_i
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = true;
         }
-        _leadership_change.notify_all();
+        _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeFollower: {
         LOGDEBUGMOD(sds_msg, "I'm a follower of: {}!", group_id);
@@ -196,6 +197,10 @@ std::error_condition service::group_init(int32_t const srv_id, std::string const
 }
 
 bool service::add_member(std::string const& group_id, std::string const& server_id) {
+    return add_member(group_id, server_id, false);
+}
+
+bool service::add_member(std::string const& group_id, std::string const& server_id, bool const wait_for_completion) {
     boost::hash< boost::uuids::uuid > uuid_hasher;
     int32_t const srv_id = uuid_hasher(boost::uuids::string_generator()(server_id)) >> 33;
     auto cfg = nuraft::srv_config(srv_id, server_id);
@@ -212,7 +217,19 @@ bool service::add_member(std::string const& group_id, std::string const& server_
     } else if (nuraft::OK != rc) {
         LOGERROR("Unknown failure to add member: [{}]", static_cast< uint32_t >(rc));
     }
-    return nuraft::OK == rc;
+
+    if (!wait_for_completion) { return nuraft::OK == rc; }
+
+    auto lk = std::unique_lock< std::mutex >(_manager_lock);
+    return (nuraft::OK == rc) &&
+        _config_change.wait_for(lk, cfg_change_timeout * 20, [this, &group_id, &server_id]() {
+            std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
+            _mesg_service->get_srv_config_all(group_id, srv_list);
+            return std::find_if(srv_list.begin(), srv_list.end(),
+                                [&server_id](const std::shared_ptr< nuraft::srv_config >& cfg) {
+                                    return server_id == cfg->get_endpoint();
+                                }) != srv_list.end();
+        });
 }
 
 bool service::rem_member(std::string const& group_id, std::string const& server_id) {
@@ -245,7 +262,7 @@ std::error_condition service::create_group(std::string const& group_id, std::str
 
     // Wait for the leader election timeout to make us the leader
     auto lk = std::unique_lock< std::mutex >(_manager_lock);
-    if (!_leadership_change.wait_for(lk, leader_change_timeout, [this, &group_id]() { return _is_leader[group_id]; })) {
+    if (!_config_change.wait_for(lk, leader_change_timeout, [this, &group_id]() { return _is_leader[group_id]; })) {
         return std::make_error_condition(std::errc::timed_out);
     }
     return std::error_condition();
@@ -296,7 +313,7 @@ bool service::request_leadership(std::string const& group_id) {
     }
     auto lk = std::unique_lock< std::mutex >(_manager_lock);
     return request_success &&
-        _leadership_change.wait_for(lk, leader_change_timeout, [this, &group_id]() { return _is_leader[group_id]; });
+        _config_change.wait_for(lk, leader_change_timeout, [this, &group_id]() { return _is_leader[group_id]; });
 }
 
 void service::leave_group(std::string const& group_id) {

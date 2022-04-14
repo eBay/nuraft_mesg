@@ -34,7 +34,7 @@ class service : public consensus_component {
     std::mutex mutable _manager_lock;
     std::map< std::string, std::shared_ptr< mesg_state_mgr > > _state_managers;
 
-    std::condition_variable _leadership_change;
+    std::condition_variable _config_change;
     std::map< std::string, bool > _is_leader;
 
     nuraft::ptr< nuraft::delayed_task_scheduler > _scheduler;
@@ -61,6 +61,7 @@ public:
 
     void start(consensus_component::params& start_params) override;
     bool add_member(std::string const& group_id, std::string const& server_id) override;
+    bool add_member(std::string const& group_id, std::string const& server_id, bool const wait_for_completion) override;
     bool rem_member(std::string const& group_id, std::string const& server_id) override;
     void leave_group(std::string const& group_id) override;
     bool request_leadership(std::string const& group_id) override;

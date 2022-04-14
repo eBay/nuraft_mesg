@@ -101,6 +101,22 @@ bool msg_service::request_leadership(group_name_t const& group_name) {
     return false;
 }
 
+void msg_service::get_srv_config_all(group_name_t const& group_name,
+                                     std::vector< shared< nuraft::srv_config > >& configs_out) {
+
+    shared< nuraft_grpc::grpc_server > server;
+    {
+        std::shared_lock< lock_type > rl(_raft_servers_lock);
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
+    }
+    if (server) {
+        try {
+            server->get_srv_config_all(configs_out);
+            return;
+        } catch (std::runtime_error& rte) { LOGERRORMOD(sds_msg, "Caught exception during add_srv(): {}", rte.what()); }
+    }
+}
+
 nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_name,
                                                     std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
     shared< nuraft_grpc::grpc_server > server;
