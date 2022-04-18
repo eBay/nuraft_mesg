@@ -386,4 +386,10 @@ uint32_t service::logstore_id(std::string const& group_id) const {
     if (auto it = _state_managers.find(group_id); _state_managers.end() != it) { return it->second->get_logstore_id(); }
     return UINT32_MAX;
 }
+
+void service::get_srv_config_all(std::string const& group_name,
+                                 std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) {
+    auto lk = std::unique_lock< std::mutex >(_manager_lock);
+    _mesg_service->get_srv_config_all(group_name, configs_out);
+}
 } // namespace sds::messaging

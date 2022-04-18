@@ -9,6 +9,7 @@
 #include <sisl/logging/logging.h>
 #include <sisl/options/options.h>
 #include <nlohmann/json.hpp>
+#include <random>
 
 #include <utility/thread_buffer.hpp>
 
@@ -63,8 +64,22 @@ protected:
     std::string id_2;
     std::string id_3;
 
+    std::vector< uint32_t > ports;
+
+    std::map< std::string, std::string > lookup_map;
     std::function< std::string(std::string const&) > lookup_callback;
     nuraft::raft_params r_params;
+
+    void get_random_ports(const uint16_t n) {
+        static std::random_device dev;
+        static std::mt19937 rng(dev());
+        std::uniform_int_distribution< std::mt19937::result_type > dist(1001u, 99999u);
+        auto cur_size = ports.size();
+        for (; ports.size() < cur_size + n;) {
+            uint32_t r = dist(rng);
+            if (std::find(ports.begin(), ports.end(), r) == ports.end()) { ports.emplace_back(r); }
+        }
+    }
 
     void SetUp() override {
         id_1 = to_string(boost::uuids::random_generator()());
@@ -75,18 +90,17 @@ protected:
         instance_2 = std::make_unique< service >();
         instance_3 = std::make_unique< service >();
 
-        lookup_callback = [srv_1 = id_1, srv_2 = id_2, srv_3 = id_3](std::string const& id) -> std::string {
-            if (id == srv_1)
-                return "127.0.0.1:9001";
-            else if (id == srv_2)
-                return "127.0.0.1:9002";
-            else if (id == srv_3)
-                return "127.0.0.1:9003";
-            else
-                return std::string();
+        // generate 3 random port numbers
+        get_random_ports(3u);
+
+        lookup_map.emplace(id_1, fmt::format("127.0.0.1:{}", ports[0]));
+        lookup_map.emplace(id_2, fmt::format("127.0.0.1:{}", ports[1]));
+        lookup_map.emplace(id_3, fmt::format("127.0.0.1:{}", ports[2]));
+        lookup_callback = [this](std::string const& id) -> std::string {
+            return (lookup_map.count(id) > 0) ? lookup_map[id] : std::string();
         };
 
-        auto params = consensus_component::params{id_1, 9001, lookup_callback, "test_type"};
+        auto params = consensus_component::params{id_1, ports[0], lookup_callback, "test_type"};
         instance_1->start(params);
 
         // RAFT server parameters
@@ -108,7 +122,7 @@ protected:
         instance_1->register_mgr_type("test_type", register_params);
 
         params.server_uuid = id_2;
-        params.mesg_port = 9002;
+        params.mesg_port = ports[1];
         register_params.create_state_mgr =
             [this, srv_addr = id_2](int32_t const srv_id,
                                     std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
@@ -119,7 +133,7 @@ protected:
         instance_2->register_mgr_type("test_type", register_params);
 
         params.server_uuid = id_3;
-        params.mesg_port = 9003;
+        params.mesg_port = ports[2];
         register_params.create_state_mgr =
             [this, srv_addr = id_3](int32_t const srv_id,
                                     std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
@@ -173,7 +187,7 @@ TEST_F(MessagingFixture, ClientReset) {
             throw std::logic_error("Not Supposed To Happen");
         }};
     instance_3->register_mgr_type("test_type", register_params);
-    auto params = consensus_component::params{id_3, 9003, lookup_callback, "test_type"};
+    auto params = consensus_component::params{id_3, ports[2], lookup_callback, "test_type"};
     instance_3->start(params);
     instance_3->join_group("test_group", "test_type", std::dynamic_pointer_cast< mesg_state_mgr >(sm_int_3));
 
@@ -216,9 +230,43 @@ TEST_F(MessagingFixture, RemoveMember) {
     EXPECT_FALSE(instance_1->client_request("test_group", buf));
 }
 
+TEST_F(MessagingFixture, SyncAddMember) {
+    std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
+    instance_1->get_srv_config_all("test_group", srv_list);
+    EXPECT_EQ(srv_list.size(), 3u);
+    srv_list.clear();
+    instance_2->get_srv_config_all("test_group", srv_list);
+    EXPECT_EQ(srv_list.size(), 3u);
+    srv_list.clear();
+    instance_3->get_srv_config_all("test_group", srv_list);
+    EXPECT_EQ(srv_list.size(), 3u);
+
+    std::unique_ptr< service > instance_4 = std::make_unique< service >();
+    std::string id_4 = to_string(boost::uuids::random_generator()());
+    // generate random_port
+    get_random_ports(1u);
+    lookup_map.emplace(id_4, fmt::format("127.0.0.1:{}", ports[3]));
+    auto params = consensus_component::params{id_4, ports[3], lookup_callback, "test_type"};
+    std::shared_ptr< test_state_mgr > sm_int_4;
+    auto register_params = consensus_component::register_params{
+        r_params,
+        [this, srv_addr = id_4, &sm_int_4](int32_t const srv_id,
+                                           std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
+            sm_int_4 = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
+            return std::static_pointer_cast< mesg_state_mgr >(sm_int_4);
+        }};
+    instance_4->start(params);
+    instance_4->register_mgr_type("test_type", register_params);
+    EXPECT_TRUE(instance_1->add_member("test_group", id_4, true /*wait for completion*/));
+
+    srv_list.clear();
+    instance_1->get_srv_config_all("test_group", srv_list);
+    EXPECT_EQ(srv_list.size(), 4u);
+}
+
 int main(int argc, char* argv[]) {
-    SISL_OPTIONS_LOAD(argc, argv, logging)
     ::testing::InitGoogleTest(&argc, argv);
+    SISL_OPTIONS_LOAD(argc, argv, logging)
     sisl::logging::SetLogger(std::string(argv[0]));
     spdlog::set_pattern("[%D %T.%f%z] [%^%l%$] [%t] %v");
     sisl::logging::GetLogger()->flush_on(spdlog::level::level_enum::err);

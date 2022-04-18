@@ -68,6 +68,10 @@ public:
     std::error_condition client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >& buf) override;
     uint32_t logstore_id(std::string const& group_id) const override;
     void get_peers(std::string const& group_id, std::list< std::string >&) const override;
+
+    // for testing
+    void get_srv_config_all(std::string const& group_name,
+                            std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out);
 };
 
 } // namespace sds::messaging
