@@ -5,7 +5,7 @@ import os
 
 class NuRaftGRPCConan(ConanFile):
     name = "nuraft_grpc"
-    version = "5.2.0"
+    version = "5.3.0"
 
     license = "Apache 2.0"
     url = "https://github.corp.ebay.com/SDS/nuraft_grpc"
