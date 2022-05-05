@@ -32,7 +32,7 @@ class engine_factory : public group_factory {
 
 public:
     engine_factory(int const threads, consensus_component::params& start_params) :
-            group_factory::group_factory(threads, start_params.server_uuid),
+            group_factory::group_factory(threads, start_params.server_uuid, start_params.trf_client),
             _lookup_endpoint_func(start_params.lookup_peer) {
         DEBUG_ASSERT(!!_lookup_endpoint_func, "Lookup endpoint function NULL!");
     }
@@ -77,7 +77,8 @@ void service::start(consensus_component::params& start_params) {
     // Start a gRPC server and create and associate sds_messaging service. The function
     // passed to msg_service will be called each time a new group is joined, allowing
     // sharing of the Server and client amongst raft instances.
-    _grpc_server.reset(grpc_helper::GrpcServer::make(_listen_address, grpc_server_threads, "", ""));
+    _grpc_server.reset(
+        grpc_helper::GrpcServer::make(_listen_address, start_params.auth_mgr, grpc_server_threads, "", ""));
     _mesg_service = msg_service::create(
         [this](int32_t const srv_id, group_name_t const& group_id, group_type_t const& group_type,
                nuraft::context*& ctx, std::shared_ptr< group_metrics > metrics,

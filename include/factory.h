@@ -24,8 +24,11 @@ template < typename T >
 using shared = std::shared_ptr< T >;
 
 class group_factory : public nuraft_grpc::grpc_factory {
+    std::shared_ptr< sisl::TrfClient > m_trf_client;
+
 public:
-    using nuraft_grpc::grpc_factory::grpc_factory;
+    group_factory(int const cli_thread_count, std::string const& name, shared< sisl::TrfClient > const trf_client) :
+            nuraft_grpc::grpc_factory(cli_thread_count, name), m_trf_client(trf_client) {}
 
     using nuraft_grpc::grpc_factory::create_client;
 

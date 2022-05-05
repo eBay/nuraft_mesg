@@ -105,7 +105,7 @@ std::error_condition group_factory::create_client(const std::string& client,
     if (endpoint.empty()) { return std::make_error_condition(std::errc::invalid_argument); }
 
     LOGDEBUGMOD(sds_msg, "Creating client for [{}] @ [{}]", client, endpoint);
-    raft_client = grpc_helper::GrpcAsyncClient::make< messaging_client >(workerName(), endpoint);
+    raft_client = grpc_helper::GrpcAsyncClient::make< messaging_client >(workerName(), endpoint, m_trf_client);
     return (!raft_client) ? std::make_error_condition(std::errc::connection_aborted) : std::error_condition();
 }
 

@@ -10,6 +10,8 @@
 #include <system_error>
 
 #include <libnuraft/nuraft.hxx>
+#include <sisl/auth_manager/trf_client.hpp>
+#include <sisl/auth_manager/auth_manager.hpp>
 
 namespace sds::messaging {
 
@@ -35,6 +37,8 @@ public:
         uint32_t mesg_port;
         lookup_peer_cb lookup_peer;
         std::string default_group_type;
+        std::shared_ptr< sisl::AuthManager > auth_mgr{nullptr};
+        std::shared_ptr< sisl::TrfClient > trf_client{nullptr};
     };
     virtual ~consensus_component() = default;
     virtual void start(consensus_component::params& start_params) = 0;
