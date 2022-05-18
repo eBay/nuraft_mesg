@@ -47,14 +47,19 @@ protected:
 template < typename TSERVICE >
 class grpc_client : public grpc_base_client, public grpc_helper::GrpcAsyncClient {
 public:
-    grpc_client(std::string const& worker_name, std::string const& addr, std::string const& target_domain = "",
+    grpc_client(std::string const& worker_name, std::string const& addr,
+                const std::shared_ptr< sisl::TrfClient > trf_client, std::string const& target_domain = "",
                 std::string const& ssl_cert = "") :
             grpc_base_client(),
-            grpc_helper::GrpcAsyncClient(addr, target_domain, ssl_cert),
+            grpc_helper::GrpcAsyncClient(addr, trf_client, target_domain, ssl_cert),
             _addr(addr),
             _worker_name(worker_name.data()) {
         init();
     }
+
+    grpc_client(std::string const& worker_name, std::string const& addr, std::string const& target_domain = "",
+                std::string const& ssl_cert = "") :
+            grpc_client(worker_name, addr, nullptr, target_domain, ssl_cert) {}
 
     ~grpc_client() override = default;
 
