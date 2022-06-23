@@ -48,6 +48,10 @@ bool grpc_server::request_leadership() {
     return _raft_server->request_leadership();
 }
 
+void grpc_server::get_srv_config_all(std::vector< nuraft::ptr< nuraft::srv_config > >& configs_out) {
+    _raft_server->get_srv_config_all(configs_out);
+}
+
 nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > > grpc_server::rem_srv(int const member_id) {
     return _raft_server->remove_srv(member_id);
 }

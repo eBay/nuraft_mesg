@@ -35,6 +35,8 @@ public:
 
     bool request_leadership();
 
+    void get_srv_config_all(std::vector< nuraft::ptr< nuraft::srv_config > >& configs_out);
+
     nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > >
     append_entries(const std::vector< nuraft::ptr< nuraft::buffer > >& logs);
 
