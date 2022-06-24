@@ -14,8 +14,7 @@ class TestPackageConan(ConanFile):
 
     requires = (
             "nlohmann_json/3.8.0",
-            "jungle_logstore/[~=2, include_prerelease=True]@sds/master",
-            ("nuraft/1.8.1-6@nudata/master", "override")
+            "jungle_logstore/[~=2, include_prerelease=True]@sds/master"
         )
 
     def build(self):
