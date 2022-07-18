@@ -5,7 +5,7 @@ import os
 
 class NuRaftGRPCConan(ConanFile):
     name = "nuraft_grpc"
-    version = "5.4.0"
+    version = "5.4.1"
 
     license = "Apache 2.0"
     url = "https://github.corp.ebay.com/SDS/nuraft_grpc"
@@ -15,7 +15,7 @@ class NuRaftGRPCConan(ConanFile):
 
     generators = "cmake"
     requires = (
-                "nuraft/[~=1.8, include_prerelease=True]@nudata/master",
+                "nuraft/2022.07.18@nudata/master",
                 "grpc_helper/[~=2, include_prerelease=True]@sisl/master",
                 "sisl/[~=7, include_prerelease=True]@sisl/master",
                 ("fmt/8.0.1",       "override"),
