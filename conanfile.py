@@ -24,7 +24,6 @@ class NuRaftGRPCConan(ConanFile):
                 "shared": ['True', 'False'],
                 "fPIC": ['True', 'False'],
                 "sanitize": ['True', 'False'],
-                "prerelease": ['True', 'False'],
                 }
     default_options = (
                         'shared=False',
