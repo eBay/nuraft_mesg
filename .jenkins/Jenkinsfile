@@ -112,7 +112,7 @@ pipeline {
                             expression { "${BUILD_TYPE}" != 'sanitize' }
                         } }
                         steps {
-                            sh "conan create ${BUILD_MISSING} -o ${PROJECT}:prerelease=${PRERELEASE} -pr ${BUILD_TYPE} . ${PROJECT}/${TAG}"
+                            sh "conan create ${BUILD_MISSING} -o sisl:prerelease=${PRERELEASE} -pr ${BUILD_TYPE} . ${PROJECT}/${TAG}"
                         }
                         post {
                             failure {
@@ -129,7 +129,7 @@ pipeline {
                             expression { "${BUILD_TYPE}" == 'sanitize' }
                         } }
                         steps {
-                            sh "conan create ${BUILD_MISSING} -o ${PROJECT}:prerelease=${PRERELEASE} -o ${PROJECT}:sanitize=True -pr debug . ${PROJECT}/${TAG}"
+                            sh "conan create ${BUILD_MISSING} -o sisl:prerelease=${PRERELEASE} -o ${PROJECT}:sanitize=True -pr debug . ${PROJECT}/${TAG}"
                         }
                         post {
                             failure {
@@ -174,7 +174,7 @@ pipeline {
                                 steps {
                                     slackSend channel: '#sds-ci', message: "*${PROJECT}:${TAG}* is undergoing Code Coverage."
                                     sh "echo \"sonar.branch.name=${BRANCH_NAME}\" >> sonar-project.properties"
-                                    sh "conan install -o ${PROJECT}:prerelease=${PRERELEASE} -pr ${BUILD_TYPE} ${BUILD_MISSING} -o ${PROJECT}:coverage=True ."
+                                    sh "conan install -o sisl:prerelease=${PRERELEASE} -pr ${BUILD_TYPE} ${BUILD_MISSING} -o ${PROJECT}:coverage=True ."
                                     sh "build-wrapper-linux-x86-64 --out-dir /tmp/sonar conan build ."
                                     sh "find . -name \"*.gcno\" -exec gcov {} \\;"
                                     withSonarQubeEnv('sds-sonar')  {
