@@ -1,16 +1,23 @@
+cmake_minimum_required (VERSION 3.11)
 
-list(APPEND PROTOBUF_IMPORT_DIRS
-          "${CONAN_NURAFT_GRPC_ROOT}/proto"
-        )
-PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
-                            messaging_service.proto)
-PROTOBUF_GENERATE_GRPC_CPP(GRPC_SRCS GRPC_HDRS
-                            messaging_service.proto)
+add_library(mesg_rpc OBJECT 
+            messaging_service.proto
+          )
+target_link_libraries(mesg_rpc
+      protobuf::libprotobuf
+      gRPC::grpc++
+  )
 
+protobuf_generate(
+            LANGUAGE cpp
+            TARGET mesg_rpc
+            IMPORT_DIRS "${CMAKE_CURRENT_SOURCE_DIR}" "${nuraft_grpc_LIB_DIRS}/../proto"
+          )
 
-list(GET PROTO_HDRS 0 FIRST_PROTO)
-get_filename_component(PROTO_PATH ${FIRST_PROTO} DIRECTORY)
-set(GRPC_INC ${PROTO_PATH} PARENT_SCOPE)
-
-add_library(mesg_pb OBJECT ${PROTO_SRCS})
-add_library(mesg_rpc OBJECT ${GRPC_SRCS})
+protobuf_generate(
+    TARGET mesg_rpc
+    LANGUAGE grpc
+    IMPORT_DIRS "${CMAKE_CURRENT_SOURCE_DIR}" "${nuraft_grpc_LIB_DIRS}/../proto"
+    GENERATE_EXTENSIONS .grpc.pb.h .grpc.pb.cc
+    PLUGIN protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>
+)
