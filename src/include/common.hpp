@@ -15,7 +15,7 @@
 #include <libnuraft/nuraft.hxx>
 #include <sisl/logging/logging.h>
 
-#include "raft_types.pb.h"
+#include "proto/raft_types.pb.h"
 
 SISL_LOGGING_DECL(nuraft)
 

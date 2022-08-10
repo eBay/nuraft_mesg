@@ -6,10 +6,9 @@ set(CMAKE_CXX_STANDARD 17)
 
 if(EXISTS ${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
     include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-    conan_basic_setup()
+    conan_basic_setup(TARGETS)
 else()
     message(WARNING "Conan Build file does not exist, trying to build without!")
-    return()
 endif()
 
 if (${CMAKE_BUILD_TYPE} STREQUAL Debug)
@@ -27,9 +26,6 @@ if (CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
 endif ()
 
-find_package(Protobuf REQUIRED)
-
-include(cmake/grpc.cmake)
 add_subdirectory (src)
 
 # build info

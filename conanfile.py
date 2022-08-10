@@ -1,37 +1,29 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-from conans import ConanFile, CMake, tools
 import os
+from conans import ConanFile, CMake, tools
 
 class NuRaftGRPCConan(ConanFile):
     name = "nuraft_grpc"
     version = "5.4.1"
-
-    license = "Apache 2.0"
-    url = "https://github.corp.ebay.com/SDS/nuraft_grpc"
+    homepage = "https://github.corp.ebay.com/SDS/access-mgr"
     description = "A gRPC service for nuraft"
+    topics = ("ebay", "nublox", "raft")
+    url = "https://github.corp.ebay.com/SDS/nuraft_grpc"
+    license = "Apache-2.0"
 
     settings = "arch", "os", "compiler", "build_type"
-
-    generators = "cmake"
-    requires = (
-                "nuraft/2022.07.18@nudata/master",
-                "grpc_helper/[~=2, include_prerelease=True]@sisl/master",
-                "sisl/[~=7, include_prerelease=True]@sisl/master",
-                ("fmt/8.0.1",       "override"),
-                )
     options = {
                 "shared": ['True', 'False'],
                 "fPIC": ['True', 'False'],
                 "sanitize": ['True', 'False'],
                 }
-    default_options = (
-                        'shared=False',
-                        'fPIC=True',
-                        'sanitize=False',
-                        'sisl:prerelease=True',
-                        )
+    default_options = {
+                'shared': False,
+                'fPIC': True,
+                'sanitize': False,
+                'sisl:prerelease': True,
+            }
 
+    generators = "cmake", "cmake_find_package"
     exports = ["LICENSE.md"]
     exports_sources = (
                         "CMakeLists.txt",
@@ -43,42 +35,50 @@ class NuRaftGRPCConan(ConanFile):
         if self.settings.build_type != "Debug":
             del self.options.sanitize
 
+    def configure(self):
+        if self.options.shared:
+            del self.options.fPIC
+
+    def requirements(self):
+        self.requires("nuraft/2022.07.18@nudata/master")
+        self.requires("grpc_helper/[~=2, include_prerelease=True]@sisl/develop")
+        self.requires("sisl/[~=8, include_prerelease=True]@sisl/develop")
+
+        self.requires("boost/1.79.0", override=True)
+        self.requires("openssl/1.1.1q", override=True)
+
     def build(self):
         cmake = CMake(self)
 
-        definitions = {'CONAN_BUILD_COVERAGE': 'OFF',
-                       'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON',
+        definitions = {'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON',
                        'MEMORY_SANITIZER_ON': 'OFF'}
         test_target = None
 
-        run_tests = True
         if self.settings.build_type == "Debug":
             if self.options.sanitize:
                 definitions['MEMORY_SANITIZER_ON'] = 'ON'
-            else:
-                if (None == os.getenv("RUN_TESTS")):
-                    run_tests = False
 
         cmake.configure(defs=definitions)
         cmake.build()
-        if run_tests:
-            cmake.test(target=test_target)
+        cmake.test(target=test_target)
 
     def package(self):
+        self.copy(pattern="LICENSE*", dst="licenses")
+        self.copy("*.h", dst="include/nuraft_grpc", excludes="*.pb.h", keep_path=False)
+        self.copy("*.pb.h", dst="include/nuraft_grpc/proto", keep_path=False)
         self.copy("*.h", dst="include/nuraft_grpc", keep_path=False)
         self.copy("*.hpp", dst="include/nuraft_grpc", keep_path=False)
         self.copy("*.dll", dst="bin", keep_path=False)
-        self.copy("*.dylib*", dst="lib", keep_path=False)
-        self.copy("*.so", dst="lib", keep_path=False)
+        self.copy("*.dylib*", dst="lib", keep_path=False, symlinks=True)
+        self.copy("*.so", dst="lib", keep_path=False, symlinks=True)
         self.copy("*.a", dst="lib", keep_path=False)
         self.copy("*.lib", dst="lib", keep_path=False)
         self.copy("*.proto", dst="proto/", keep_path=False)
 
     def package_info(self):
-        self.cpp_info.libs = tools.collect_libs(self)
-        if self.settings.build_type == "Debug":
-            if self.options.sanitize:
-                self.cpp_info.sharedlinkflags.append("-fsanitize=address")
-                self.cpp_info.exelinkflags.append("-fsanitize=address")
-                self.cpp_info.sharedlinkflags.append("-fsanitize=undefined")
-                self.cpp_info.exelinkflags.append("-fsanitize=undefined")
+        self.cpp_info.libs = ["nuraft_grpc"]
+        if self.settings.build_type == "Debug" and self.options.sanitize:
+            self.cpp_info.sharedlinkflags.append("-fsanitize=address")
+            self.cpp_info.exelinkflags.append("-fsanitize=address")
+            self.cpp_info.sharedlinkflags.append("-fsanitize=undefined")
+            self.cpp_info.exelinkflags.append("-fsanitize=undefined")
