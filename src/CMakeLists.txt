@@ -1,26 +1,20 @@
-add_compile_options(-Wall -Wextra -Werror -Wno-unused-parameter)
+cmake_minimum_required(VERSION 3.11)
 
-PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
-                            proto/raft_types.proto
-                            proto/raft_service.proto
-                        )
+find_package(grpc_helper REQUIRED)
+find_package(nuraft REQUIRED)
 
-PROTOBUF_GENERATE_GRPC_CPP(GRPC_SRCS GRPC_HDRS
-                            proto/raft_service.proto
-                        )
+add_subdirectory (proto)
 
-list(GET PROTO_HDRS 0 FIRST_PROTO)
-get_filename_component(PROTO_PATH ${FIRST_PROTO} DIRECTORY)
-include_directories(BEFORE include ${PROTO_PATH})
-
-set(LIBRARY_SOURCES
-            lib/grpc_client.cpp
-            lib/grpc_factory.cpp
-            lib/grpc_server.cpp
-            ${PROTO_SRCS}
-            ${PROTO_HDRS}
-            ${GRPC_SRCS}
-            ${GRPC_HDRS}
-        )
-add_library(nuraft_grpc ${LIBRARY_SOURCES})
-conan_target_link_libraries(nuraft_grpc)
+add_library(${PROJECT_NAME})
+target_sources(${PROJECT_NAME} PRIVATE
+    lib/grpc_client.cpp
+    lib/grpc_factory.cpp
+    lib/grpc_server.cpp
+    $<TARGET_OBJECTS:${PROJECT_NAME}-proto>
+  )
+target_link_libraries(${PROJECT_NAME}
+    grpc_helper::grpc_helper
+    nuraft::nuraft
+  )
+target_include_directories(${PROJECT_NAME} PRIVATE "include")
+target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")

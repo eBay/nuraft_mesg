@@ -1,21 +1,18 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 from conans import ConanFile, CMake, tools, RunEnvironment
 import os
 
-
 class TestPackageConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "cmake"
+    generators = "cmake", "cmake_find_package"
 
     fail_timeout = '30s'
     abort_timeout = '35s'
 
-    requires = (
-            "nlohmann_json/3.8.0",
-            "jungle_logstore/2022.07.18@sds/master"
-        )
+    def requirements(self):
+        self.requires("nlohmann_json/3.10.5")
+        self.requires("jungle_logstore/2022.07.18@sds/master")
+
+        self.requires("lz4/1.9.3", override=True)
 
     def build(self):
         cmake = CMake(self)
