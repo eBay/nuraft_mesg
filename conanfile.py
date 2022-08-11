@@ -41,7 +41,7 @@ class NuRaftGRPCConan(ConanFile):
 
     def requirements(self):
         self.requires("nuraft/2022.07.18@nudata/master")
-        self.requires("grpc_helper/[~=2, include_prerelease=True]@sisl/develop")
+        self.requires("grpc_helper/[~=3, include_prerelease=True]@sisl/develop")
         self.requires("sisl/[~=8, include_prerelease=True]@sisl/develop")
 
         self.requires("boost/1.79.0", override=True)
