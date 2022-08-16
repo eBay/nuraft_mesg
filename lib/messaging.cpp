@@ -81,9 +81,13 @@ void service::start(consensus_component::params& start_params) {
         grpc_helper::GrpcServer::make(_listen_address, start_params.auth_mgr, grpc_server_threads, "", ""));
     _mesg_service = msg_service::create(
         [this](int32_t const srv_id, group_name_t const& group_id, group_type_t const& group_type,
-               nuraft::context*& ctx, std::shared_ptr< group_metrics > metrics,
-               msg_service* sds_msg) mutable -> std::error_condition {
-            return this->group_init(srv_id, group_id, group_type, ctx, metrics, sds_msg);
+               nuraft::context*& ctx, std::shared_ptr< group_metrics > metrics) mutable -> std::error_condition {
+            return this->group_init(srv_id, group_id, group_type, ctx, metrics);
+        },
+        [this](group_type_t const& group_type) -> process_req_cb {
+            std::lock_guard< std::mutex > lg(_manager_lock);
+            auto const& type_params = _state_mgr_types[group_type];
+            return type_params.process_req;
         },
         _node_id);
     _mesg_service->setDefaultGroupType(start_params.default_group_type);
@@ -153,8 +157,7 @@ void service::exit_group(std::string const& group_id) {
 
 std::error_condition service::group_init(int32_t const srv_id, std::string const& group_id,
                                          std::string const& group_type, nuraft::context*& ctx,
-                                         std::shared_ptr< sds::messaging::group_metrics > metrics,
-                                         sds::messaging::msg_service* sds_msg) {
+                                         std::shared_ptr< sds::messaging::group_metrics > metrics) {
     LOGDEBUGMOD(sds_msg, "Creating context for Group: {} as Member: {}", group_id, srv_id);
 
     // State manager (RAFT log store, config)
@@ -222,15 +225,14 @@ bool service::add_member(std::string const& group_id, std::string const& server_
     if (!wait_for_completion) { return nuraft::OK == rc; }
 
     auto lk = std::unique_lock< std::mutex >(_manager_lock);
-    return (nuraft::OK == rc) &&
-        _config_change.wait_for(lk, cfg_change_timeout * 20, [this, &group_id, &server_id]() {
-            std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
-            _mesg_service->get_srv_config_all(group_id, srv_list);
-            return std::find_if(srv_list.begin(), srv_list.end(),
-                                [&server_id](const std::shared_ptr< nuraft::srv_config >& cfg) {
-                                    return server_id == cfg->get_endpoint();
-                                }) != srv_list.end();
-        });
+    return (nuraft::OK == rc) && _config_change.wait_for(lk, cfg_change_timeout * 20, [this, &group_id, &server_id]() {
+        std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
+        _mesg_service->get_srv_config_all(group_id, srv_list);
+        return std::find_if(srv_list.begin(), srv_list.end(),
+                            [&server_id](const std::shared_ptr< nuraft::srv_config >& cfg) {
+                                return server_id == cfg->get_endpoint();
+                            }) != srv_list.end();
+    });
 }
 
 bool service::rem_member(std::string const& group_id, std::string const& server_id) {

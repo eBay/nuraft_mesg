@@ -182,9 +182,15 @@ TEST_F(MessagingFixture, ClientReset) {
     });
     EXPECT_FALSE(instance_1->client_request("test_group", buf));
 
+    uint32_t append_count{0};
     auto register_params = consensus_component::register_params{
-        r_params, [](int32_t const srv_id, std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
+        r_params,
+        [](int32_t const srv_id, std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
             throw std::logic_error("Not Supposed To Happen");
+        },
+        [&append_count](std::function< void() > process_req) {
+            ++append_count;
+            process_req();
         }};
     instance_3->register_mgr_type("test_type", register_params);
     auto params = consensus_component::params{id_3, ports[2], lookup_callback, "test_type"};
@@ -207,6 +213,7 @@ TEST_F(MessagingFixture, ClientReset) {
     instance_3->leave_group("test_group");
     instance_2->leave_group("test_group");
     instance_1->leave_group("test_group");
+    EXPECT_GT(append_count, 0u);
 }
 
 // Test sending a message for a group the messaging service is not aware of.

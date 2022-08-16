@@ -31,6 +31,7 @@ public:
     using lookup_peer_cb = std::function< std::string(std::string const&) >;
     using create_state_mgr_cb =
         std::function< std::shared_ptr< mesg_state_mgr >(int32_t const srv_id, std::string const& group_id) >;
+    using process_req_cb = std::function< void(std::function< void() >) >;
 
     struct params {
         std::string server_uuid;
@@ -47,11 +48,13 @@ public:
     struct register_params {
         nuraft::raft_params raft_params;
         create_state_mgr_cb create_state_mgr;
+        process_req_cb process_req{nullptr};
     };
     virtual void register_mgr_type(std::string const& group_type, register_params& params) = 0;
 
     virtual std::error_condition create_group(std::string const& group_id, std::string const& group_type) = 0;
-    virtual std::error_condition join_group(std::string const& group_id, std::string const& group_type, std::shared_ptr< mesg_state_mgr > smgr) = 0;
+    virtual std::error_condition join_group(std::string const& group_id, std::string const& group_type,
+                                            std::shared_ptr< mesg_state_mgr > smgr) = 0;
 
     // Send a client request to the cluster
     virtual bool add_member(std::string const& group_id, std::string const& server_id) = 0;
@@ -67,4 +70,4 @@ public:
     virtual int32_t server_id() const = 0;
 };
 
-} // namespace access_mgr
+} // namespace sds::messaging

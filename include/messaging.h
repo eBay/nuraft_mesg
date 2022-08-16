@@ -41,8 +41,7 @@ class service : public consensus_component {
     std::shared_ptr< sisl::logging::logger_t > _custom_logger;
 
     std::error_condition group_init(int32_t const srv_id, std::string const& group_id, std::string const& group_type,
-                                    nuraft::context*& ctx, std::shared_ptr< sds::messaging::group_metrics > metrics,
-                                    sds::messaging::msg_service* sds_msg);
+                                    nuraft::context*& ctx, std::shared_ptr< sds::messaging::group_metrics > metrics);
     nuraft::cb_func::ReturnCode callback_handler(std::string const& group_id, nuraft::cb_func::Type type,
                                                  nuraft::cb_func::Param* param);
     void exit_group(std::string const& group_id);

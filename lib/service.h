@@ -42,7 +42,9 @@ public:
 
 using get_server_ctx_cb = std::function< std::error_condition(int32_t srv_id, group_name_t const&, group_type_t const&,
                                                               nuraft::context*& ctx_out,
-                                                              shared< group_metrics > metrics, msg_service* sds_msg) >;
+                                                              shared< group_metrics > metrics) >;
+// A calback that returns the registered callback for for offloading RAFT request processing
+using process_offload_cb = std::function< std::function< void(std::function< void() >) >(group_type_t const&) >;
 
 struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name);
@@ -53,6 +55,7 @@ struct grpc_server_wrapper {
 
 class msg_service : public std::enable_shared_from_this< msg_service > {
     get_server_ctx_cb _get_server_ctx;
+    process_offload_cb _get_process_offload;
     std::mutex _raft_sync_lock;
     std::condition_variable_any _raft_servers_sync;
     lock_type _raft_servers_lock;
@@ -60,12 +63,14 @@ class msg_service : public std::enable_shared_from_this< msg_service > {
     std::string const _service_address;
     std::string _default_group_type;
 
-    msg_service(get_server_ctx_cb get_server_ctx, std::string const& service_address) :
-            _get_server_ctx(get_server_ctx), _service_address(service_address) {}
+    msg_service(get_server_ctx_cb get_server_ctx, process_offload_cb process_offload,
+                std::string const& service_address) :
+            _get_server_ctx(get_server_ctx), _get_process_offload(process_offload), _service_address(service_address) {}
     ~msg_service();
 
 public:
-    static shared< msg_service > create(get_server_ctx_cb get_server_ctx, std::string const& service_address);
+    static shared< msg_service > create(get_server_ctx_cb get_server_ctx, process_offload_cb poc,
+                                        std::string const& service_address);
 
     msg_service(msg_service const&) = delete;
     msg_service& operator=(msg_service const&) = delete;

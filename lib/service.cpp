@@ -29,8 +29,9 @@ grpc_server_wrapper::grpc_server_wrapper(group_name_t const& group_name) : m_ser
     if (0 < SISL_OPTIONS.count("msg_metrics")) m_metrics = std::make_shared< group_metrics >(group_name);
 }
 
-shared< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, std::string const& service_address) {
-    return std::shared_ptr< msg_service >(new msg_service(get_server_ctx, service_address),
+shared< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, process_offload_cb poc,
+                                          std::string const& service_address) {
+    return std::shared_ptr< msg_service >(new msg_service(get_server_ctx, poc, service_address),
                                           [](msg_service* p) { delete p; });
 }
 
@@ -155,8 +156,12 @@ bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGr
     LOGTRACEMOD(sds_msg, "Received [{}] from: [{}] to: [{}] Group: [{}]",
                 nuraft::msg_type_to_string(nuraft::msg_type(base.type())), base.src(), base.dest(), group_name);
 
+    // JoinClusterRequests are expected to be received upon Cluster creation by the current leader. We need
+    // to initialize a RaftServer context based on the corresponding type prior to servicing this request. This
+    // should emplace a corresponding server in the _raft_servers member.
     if (nuraft::join_cluster_request == base.type()) { joinRaftGroup(base.dest(), group_name, request.group_type()); }
 
+    // Find th RaftServer context based on the name of the group.
     shared< nuraft_grpc::grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
@@ -166,8 +171,20 @@ bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGr
         }
     }
 
+    // Setup our response and process the request. Group types are able to register a Callback that expects a Nullary
+    // to process the requests and send back possibly asynchronous responses in a seperate context. This can be used
+    // to offload the Raft append operations onto a seperate thread group.
     response.set_group_name(group_name);
     if (server) {
+        if (auto offload = _get_process_offload(request.group_type()); nullptr != offload) {
+            offload([rpc_data, server]() {
+                auto& request = rpc_data->request();
+                auto& response = rpc_data->response();
+                rpc_data->set_status(server->step(request.msg(), *response.mutable_msg()));
+                rpc_data->send_response();
+            });
+            return false;
+        }
         try {
             rpc_data->set_status(server->step(request.msg(), *response.mutable_msg()));
             return true;
@@ -232,7 +249,7 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
         if (g_type.empty()) { g_type = _default_group_type; }
         std::tie(it, happened) = _raft_servers.emplace(std::make_pair(group_name, group_name));
         if (_raft_servers.end() != it && happened) {
-            if (auto err = _get_server_ctx(srv_id, group_name, g_type, ctx, it->second.m_metrics, this); err) {
+            if (auto err = _get_server_ctx(srv_id, group_name, g_type, ctx, it->second.m_metrics); err) {
                 LOGERRORMOD(sds_msg, "Error during RAFT server creation on group {}: {}", group_name, err.message());
                 return err;
             }
