@@ -40,12 +40,9 @@ class NuRaftGRPCConan(ConanFile):
             del self.options.fPIC
 
     def requirements(self):
-        self.requires("nuraft/2022.07.18@nudata/master")
+        self.requires("nuraft/nbi.20220801")
         self.requires("grpc_helper/[~=3, include_prerelease=True]@sisl/master")
         self.requires("sisl/[~=8, include_prerelease=True]@sisl/master")
-
-        self.requires("boost/1.79.0", override=True)
-        self.requires("openssl/1.1.1q", override=True)
 
     def build(self):
         cmake = CMake(self)
