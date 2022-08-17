@@ -145,8 +145,8 @@ protected:
 
         instance_1->create_group("test_group", "test_type");
 
-        EXPECT_TRUE(instance_1->add_member("test_group", id_2));
-        EXPECT_TRUE(instance_1->add_member("test_group", id_3));
+        EXPECT_TRUE(instance_1->add_member("test_group", id_2, true));
+        EXPECT_TRUE(instance_1->add_member("test_group", id_3, true));
         std::this_thread::sleep_for(std::chrono::seconds(2));
     }
 
@@ -218,7 +218,7 @@ TEST_F(MessagingFixture, ClientReset) {
 
 // Test sending a message for a group the messaging service is not aware of.
 TEST_F(MessagingFixture, UnknownGroup) {
-    EXPECT_FALSE(instance_1->add_member("unknown_group", to_string(boost::uuids::random_generator()())));
+    EXPECT_FALSE(instance_1->add_member("unknown_group", to_string(boost::uuids::random_generator()()), true));
 
     instance_1->leave_group("unknown_group");
 
