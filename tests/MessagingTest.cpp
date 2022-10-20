@@ -11,7 +11,7 @@
 #include <nlohmann/json.hpp>
 #include <random>
 
-#include <utility/thread_buffer.hpp>
+#include <sisl/utility/thread_buffer.hpp>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

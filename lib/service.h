@@ -9,7 +9,7 @@
 #include <shared_mutex>
 #include <nuraft_grpc/grpc_server.hpp>
 #include <grpc_helper/rpc_server.hpp>
-#include <metrics/metrics.hpp>
+#include <sisl/metrics/metrics.hpp>
 
 #include "messaging_service.grpc.pb.h"
 

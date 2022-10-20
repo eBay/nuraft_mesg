@@ -11,7 +11,7 @@
 
 #include <nuraft_grpc/grpc_factory.hpp>
 #include <sisl/logging/logging.h>
-#include <metrics/metrics.hpp>
+#include <sisl/metrics/metrics.hpp>
 
 namespace sds::messaging {
 
