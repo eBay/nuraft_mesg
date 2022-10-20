@@ -42,7 +42,7 @@ class NuRaftGRPCConan(ConanFile):
     def requirements(self):
         self.requires("nuraft/nbi.20220801")
         self.requires("grpc_helper/[~=3, include_prerelease=True]@sisl/master")
-        self.requires("sisl/[~=8, include_prerelease=True]@sisl/master")
+        self.requires("sisl/[~=8, include_prerelease=True]@oss/master")
 
     def build(self):
         cmake = CMake(self)
