@@ -7,6 +7,7 @@ pipeline {
         MASTER_BRANCH = 'master'
         TESTING_BRANCH = 'testing/v*'
         STABLE_BRANCH = 'stable/v*'
+        BUILD_MISSING = "--build missing"
     }
 
     stages {
@@ -18,18 +19,6 @@ pipeline {
             steps {
                 script {
                     sh(script: "sed -Ei 's,version = .*\"([[:digit:]]+\\.[[:digit:]]+\\.[[:digit:]]+).*,version = \"\\1-${env.BUILD_NUMBER}\",' conanfile.py")
-                    BUILD_MISSING = "--build missing"
-                }
-            }
-        }
-        stage('Adjust for Testing/Stable') {
-            when { anyOf {
-                branch "${TESTING_BRANCH}"
-                branch "${STABLE_BRANCH}"
-            } }
-            steps {
-                script {
-                    BUILD_MISSING = ""
                 }
             }
         }
