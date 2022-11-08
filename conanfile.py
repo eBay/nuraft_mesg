@@ -40,7 +40,7 @@ class NuRaftGRPCConan(ConanFile):
             del self.options.fPIC
 
     def requirements(self):
-        self.requires("nuraft/nbi.20220801")
+        self.requires("nuraft/nbi.20221102")
         self.requires("grpc_helper/[~=3, include_prerelease=True]@sisl/master")
         self.requires("sisl/[~=8, include_prerelease=True]@oss/master")
 
