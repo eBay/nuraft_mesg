@@ -64,7 +64,6 @@ class NuRaftGRPCConan(ConanFile):
         self.copy(pattern="LICENSE*", dst="licenses")
         self.copy("*.h", dst="include/nuraft_grpc", excludes="*.pb.h", keep_path=False)
         self.copy("*.pb.h", dst="include/nuraft_grpc/proto", keep_path=False)
-        self.copy("*.h", dst="include/nuraft_grpc", keep_path=False)
         self.copy("*.hpp", dst="include/nuraft_grpc", keep_path=False)
         self.copy("*.dll", dst="bin", keep_path=False)
         self.copy("*.dylib*", dst="lib", keep_path=False, symlinks=True)

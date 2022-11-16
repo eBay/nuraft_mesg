@@ -15,7 +15,7 @@
 #include <grpc_helper/rpc_server.hpp>
 
 #include "grpc_server.hpp"
-#include "raft_service.grpc.pb.h"
+#include "proto/raft_service.grpc.pb.h"
 
 namespace nuraft_grpc {
 

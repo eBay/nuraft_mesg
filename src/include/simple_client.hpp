@@ -12,7 +12,7 @@
 #pragma once
 
 #include "grpc_client.hpp"
-#include "raft_service.grpc.pb.h"
+#include "proto/raft_service.grpc.pb.h"
 
 namespace nuraft_grpc {
 
