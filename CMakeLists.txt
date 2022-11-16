@@ -1,8 +1,8 @@
 cmake_minimum_required (VERSION 3.11)
 
-include_directories("${CONAN_INCLUDE_DIRS_NURAFT_GRPC}/nuraft_grpc")
-
 find_package(nuraft_grpc REQUIRED)
+
+include_directories("${CONAN_INCLUDE_DIRS_NURAFT_GRPC}/nuraft_grpc/proto")
 
 # add version information
 set(PACKAGE_REVISION "0.0.0+unknown")

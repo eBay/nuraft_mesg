@@ -2,13 +2,13 @@
 // Copyright 2018 (c) eBay Corporation
 //
 #include "test_state_manager.h"
-#include "libnuraft/state_machine.hxx"
 
 #include <fstream>
 
 #include <jungle_log_store.h>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <libnuraft/state_machine.hxx>
 
 #include "test_state_machine.h"
 
