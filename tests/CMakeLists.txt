@@ -15,5 +15,5 @@ target_link_libraries (am_messaging_test
       GTest::gmock
     )
 
-add_test(NAME MessagingTest COMMAND am_messaging_test -csv 1)
+add_test(NAME MessagingTest COMMAND am_messaging_test -csv 3)
 set_property(TEST MessagingTest PROPERTY RUN_SERIAL 1)
