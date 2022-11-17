@@ -40,6 +40,8 @@ public:
         std::string default_group_type;
         std::shared_ptr< sisl::AuthManager > auth_mgr{nullptr};
         std::shared_ptr< sisl::TrfClient > trf_client{nullptr};
+        std::string ssl_key{};
+        std::string ssl_cert{};
     };
     virtual ~consensus_component() = default;
     virtual void start(consensus_component::params& start_params) = 0;
@@ -68,6 +70,8 @@ public:
     virtual void get_peers(std::string const& group_id, std::list< std::string >&) const = 0;
     virtual uint32_t logstore_id(std::string const& group_id) const = 0;
     virtual int32_t server_id() const = 0;
+
+    virtual void restart_server(consensus_component::params& start_params) = 0;
 };
 
 } // namespace sds::messaging

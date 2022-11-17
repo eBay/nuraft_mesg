@@ -13,6 +13,8 @@ SISL_LOGGING_DECL(sds_msg)
 
 namespace sds::messaging {
 
+std::string group_factory::m_ssl_cert;
+
 class messaging_client : public nuraft_grpc::grpc_client< Messaging >,
                          public std::enable_shared_from_this< messaging_client > {
 public:
@@ -98,6 +100,12 @@ std::error_condition mesg_factory::reinit_client(const std::string& client,
     return std::error_condition();
 }
 
+group_factory::group_factory(int const cli_thread_count, std::string const& name,
+                             shared< sisl::TrfClient > const trf_client, std::string const& ssl_cert) :
+        nuraft_grpc::grpc_factory(cli_thread_count, name), m_trf_client(trf_client) {
+    m_ssl_cert = ssl_cert;
+}
+
 std::error_condition group_factory::create_client(const std::string& client,
                                                   nuraft::ptr< nuraft::rpc_client >& raft_client) {
     LOGDEBUGMOD(sds_msg, "Creating client to {}", client);
@@ -105,7 +113,8 @@ std::error_condition group_factory::create_client(const std::string& client,
     if (endpoint.empty()) { return std::make_error_condition(std::errc::invalid_argument); }
 
     LOGDEBUGMOD(sds_msg, "Creating client for [{}] @ [{}]", client, endpoint);
-    raft_client = grpc_helper::GrpcAsyncClient::make< messaging_client >(workerName(), endpoint, m_trf_client);
+    raft_client =
+        grpc_helper::GrpcAsyncClient::make< messaging_client >(workerName(), endpoint, m_trf_client, "", m_ssl_cert);
     return (!raft_client) ? std::make_error_condition(std::errc::connection_aborted) : std::error_condition();
 }
 
