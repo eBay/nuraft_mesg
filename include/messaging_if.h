@@ -70,8 +70,7 @@ public:
     virtual void get_peers(std::string const& group_id, std::list< std::string >&) const = 0;
     virtual uint32_t logstore_id(std::string const& group_id) const = 0;
     virtual int32_t server_id() const = 0;
-
-    virtual void restart_server(consensus_component::params& start_params) = 0;
+    virtual void restart_server() = 0;
 };
 
 } // namespace sds::messaging

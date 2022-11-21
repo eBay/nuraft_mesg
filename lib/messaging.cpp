@@ -51,12 +51,12 @@ service::~service() {
 }
 
 void service::start(consensus_component::params& start_params) {
-    _node_id = start_params.server_uuid;
+    _start_params = start_params;
     boost::hash< boost::uuids::uuid > uuid_hasher;
-    _srv_id = uuid_hasher(boost::uuids::string_generator()(_node_id)) >> 33;
+    _srv_id = uuid_hasher(boost::uuids::string_generator()(_start_params.server_uuid)) >> 33;
 
-    _g_factory = std::make_shared< engine_factory >(grpc_client_threads, start_params);
-    auto logger_name = fmt::format("nuraft_{}", _node_id);
+    _g_factory = std::make_shared< engine_factory >(grpc_client_threads, _start_params);
+    auto logger_name = fmt::format("nuraft_{}", _start_params.server_uuid);
     //
     // NOTE: The Unit tests require this instance to be recreated with the same parameters.
     // This exception is only expected in this case where we "restart" the server by just recreating the instance.
@@ -72,9 +72,8 @@ void service::start(consensus_component::params& start_params) {
     service_options.thread_pool_size_ = 1;
     _scheduler = std::make_shared< nuraft::asio_service >(service_options, logger);
 
-    // Start a gRPC server and create and associate sds_messaging service. The function
-    // passed to msg_service will be called each time a new group is joined, allowing
-    // sharing of the Server and client amongst raft instances.
+    // The function passed to msg_service will be called each time a new group is joined,
+    // allowing sharing of the Server and client amongst raft instances.
 
     _mesg_service = msg_service::create(
         [this](int32_t const srv_id, group_name_t const& group_id, group_type_t const& group_type,
@@ -86,19 +85,21 @@ void service::start(consensus_component::params& start_params) {
             auto const& type_params = _state_mgr_types[group_type];
             return type_params.process_req;
         },
-        _node_id);
-    _mesg_service->setDefaultGroupType(start_params.default_group_type);
-    restart_server(start_params);
+        _start_params.server_uuid);
+    _mesg_service->setDefaultGroupType(_start_params.default_group_type);
+
+    // Start a gRPC server and create and associate sds_messaging service.
+    restart_server();
 }
 
-void service::restart_server(consensus_component::params& start_params) {
-    auto _listen_address = fmt::format(FMT_STRING("0.0.0.0:{}"), start_params.mesg_port);
-    LOGINFO("Starting Messaging Service on http://{}", _listen_address);
+void service::restart_server() {
+    auto listen_address = fmt::format(FMT_STRING("0.0.0.0:{}"), _start_params.mesg_port);
+    LOGINFO("Starting Messaging Service on http://{}", listen_address);
 
     std::lock_guard< std::mutex > lg(_manager_lock);
     _grpc_server.reset();
     _grpc_server = std::unique_ptr< grpc_helper::GrpcServer >(grpc_helper::GrpcServer::make(
-        _listen_address, start_params.auth_mgr, grpc_server_threads, start_params.ssl_key, start_params.ssl_cert));
+        listen_address, _start_params.auth_mgr, grpc_server_threads, _start_params.ssl_key, _start_params.ssl_cert));
     _mesg_service->associate(_grpc_server.get());
     _grpc_server->run();
     _mesg_service->bind(_grpc_server.get());

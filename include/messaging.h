@@ -22,7 +22,7 @@ class msg_service;
 class group_metrics;
 
 class service : public consensus_component {
-    std::string _node_id;
+    consensus_component::params _start_params;
     int32_t _srv_id;
 
     std::map< std::string, consensus_component::register_params > _state_mgr_types;
@@ -67,7 +67,7 @@ public:
     std::error_condition client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >& buf) override;
     uint32_t logstore_id(std::string const& group_id) const override;
     void get_peers(std::string const& group_id, std::list< std::string >&) const override;
-    void restart_server(consensus_component::params& start_params) override;
+    void restart_server() override;
 
     // for testing
     void get_srv_config_all(std::string const& group_name,
