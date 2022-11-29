@@ -11,7 +11,7 @@ class TestPackageConan(ConanFile):
     def requirements(self):
         self.requires("nlohmann_json/3.10.5")
         self.requires("jungle_logstore/nbi.20221129@sds/master")
-        self.requires("lz4/1.9.3", override=True)
+        self.requires("lz4/1.9.4", override=True)
 
     def build(self):
         cmake = CMake(self)
