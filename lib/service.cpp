@@ -149,7 +149,9 @@ bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGr
     if (intended_addr != _service_address) {
         LOGWARNMOD(sds_msg, "Recieved mesg for {} intended for {}, we are {}",
                    nuraft::msg_type_to_string(nuraft::msg_type(base.type())), intended_addr, _service_address);
-        rpc_data->set_status(::grpc::Status(::grpc::INVALID_ARGUMENT, "Bad service address {}", intended_addr));
+        rpc_data->set_status(::grpc::Status(
+            ::grpc::INVALID_ARGUMENT,
+            fmt::format(FMT_STRING("intended addr: [{}], our addr: [{}]"), intended_addr, _service_address)));
         return true;
     }
 

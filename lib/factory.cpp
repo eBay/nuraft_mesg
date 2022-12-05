@@ -29,8 +29,16 @@ public:
         auto weak_this = std::weak_ptr< messaging_client >(shared_from_this());
         auto group_compl = [weak_this, complete](auto response, auto status) mutable {
             if (::grpc::INVALID_ARGUMENT == status.error_code()) {
-                LOGERRORMOD(sds_msg, "Sent message to wrong service, need to disconnect!");
-                if (auto mc = weak_this.lock(); mc) { mc->bad_service.fetch_add(1, std::memory_order_relaxed); }
+                if (auto mc = weak_this.lock(); mc) {
+                    mc->bad_service.fetch_add(1, std::memory_order_relaxed);
+                    LOGERRORMOD(
+                        sds_msg,
+                        "Sent message to wrong service, need to disconnect! Error Message: [{}] Client IP: [{}]",
+                        status.error_message(), mc->_addr);
+                } else {
+                    LOGERRORMOD(sds_msg, "Sent message to wrong service, need to disconnect! Error Message: [{}]",
+                                status.error_message());
+                }
             }
             complete(*response.mutable_msg(), status);
         };
