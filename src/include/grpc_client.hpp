@@ -13,7 +13,7 @@
 
 #include "common.hpp"
 
-#include <grpc_helper/rpc_client.hpp>
+#include <sisl/grpc/rpc_client.hpp>
 
 namespace nuraft_grpc {
 
@@ -45,13 +45,13 @@ protected:
 };
 
 template < typename TSERVICE >
-class grpc_client : public grpc_base_client, public grpc_helper::GrpcAsyncClient {
+class grpc_client : public grpc_base_client, public sisl::GrpcAsyncClient {
 public:
     grpc_client(std::string const& worker_name, std::string const& addr,
                 const std::shared_ptr< sisl::TrfClient > trf_client, std::string const& target_domain = "",
                 std::string const& ssl_cert = "") :
             grpc_base_client(),
-            grpc_helper::GrpcAsyncClient(addr, trf_client, target_domain, ssl_cert),
+            sisl::GrpcAsyncClient(addr, trf_client, target_domain, ssl_cert),
             _addr(addr),
             _worker_name(worker_name.data()) {
         init();
@@ -67,8 +67,8 @@ public:
         // Re-create channel only if current channel is busted.
         if (!_stub || !is_connection_ready()) {
             LOGDEBUGMOD(nuraft, "Client init ({}) to {}", (!!_stub ? "Again" : "First"), _addr);
-            grpc_helper::GrpcAsyncClient::init();
-            _stub = grpc_helper::GrpcAsyncClient::make_stub< TSERVICE >(_worker_name);
+            sisl::GrpcAsyncClient::init();
+            _stub = sisl::GrpcAsyncClient::make_stub< TSERVICE >(_worker_name);
         } else {
             LOGDEBUGMOD(nuraft, "Channel looks fine, re-using");
         }
@@ -77,7 +77,7 @@ public:
 protected:
     std::string const _addr;
     char const* _worker_name;
-    typename ::grpc_helper::GrpcAsyncClient::AsyncStub< TSERVICE >::UPtr _stub;
+    typename ::sisl::GrpcAsyncClient::AsyncStub< TSERVICE >::UPtr _stub;
 };
 
 } // namespace nuraft_grpc

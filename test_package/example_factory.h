@@ -22,7 +22,7 @@ struct example_factory : public nuraft_grpc::grpc_factory {
         auto const endpoint = format(FMT_STRING("127.0.0.1:{}"), 9000 + std::stol(client));
         LOGDEBUGMOD(nuraft, "Creating client for [{}] @ [{}]", client, endpoint);
 
-        raft_client = grpc_helper::GrpcAsyncClient::make< nuraft_grpc::simple_grpc_client >(workerName(), endpoint);
+        raft_client = sisl::GrpcAsyncClient::make< nuraft_grpc::simple_grpc_client >(workerName(), endpoint);
         return (!raft_client) ? std::make_error_condition(std::errc::connection_aborted) : std::error_condition();
     }
 

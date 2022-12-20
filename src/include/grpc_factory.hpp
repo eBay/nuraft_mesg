@@ -5,7 +5,7 @@
 //      Brian Szmyd <bszmyd@ebay.com>
 //
 // Brief:
-//   Implements cornerstone's rpc_client_factory providing grpc_helper::GrpcAsyncClient
+//   Implements cornerstone's rpc_client_factory providing sisl::GrpcAsyncClient
 //   inherited rpc_client instances sharing a common worker pool.
 
 #pragma once

@@ -15,7 +15,7 @@
 #include <libnuraft/raft_server_handler.hxx>
 #include <grpcpp/server.h>
 
-namespace grpc_helper {
+namespace sisl {
 class GrpcServer;
 }
 
@@ -46,8 +46,8 @@ public:
     shared< nuraft::raft_server > raft_server() { return _raft_server; }
 
     // Setup the RPC call backs
-    virtual void associate(grpc_helper::GrpcServer* server) = 0;
-    virtual void bind(grpc_helper::GrpcServer* server) = 0;
+    virtual void associate(sisl::GrpcServer* server) = 0;
+    virtual void bind(sisl::GrpcServer* server) = 0;
 };
 
 } // namespace nuraft_grpc

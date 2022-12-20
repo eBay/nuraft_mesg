@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include <grpc_helper/rpc_server.hpp>
+#include <sisl/grpc/rpc_server.hpp>
 
 #include "grpc_server.hpp"
 #include "proto/raft_service.grpc.pb.h"
@@ -32,7 +32,7 @@ public:
         }
     }
 
-    void associate(grpc_helper::GrpcServer* server) override {
+    void associate(sisl::GrpcServer* server) override {
         assert(server);
         if (!server->register_async_service< RaftSvc >()) {
             LOGERRORMOD(nuraft, "Could not register RaftSvc with gRPC!");
@@ -40,11 +40,11 @@ public:
         }
     }
 
-    void bind(grpc_helper::GrpcServer* server) override {
+    void bind(sisl::GrpcServer* server) override {
         assert(server);
         if (!server->register_rpc< RaftSvc, RaftMessage, RaftMessage, false >(
                 "Simple", &AsyncRaftSvc::RequestStep,
-                [this](const grpc_helper::AsyncRpcDataPtr< RaftSvc, RaftMessage, RaftMessage >& rpc_data) -> bool {
+                [this](const sisl::AsyncRpcDataPtr< RaftSvc, RaftMessage, RaftMessage >& rpc_data) -> bool {
                     this->step(rpc_data->request(), rpc_data->response());
                     return true;
                 })) {
