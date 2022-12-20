@@ -40,7 +40,7 @@ msg_service::~msg_service() {
     DEBUG_ASSERT(_raft_servers.empty(), "RAFT servers not fully terminated!");
 }
 
-void msg_service::associate(::grpc_helper::GrpcServer* server) {
+void msg_service::associate(::sisl::GrpcServer* server) {
     RELEASE_ASSERT(server, "NULL server!");
     if (!server->register_async_service< Messaging >()) {
         LOGERRORMOD(nuraft, "Could not register RaftSvc with gRPC!");
@@ -48,7 +48,7 @@ void msg_service::associate(::grpc_helper::GrpcServer* server) {
     }
 }
 
-void msg_service::bind(::grpc_helper::GrpcServer* server) {
+void msg_service::bind(::sisl::GrpcServer* server) {
     RELEASE_ASSERT(server, "NULL server!");
     if (!server->register_rpc< Messaging, RaftGroupMsg, RaftGroupMsg, false >(
             "RaftStep", &AsyncRaftSvc::RequestRaftStep,
@@ -138,7 +138,7 @@ void msg_service::setDefaultGroupType(std::string const& _type) {
     _default_group_type = _type;
 }
 
-bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data) {
+bool msg_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data) {
     auto& request = rpc_data->request();
     auto& response = rpc_data->response();
     auto const& group_name = request.group_name();
@@ -204,8 +204,8 @@ bool msg_service::raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGr
 class null_service final : public nuraft_grpc::grpc_server {
 public:
     using nuraft_grpc::grpc_server::grpc_server;
-    void associate(grpc_helper::GrpcServer*) override{};
-    void bind(grpc_helper::GrpcServer*) override{};
+    void associate(sisl::GrpcServer*) override{};
+    void bind(sisl::GrpcServer*) override{};
 };
 
 class msg_group_listner : public nuraft::rpc_listener {

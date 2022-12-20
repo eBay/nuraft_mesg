@@ -12,9 +12,9 @@
 
 #include "messaging_if.h"
 
-namespace grpc_helper {
+namespace sisl {
 class GrpcServer;
-} // namespace grpc_helper
+} // namespace sisl
 
 namespace sds::messaging {
 class group_factory;
@@ -29,7 +29,7 @@ class service : public consensus_component {
 
     std::shared_ptr< ::sds::messaging::group_factory > _g_factory;
     std::shared_ptr< ::sds::messaging::msg_service > _mesg_service;
-    std::unique_ptr< ::grpc_helper::GrpcServer > _grpc_server;
+    std::unique_ptr< ::sisl::GrpcServer > _grpc_server;
 
     std::mutex mutable _manager_lock;
     std::map< std::string, std::shared_ptr< mesg_state_mgr > > _state_managers;

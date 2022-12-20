@@ -8,7 +8,7 @@
 #include <map>
 #include <shared_mutex>
 #include <nuraft_grpc/grpc_server.hpp>
-#include <grpc_helper/rpc_server.hpp>
+#include <sisl/grpc/rpc_server.hpp>
 #include <sisl/metrics/metrics.hpp>
 
 #include "messaging_service.grpc.pb.h"
@@ -85,11 +85,11 @@ public:
     nuraft::cmd_result_code append_entries(group_name_t const& group_name,
                                            std::vector< nuraft::ptr< nuraft::buffer > > const& logs);
 
-    void associate(grpc_helper::GrpcServer* server);
-    void bind(grpc_helper::GrpcServer* server);
+    void associate(sisl::GrpcServer* server);
+    void bind(sisl::GrpcServer* server);
 
     //::grpc::Status raftStep(RaftGroupMsg& request, RaftGroupMsg& response);
-    bool raftStep(const grpc_helper::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
+    bool raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
 
     void setDefaultGroupType(std::string const& _type);
 

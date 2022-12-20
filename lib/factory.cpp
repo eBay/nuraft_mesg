@@ -122,7 +122,7 @@ std::error_condition group_factory::create_client(const std::string& client,
 
     LOGDEBUGMOD(sds_msg, "Creating client for [{}] @ [{}]", client, endpoint);
     raft_client =
-        grpc_helper::GrpcAsyncClient::make< messaging_client >(workerName(), endpoint, m_trf_client, "", m_ssl_cert);
+        sisl::GrpcAsyncClient::make< messaging_client >(workerName(), endpoint, m_trf_client, "", m_ssl_cert);
     return (!raft_client) ? std::make_error_condition(std::errc::connection_aborted) : std::error_condition();
 }
 

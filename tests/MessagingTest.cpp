@@ -5,7 +5,7 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/string_generator.hpp>
-#include <grpc_helper/rpc_client.hpp>
+#include <sisl/grpc/rpc_client.hpp>
 #include <sisl/logging/logging.h>
 #include <sisl/options/options.h>
 #include <nlohmann/json.hpp>
@@ -279,7 +279,7 @@ int main(int argc, char* argv[]) {
     sisl::logging::GetLogger()->flush_on(spdlog::level::level_enum::err);
 
     auto ret = RUN_ALL_TESTS();
-    grpc_helper::GrpcAsyncClientWorker::shutdown_all();
+    sisl::GrpcAsyncClientWorker::shutdown_all();
 
     return ret;
 }

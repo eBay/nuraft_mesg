@@ -12,7 +12,7 @@
 
 #include <libnuraft/async.hxx>
 #include <sisl/options/options.h>
-#include <grpc_helper/rpc_server.hpp>
+#include <sisl/grpc/rpc_server.hpp>
 
 #include "service.h"
 #include "factory.h"
@@ -98,7 +98,7 @@ void service::restart_server() {
 
     std::lock_guard< std::mutex > lg(_manager_lock);
     _grpc_server.reset();
-    _grpc_server = std::unique_ptr< grpc_helper::GrpcServer >(grpc_helper::GrpcServer::make(
+    _grpc_server = std::unique_ptr< sisl::GrpcServer >(sisl::GrpcServer::make(
         listen_address, _start_params.auth_mgr, grpc_server_threads, _start_params.ssl_key, _start_params.ssl_cert));
     _mesg_service->associate(_grpc_server.get());
     _grpc_server->run();
