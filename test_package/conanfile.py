@@ -13,6 +13,8 @@ class TestPackageConan(ConanFile):
         self.requires("jungle_logstore/nbi.20221129@sds/master")
         self.requires("lz4/1.9.4", override=True)
 
+        self.requires("nuraft/2.0.0", override=True)
+
     def build(self):
         cmake = CMake(self)
         cmake.configure()
