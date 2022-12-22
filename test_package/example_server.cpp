@@ -1,9 +1,17 @@
-///
-// Copyright 2018 (c) eBay Corporation
-//
-// Authors:
-//      Brian Szmyd <bszmyd@ebay.com>
-//
+/*********************************************************************************
+ * Modifications Copyright 2017-2019 eBay Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *    https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed
+ * under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+ * CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ *********************************************************************************/
 
 #include <cassert>
 
@@ -65,8 +73,7 @@ int main(int argc, char** argv) {
             new context(smgr, smachine, listener, l, rpc_cli_factory, scheduler, params));
         auto grpc_svc_ = std::make_unique< nuraft_grpc::simple_server >(server);
 
-        auto grpc_server =
-            std::unique_ptr< sisl::GrpcServer >(sisl::GrpcServer::make(server_address, 2, "", ""));
+        auto grpc_server = std::unique_ptr< sisl::GrpcServer >(sisl::GrpcServer::make(server_address, 2, "", ""));
         grpc_svc_->associate(grpc_server.get());
         grpc_server->run();
         grpc_svc_->bind(grpc_server.get());

@@ -4,10 +4,10 @@ from conans import ConanFile, CMake, tools
 class NuRaftGRPCConan(ConanFile):
     name = "nuraft_grpc"
     version = "5.4.2"
-    homepage = "https://github.corp.ebay.com/SDS/access-mgr"
+    homepage = "https://github.com/eBay/nuraft_grpc"
     description = "A gRPC service for nuraft"
     topics = ("ebay", "nublox", "raft")
-    url = "https://github.corp.ebay.com/SDS/nuraft_grpc"
+    url = "https://github.com/eBay/nuraft_grpc"
     license = "Apache-2.0"
 
     settings = "arch", "os", "compiler", "build_type"
@@ -24,7 +24,7 @@ class NuRaftGRPCConan(ConanFile):
             }
 
     generators = "cmake", "cmake_find_package"
-    exports = ["LICENSE.md"]
+    exports = ["LICENSE"]
     exports_sources = (
                         "CMakeLists.txt",
                         "cmake/*",
@@ -60,7 +60,7 @@ class NuRaftGRPCConan(ConanFile):
         cmake.test(target=test_target)
 
     def package(self):
-        self.copy(pattern="LICENSE*", dst="licenses")
+        self.copy(pattern="LICENSE", dst="licenses")
         self.copy("*.h", dst="include/nuraft_grpc", excludes="*.pb.h", keep_path=False)
         self.copy("*.pb.h", dst="include/nuraft_grpc/proto", keep_path=False)
         self.copy("*.hpp", dst="include/nuraft_grpc", keep_path=False)
