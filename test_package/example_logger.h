@@ -19,7 +19,7 @@
 
 SISL_LOGGING_DECL(nuraft)
 
-struct sds_logger : ::nuraft::logger {
+struct example_logger : ::nuraft::logger {
     void debug(const std::string& log_line) override { LOGDEBUGMOD(nuraft, "{}", log_line); }
 
     void info(const std::string& log_line) override { LOGINFOMOD(nuraft, "{}", log_line); }
