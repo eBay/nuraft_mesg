@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Nothing
+### Changed
+
+- Switched CI to use Ubuntu 22.04 (GCC 11.3)
 
 [Unreleased]: https://github.corp.ebay.com/SDS/raft_core_grpc/compare/testing/...HEAD
