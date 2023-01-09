@@ -1,8 +1,14 @@
 # nuraft_grpc
 
-NuRaftGRPC is a Protobuf translation layer for [nuraft](https://github.com/eBay/nuraft)
+## Notes
+
+Currently this project can only be built on Linux using the GCC compiler toolchain. Work is on-going to support other
+platforms (e.g. MacOS) using the Clang and VSCode toolchains. Please feel free to contribute changes that support this
+endeavour.
 
 ## Brief
+
+NuRAFT-gRPC is a Protobuf translation layer for [nuraft](https://github.com/eBay/nuraft)
 
 This project provides a the wiring to use Protobuf for marshalling NuRaft calls between services as an alternative
 to the native Boost::ASIO RPC service.
@@ -32,5 +38,5 @@ A simple echo server can be found in `test_package/example_{client,server}.cpp`
 This project is typically build from a combination of conan.io and CMake.
 ```
 $ pip install -U conan
-$ conan create . <user>/<channel>
+$ conan create --build missing . <user>/<channel>
 ```
