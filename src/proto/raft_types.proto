@@ -39,6 +39,9 @@ enum ResultCode {
     SERVER_NOT_FOUND = 8;
     CANNOT_REMOVE_LEADER = 9;
     SERVER_IS_LEAVING = 10;
+    TERM_MISMATCH = 11;
+
+    RESULT_NOT_EXIST_YET = 10000;
 
     FAILED = 32768;
 }
@@ -47,6 +50,7 @@ message LogEntry {
     uint64 term = 1;
     LogType type = 2;
     bytes buffer = 3;
+    uint64 timestamp = 4;
 }
 
 message RCMsgBase {
