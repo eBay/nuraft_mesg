@@ -27,6 +27,7 @@ inline LogEntry* fromLogEntry(nuraft::log_entry const& entry, LogEntry* log) {
     auto& buffer = entry.get_buf();
     buffer.pos(0);
     log->set_buffer(buffer.data(), buffer.size());
+    log->set_timestamp(entry.get_timestamp());
     return log;
 }
 
