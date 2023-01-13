@@ -25,9 +25,9 @@
 
 #include "proto/raft_types.pb.h"
 
-SISL_LOGGING_DECL(nuraft)
+SISL_LOGGING_DECL(nuraft_mesg)
 
-namespace nuraft_grpc {
+namespace nuraft_mesg {
 
 template < typename T >
 using boxed = std::unique_ptr< T >;
@@ -35,4 +35,4 @@ using boxed = std::unique_ptr< T >;
 template < typename T >
 using shared = std::shared_ptr< T >;
 
-} // namespace nuraft_grpc
+} // namespace nuraft_mesg

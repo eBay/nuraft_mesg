@@ -1,3 +1,17 @@
+/*********************************************************************************
+ * Modifications Copyright 2017-2019 eBay Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *    https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed
+ * under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+ * CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ *********************************************************************************/
 #pragma once
 
 #include "messaging_if.hpp"
@@ -5,7 +19,7 @@
 
 class test_state_machine;
 
-class test_state_mgr : public sds::messaging::mesg_state_mgr {
+class test_state_mgr : public nuraft_mesg::mesg_state_mgr {
 public:
     test_state_mgr(int32_t srv_id, std::string const& srv_addr, std::string const& group_id);
 

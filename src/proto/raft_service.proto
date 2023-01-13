@@ -17,7 +17,7 @@ syntax = "proto3";
 
 import "raft_types.proto";
 
-package nuraft_grpc;
+package nuraft_mesg;
 
 /// This is a VERY basic service. A service might include this RPC as
 /// one of the calls in a greater service.

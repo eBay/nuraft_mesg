@@ -1,13 +1,13 @@
 import os
 from conans import ConanFile, CMake, tools
 
-class NuRaftGRPCConan(ConanFile):
-    name = "nuraft_grpc"
-    version = "5.5.0"
-    homepage = "https://github.com/eBay/nuraft_grpc"
+class NuRaftMesgConan(ConanFile):
+    name = "nuraft_mesg"
+    version = "1.0.0"
+    homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for nuraft"
     topics = ("ebay", "nublox", "raft")
-    url = "https://github.com/eBay/nuraft_grpc"
+    url = "https://github.com/eBay/nuraft_mesg"
     license = "Apache-2.0"
 
     settings = "arch", "os", "compiler", "build_type"
@@ -67,9 +67,9 @@ class NuRaftGRPCConan(ConanFile):
 
     def package(self):
         self.copy(pattern="LICENSE", dst="licenses")
-        self.copy("*.h", dst="include/nuraft_grpc", excludes="*.pb.h", keep_path=False)
-        self.copy("*.pb.h", dst="include/nuraft_grpc/proto", keep_path=False)
-        self.copy("*.hpp", dst="include/nuraft_grpc", keep_path=False)
+        self.copy("*.h", dst="include/nuraft_mesg", excludes="*.pb.h", keep_path=False)
+        self.copy("*.pb.h", dst="include/nuraft_mesg/proto", keep_path=False)
+        self.copy("*.hpp", dst="include/nuraft_mesg", keep_path=False)
         self.copy("*.dll", dst="bin", keep_path=False)
         self.copy("*.dylib*", dst="lib", keep_path=False, symlinks=True)
         self.copy("*.so", dst="lib", keep_path=False, symlinks=True)
@@ -78,7 +78,7 @@ class NuRaftGRPCConan(ConanFile):
         self.copy("*.proto", dst="proto/", keep_path=False)
 
     def package_info(self):
-        self.cpp_info.libs = ["nuraft_grpc"]
+        self.cpp_info.libs = ["nuraft_mesg"]
         if self.settings.build_type == "Debug" and self.options.sanitize:
             self.cpp_info.sharedlinkflags.append("-fsanitize=address")
             self.cpp_info.exelinkflags.append("-fsanitize=address")

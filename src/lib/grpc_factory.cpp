@@ -21,7 +21,7 @@
 #include "grpc_client.hpp"
 #include "grpc_factory.hpp"
 
-namespace nuraft_grpc {
+namespace nuraft_mesg {
 
 template < typename Payload >
 struct client_ctx {
@@ -82,7 +82,7 @@ void respHandler(shared< ContextType > ctx, shared< nuraft::resp_msg >& rsp, sha
         ctx->set((rsp ? rsp->get_result_code() : nuraft::cmd_result_code::SERVER_NOT_FOUND));
         return;
     } else if (rsp->get_accepted()) {
-        LOGDEBUGMOD(nuraft, "Accepted response");
+        LOGDEBUGMOD(nuraft_mesg, "Accepted response");
         ctx->set(rsp->get_result_code());
         return;
     } else if (ctx->_cur_dest == rsp->get_dst()) {
@@ -97,7 +97,7 @@ void respHandler(shared< ContextType > ctx, shared< nuraft::resp_msg >& rsp, sha
 
     // Not accepted: means that `get_dst()` is a new leader.
     auto gresp = std::dynamic_pointer_cast< grpc_resp >(rsp);
-    LOGDEBUGMOD(nuraft, "Updating destination from {} to {}[{}]", ctx->_cur_dest, rsp->get_dst(), gresp->dest_addr);
+    LOGDEBUGMOD(nuraft_mesg, "Updating destination from {} to {}[{}]", ctx->_cur_dest, rsp->get_dst(), gresp->dest_addr);
     ctx->_cur_dest = rsp->get_dst();
     auto client = factory->create_client(gresp->dest_addr);
 
@@ -105,7 +105,7 @@ void respHandler(shared< ContextType > ctx, shared< nuraft::resp_msg >& rsp, sha
     auto handler = static_cast< nuraft::rpc_handler >(
         [ctx](shared< nuraft::resp_msg >& rsp, shared< nuraft::rpc_exception >& err) { respHandler(ctx, rsp, err); });
 
-    LOGDEBUGMOD(nuraft, "Creating new message: {}", ctx->_new_srv_addr);
+    LOGDEBUGMOD(nuraft_mesg, "Creating new message: {}", ctx->_new_srv_addr);
     auto msg = createMessage(ctx->payload(), ctx->_new_srv_addr);
     client->send(msg, handler);
 }
@@ -130,7 +130,7 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string&
     auto [it, happened] = _clients.emplace(client, nullptr);
     if (_clients.end() != it) {
         if (!happened) {
-            LOGDEBUGMOD(nuraft, "Re-creating client for {}", client);
+            LOGDEBUGMOD(nuraft_mesg, "Re-creating client for {}", client);
             if (auto err = reinit_client(client, it->second); err) {
                 LOGERROR("Failed to re-initialize client {}: {}", client, err.message());
                 new_client = std::make_shared< grpc_error_client >();
@@ -138,7 +138,7 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string&
                 new_client = it->second;
             }
         } else {
-            LOGDEBUGMOD(nuraft, "Creating client for {}", client);
+            LOGDEBUGMOD(nuraft_mesg, "Creating client for {}", client);
             if (auto err = create_client(client, it->second); err) {
                 LOGERROR("Failed to create client for {}: {}", client, err.message());
                 new_client = std::make_shared< grpc_error_client >();
@@ -208,4 +208,4 @@ std::future< nuraft::cmd_result_code > grpc_factory::client_request(shared< nura
     return ctx->future();
 }
 
-} // namespace nuraft_grpc
+} // namespace nuraft_mesg

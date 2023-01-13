@@ -25,7 +25,7 @@
 #include "grpc_server.hpp"
 #include "proto/raft_service.grpc.pb.h"
 
-namespace nuraft_grpc {
+namespace nuraft_mesg {
 
 using AsyncRaftSvc = RaftSvc::AsyncService;
 
@@ -43,7 +43,7 @@ public:
     void associate(sisl::GrpcServer* server) override {
         assert(server);
         if (!server->register_async_service< RaftSvc >()) {
-            LOGERRORMOD(nuraft, "Could not register RaftSvc with gRPC!");
+            LOGERRORMOD(nuraft_mesg, "Could not register RaftSvc with gRPC!");
             abort();
         }
     }
@@ -56,10 +56,10 @@ public:
                     this->step(rpc_data->request(), rpc_data->response());
                     return true;
                 })) {
-            LOGERRORMOD(nuraft, "Could not bind gRPC ::Step to routine!");
+            LOGERRORMOD(nuraft_mesg, "Could not bind gRPC ::Step to routine!");
             abort();
         }
     }
 };
 
-} // namespace nuraft_grpc
+} // namespace nuraft_mesg

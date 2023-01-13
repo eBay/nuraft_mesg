@@ -1,3 +1,17 @@
+/*********************************************************************************
+ * Modifications Copyright 2017-2019 eBay Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *    https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed
+ * under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+ * CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ *********************************************************************************/
 #include <memory>
 #include <string>
 
@@ -22,7 +36,7 @@
 
 #include "test_state_manager.h"
 
-SISL_LOGGING_INIT(nuraft, sds_msg, grpc_server)
+SISL_LOGGING_INIT(nuraft, nuraft_mesg, grpc_server)
 
 SISL_OPTIONS_ENABLE(logging)
 
@@ -31,7 +45,7 @@ constexpr auto heartbeat_period = 100;
 constexpr auto elect_to_low = heartbeat_period * 2;
 constexpr auto elect_to_high = elect_to_low * 2;
 
-namespace sds::messaging {
+namespace nuraft_mesg {
 
 extern nuraft::ptr< nuraft::cluster_config > fromClusterConfig(nlohmann::json const& cluster_config);
 
@@ -44,9 +58,9 @@ static nuraft::ptr< nuraft::buffer > create_message(nlohmann::json const& j_obj)
     return buf;
 }
 
-} // namespace sds::messaging
+} // namespace nuraft_mesg
 
-using namespace sds::messaging;
+using namespace nuraft_mesg;
 using testing::_;
 using testing::Return;
 
@@ -161,7 +175,7 @@ public:
 
 // Basic client request (append_entries)
 TEST_F(MessagingFixture, ClientRequest) {
-    auto buf = sds::messaging::create_message(nlohmann::json{
+    auto buf = nuraft_mesg::create_message(nlohmann::json{
         {"op_type", 2},
     });
     EXPECT_FALSE(instance_1->client_request("test_group", buf));
@@ -177,7 +191,7 @@ TEST_F(MessagingFixture, ClientReset) {
     instance_3 = std::make_unique< service >();
 
     // Commit message
-    auto buf = sds::messaging::create_message(nlohmann::json{
+    auto buf = nuraft_mesg::create_message(nlohmann::json{
         {"op_type", 2},
     });
     EXPECT_FALSE(instance_1->client_request("test_group", buf));
@@ -222,7 +236,7 @@ TEST_F(MessagingFixture, UnknownGroup) {
 
     instance_1->leave_group("unknown_group");
 
-    auto buf = sds::messaging::create_message(nlohmann::json{
+    auto buf = nuraft_mesg::create_message(nlohmann::json{
         {"op_type", 2},
     });
     EXPECT_TRUE(instance_1->client_request("unknown_group", buf));
@@ -231,7 +245,7 @@ TEST_F(MessagingFixture, UnknownGroup) {
 TEST_F(MessagingFixture, RemoveMember) {
     EXPECT_TRUE(instance_1->rem_member("test_group", id_3));
 
-    auto buf = sds::messaging::create_message(nlohmann::json{
+    auto buf = nuraft_mesg::create_message(nlohmann::json{
         {"op_type", 2},
     });
     EXPECT_FALSE(instance_1->client_request("test_group", buf));

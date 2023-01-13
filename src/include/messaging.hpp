@@ -1,3 +1,17 @@
+/*********************************************************************************
+ * Modifications Copyright 2017-2019 eBay Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *    https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed
+ * under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+ * CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ *********************************************************************************/
 #pragma once
 
 #include <condition_variable>
@@ -16,7 +30,7 @@ namespace sisl {
 class GrpcServer;
 } // namespace sisl
 
-namespace sds::messaging {
+namespace nuraft_mesg {
 class group_factory;
 class msg_service;
 class group_metrics;
@@ -27,8 +41,8 @@ class service : public consensus_component {
 
     std::map< std::string, consensus_component::register_params > _state_mgr_types;
 
-    std::shared_ptr< ::sds::messaging::group_factory > _g_factory;
-    std::shared_ptr< ::sds::messaging::msg_service > _mesg_service;
+    std::shared_ptr< group_factory > _g_factory;
+    std::shared_ptr< msg_service > _mesg_service;
     std::unique_ptr< ::sisl::GrpcServer > _grpc_server;
 
     std::mutex mutable _manager_lock;
@@ -41,7 +55,7 @@ class service : public consensus_component {
     std::shared_ptr< sisl::logging::logger_t > _custom_logger;
 
     std::error_condition group_init(int32_t const srv_id, std::string const& group_id, std::string const& group_type,
-                                    nuraft::context*& ctx, std::shared_ptr< sds::messaging::group_metrics > metrics);
+                                    nuraft::context*& ctx, std::shared_ptr< group_metrics > metrics);
     nuraft::cb_func::ReturnCode callback_handler(std::string const& group_id, nuraft::cb_func::Type type,
                                                  nuraft::cb_func::Param* param);
     void exit_group(std::string const& group_id);
@@ -74,4 +88,4 @@ public:
                             std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out);
 };
 
-} // namespace sds::messaging
+} // namespace nuraft_mesg

@@ -27,7 +27,7 @@ namespace sisl {
 class GrpcServer;
 }
 
-namespace nuraft_grpc {
+namespace nuraft_mesg {
 
 class grpc_server : public nuraft::raft_server_handler {
     shared< nuraft::raft_server > _raft_server;
@@ -58,4 +58,4 @@ public:
     virtual void bind(sisl::GrpcServer* server) = 0;
 };
 
-} // namespace nuraft_grpc
+} // namespace nuraft_mesg

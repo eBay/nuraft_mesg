@@ -23,7 +23,7 @@
 #include "grpc_client.hpp"
 #include "proto/raft_service.grpc.pb.h"
 
-namespace nuraft_grpc {
+namespace nuraft_mesg {
 
 class simple_grpc_client : public grpc_client< RaftSvc > {
 public:
@@ -36,4 +36,4 @@ protected:
     }
 };
 
-} // namespace nuraft_grpc
+} // namespace nuraft_mesg

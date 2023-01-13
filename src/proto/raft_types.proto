@@ -15,7 +15,7 @@
 
 syntax = "proto3";
 
-package nuraft_grpc;
+package nuraft_mesg;
 
 enum LogType {
     UNKNOWN = 0;

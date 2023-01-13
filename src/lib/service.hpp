@@ -13,7 +13,7 @@
 
 #include "proto/messaging_service.grpc.pb.h"
 
-namespace sds::messaging {
+namespace nuraft_mesg {
 
 template < typename T >
 using boxed = std::unique_ptr< T >;
@@ -49,7 +49,7 @@ using process_offload_cb = std::function< std::function< void(std::function< voi
 struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name);
 
-    shared< nuraft_grpc::grpc_server > m_server;
+    shared< grpc_server > m_server;
     shared< group_metrics > m_metrics;
 };
 
@@ -106,4 +106,4 @@ public:
     void shutdown_for(group_name_t const&);
 };
 
-} // namespace sds::messaging
+} // namespace nuraft_mesg

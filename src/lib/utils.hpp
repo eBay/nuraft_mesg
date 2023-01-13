@@ -20,7 +20,7 @@
 
 #include "common.hpp"
 
-namespace nuraft_grpc {
+namespace nuraft_mesg {
 
 inline RCMsgBase* fromBaseRequest(nuraft::msg_base const& rcbase) {
     auto base = new RCMsgBase;
@@ -31,4 +31,4 @@ inline RCMsgBase* fromBaseRequest(nuraft::msg_base const& rcbase) {
     return base;
 }
 
-} // namespace nuraft_grpc
+} // namespace nuraft_mesg
