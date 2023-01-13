@@ -15,11 +15,13 @@ class NuRaftMesgConan(ConanFile):
                 "shared": ['True', 'False'],
                 "fPIC": ['True', 'False'],
                 "sanitize": ['True', 'False'],
+                "testing": ['True', 'False'],
                 }
     default_options = {
                 'shared': False,
                 'fPIC': True,
                 'sanitize': False,
+                'testing': True,
                 'sisl:prerelease': True,
             }
 
@@ -41,9 +43,10 @@ class NuRaftMesgConan(ConanFile):
 
     def build_requirements(self):
         self.build_requires("gtest/1.12.1")
+        if (self.options.testing):
+            self.build_requires("jungle_logstore/nbi.20230104@sds/master")
 
     def requirements(self):
-        self.requires("jungle_logstore/nbi.20230104@sds/master")
         self.requires("nuraft/2.0.0")
         self.requires("openssl/1.1.1s")
         self.requires("sisl/[~=8.3, include_prerelease=True]@oss/master")
@@ -63,7 +66,8 @@ class NuRaftMesgConan(ConanFile):
 
         cmake.configure(defs=definitions)
         cmake.build()
-        cmake.test(target=test_target)
+        if (self.options.testing):
+            cmake.test(target=test_target)
 
     def package(self):
         self.copy(pattern="LICENSE", dst="licenses")

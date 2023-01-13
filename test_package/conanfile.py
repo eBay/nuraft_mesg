@@ -13,6 +13,9 @@ class TestPackageConan(ConanFile):
         cmake.configure()
         cmake.build()
 
+    def requirements(self):
+        self.requires("jungle_logstore/nbi.20230104@sds/master")
+
     def test(self):
         with tools.environment_append(RunEnvironment(self).vars):
             # TODO: Temporarily restricting tests to run for one build_type only, since running multiple
