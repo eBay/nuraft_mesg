@@ -13,7 +13,7 @@
 #include "grpcpp/impl/codegen/status_code_enum.h"
 #include "libnuraft/async.hxx"
 #include "libnuraft/rpc_listener.hxx"
-#include "service.h"
+#include "service.hpp"
 
 SISL_LOGGING_DECL(sds_msg)
 

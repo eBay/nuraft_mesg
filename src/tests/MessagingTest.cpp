@@ -18,7 +18,7 @@
 
 #include "libnuraft/cluster_config.hxx"
 #include "libnuraft/state_machine.hxx"
-#include "messaging.h"
+#include "messaging.hpp"
 
 #include "test_state_manager.h"
 

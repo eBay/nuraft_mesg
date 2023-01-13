@@ -2,12 +2,12 @@
  * Copyright eBay Corporation 2018
  */
 
-#include <nuraft_grpc/grpc_client.hpp>
+#include "grpc_client.hpp"
 #include <string>
 
-#include "factory.h"
-#include "service.h"
-#include "messaging_service.grpc.pb.h"
+#include "mesg_factory.hpp"
+#include "service.hpp"
+#include "proto/messaging_service.grpc.pb.h"
 
 SISL_LOGGING_DECL(sds_msg)
 

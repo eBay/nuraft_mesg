@@ -9,7 +9,7 @@
 #include <mutex>
 #include <string>
 
-#include <nuraft_grpc/grpc_factory.hpp>
+#include "grpc_factory.hpp"
 #include <sisl/logging/logging.h>
 #include <sisl/metrics/metrics.hpp>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "messaging_if.h"
+#include "messaging_if.hpp"
 #include <sisl/logging/logging.h>
 
 class test_state_machine;

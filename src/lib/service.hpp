@@ -7,11 +7,11 @@
 #include <condition_variable>
 #include <map>
 #include <shared_mutex>
-#include <nuraft_grpc/grpc_server.hpp>
+#include "grpc_server.hpp"
 #include <sisl/grpc/rpc_server.hpp>
 #include <sisl/metrics/metrics.hpp>
 
-#include "messaging_service.grpc.pb.h"
+#include "proto/messaging_service.grpc.pb.h"
 
 namespace sds::messaging {
 

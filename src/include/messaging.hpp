@@ -10,7 +10,7 @@
 
 #include <sisl/logging/logging.h>
 
-#include "messaging_if.h"
+#include "messaging_if.hpp"
 
 namespace sisl {
 class GrpcServer;

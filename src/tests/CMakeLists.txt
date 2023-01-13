@@ -9,8 +9,7 @@ target_sources(am_messaging_test PRIVATE
             test_state_manager.cpp
           )
 target_link_libraries (am_messaging_test
-      sds_messaging
-      nuraft_grpc::nuraft_grpc
+      nuraft_grpc
       jungle_logstore::jungle_logstore
       GTest::gmock
     )

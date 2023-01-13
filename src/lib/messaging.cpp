@@ -1,6 +1,6 @@
 /// Copyright 2018 (c) eBay Corporation
 //
-#include "messaging.h"
+#include "messaging.hpp"
 
 #include <chrono>
 
@@ -14,9 +14,9 @@
 #include <sisl/options/options.h>
 #include <sisl/grpc/rpc_server.hpp>
 
-#include "service.h"
-#include "factory.h"
-#include "logger.h"
+#include "service.hpp"
+#include "mesg_factory.hpp"
+#include "logger.hpp"
 
 SISL_LOGGING_DECL(sds_msg)
 
