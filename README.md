@@ -1,11 +1,5 @@
 # nuraft_grpc
 
-## Notes
-
-Currently this project can only be built on Linux using the GCC compiler toolchain. Work is on-going to support other
-platforms (e.g. MacOS) using the Clang and VSCode toolchains. Please feel free to contribute changes that support this
-endeavour.
-
 ## Brief
 
 NuRAFT-gRPC is a Protobuf translation layer for [nuraft](https://github.com/eBay/nuraft)
@@ -35,7 +29,24 @@ A simple echo server can be found in `test_package/example_{client,server}.cpp`
 
 # Conan builds
 
-This project is typically build from a combination of conan.io and CMake.
+## Notes
+
+Currently this project can only be built on Linux using the GCC compiler toolchain. Work is on-going to support other
+platforms (e.g. MacOS) using the Clang and VSCode toolchains. Please feel free to contribute changes that support this
+endeavour.
+
+## Dependencies
+
+This project depends on the [Symbiosis Library](https://github.com/eBay/sisl) which is currently not available
+in conan-center. If using conan-center one must first export this recipe to their local conan cache, example:
+```
+$ git clone https://github.com/eBay/sisl sisl
+$ conan export sisl/ oss/master
+```
+
+## Building the Package
+
+This project is typically built from a combination of conan.io and CMake (which must be installed on the host).
 ```
 $ pip install -U conan
 $ conan create --build missing . <user>/<channel>
