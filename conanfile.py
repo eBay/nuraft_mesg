@@ -5,7 +5,7 @@ class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
     version = "0.0.1"
     homepage = "https://github.com/eBay/nuraft_mesg"
-    description = "A gRPC service for nuraft"
+    description = "A gRPC service for NuRAFT"
     topics = ("ebay", "nublox", "raft")
     url = "https://github.com/eBay/nuraft_mesg"
     license = "Apache-2.0"
@@ -21,7 +21,7 @@ class NuRaftMesgConan(ConanFile):
                 'shared': False,
                 'fPIC': True,
                 'sanitize': False,
-                'testing': True,
+                'testing': False,
                 'sisl:prerelease': True,
             }
 
