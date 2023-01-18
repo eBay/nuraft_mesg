@@ -1,10 +1,27 @@
-#include "example_state_manager.h"
-#include "example_state_machine.h"
+/*********************************************************************************
+ * Modifications Copyright 2017-2019 eBay Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *    https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed
+ * under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+ * CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ *********************************************************************************/
+#include "test_state_manager.h"
 
 #include <fstream>
 
 #include <jungle_log_store.h>
+#include <memory>
 #include <nlohmann/json.hpp>
+#include <libnuraft/state_machine.hxx>
+
+#include "test_state_machine.h"
 
 using json = nlohmann::json;
 
@@ -73,10 +90,14 @@ nuraft::ptr< nuraft::cluster_config > fromClusterConfig(json const& cluster_conf
     return raft_config;
 }
 
-simple_state_mgr::simple_state_mgr(int32_t srv_id, std::string const& srv_addr, std::string const& group_id) :
-        nuraft_mesg::mesg_state_mgr(), _srv_id(srv_id), _srv_addr(srv_addr), _group_id(group_id.c_str()) {}
+test_state_mgr::test_state_mgr(int32_t srv_id, std::string const& srv_addr, std::string const& group_id) :
+        nuraft_mesg::mesg_state_mgr(),
+        _srv_id(srv_id),
+        _srv_addr(srv_addr),
+        _group_id(group_id.c_str()),
+        _state_machine(std::make_shared< test_state_machine >()) {}
 
-nuraft::ptr< nuraft::cluster_config > simple_state_mgr::load_config() {
+nuraft::ptr< nuraft::cluster_config > test_state_mgr::load_config() {
     LOGDEBUG("Loading config for [{}]", _group_id);
     json config_map;
     if (auto err = loadConfigFile(config_map, _group_id, _srv_id); !err) { return fromClusterConfig(config_map); }
@@ -85,11 +106,11 @@ nuraft::ptr< nuraft::cluster_config > simple_state_mgr::load_config() {
     return conf;
 }
 
-nuraft::ptr< nuraft::log_store > simple_state_mgr::load_log_store() {
+nuraft::ptr< nuraft::log_store > test_state_mgr::load_log_store() {
     return nuraft::cs_new< nuraft::jungle_log_store >(fmt::format(FMT_STRING("{}_s{}"), _group_id, _srv_id));
 }
 
-nuraft::ptr< nuraft::srv_state > simple_state_mgr::read_state() {
+nuraft::ptr< nuraft::srv_state > test_state_mgr::read_state() {
     LOGDEBUG("Loading state for server: {}", _srv_id);
     json state_map;
     auto state = nuraft::cs_new< nuraft::srv_state >();
@@ -102,7 +123,7 @@ nuraft::ptr< nuraft::srv_state > simple_state_mgr::read_state() {
     return state;
 }
 
-void simple_state_mgr::save_config(const nuraft::cluster_config& config) {
+void test_state_mgr::save_config(const nuraft::cluster_config& config) {
     auto const config_file = fmt::format(FMT_STRING("{}_s{}/config.json"), _group_id, _srv_id);
     auto json_obj = json{{"log_idx", config.get_log_idx()},
                          {"prev_log_idx", config.get_prev_log_idx()},
@@ -115,7 +136,7 @@ void simple_state_mgr::save_config(const nuraft::cluster_config& config) {
     } catch (std::exception& e) { LOGERROR("Failed to write config values: {}", e.what()); }
 }
 
-void simple_state_mgr::save_state(const nuraft::srv_state& state) {
+void test_state_mgr::save_state(const nuraft::srv_state& state) {
     auto const state_file = fmt::format(FMT_STRING("{}_s{}/state.json"), _group_id, _srv_id);
     auto json_obj = json{{"term", state.get_term()}, {"voted_for", state.get_voted_for()}};
 
@@ -125,12 +146,12 @@ void simple_state_mgr::save_state(const nuraft::srv_state& state) {
     } catch (std::exception& e) { LOGERROR("Failed to write config values: {}", e.what()); }
 }
 
-uint32_t simple_state_mgr::get_logstore_id() const { return 0; }
+uint32_t test_state_mgr::get_logstore_id() const { return 0; }
 
-std::shared_ptr< nuraft::state_machine > simple_state_mgr::get_state_machine() {
-    return std::make_shared<echo_state_machine>();
+std::shared_ptr< nuraft::state_machine > test_state_mgr::get_state_machine() {
+    return std::static_pointer_cast< nuraft::state_machine >(_state_machine);
 }
 
-void simple_state_mgr::permanent_destroy() {}
+void test_state_mgr::permanent_destroy() {}
 
-void simple_state_mgr::leave() {}
+void test_state_mgr::leave() {}

@@ -1,91 +1,133 @@
-/*********************************************************************************
- * Modifications Copyright 2017-2019 eBay Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *    https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed
- * under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
- * CONDITIONS OF ANY KIND, either express or implied. See the License for the
- * specific language governing permissions and limitations under the License.
- *
- *********************************************************************************/
-
 #include <cassert>
+#include <csignal>
 
 #include <libjungle/jungle.h>
+#include <nuraft_mesg/messaging.hpp>
+#include <sisl/grpc/rpc_client.hpp>
+#include <sisl/grpc/rpc_server.hpp>
 #include <sisl/logging/logging.h>
 #include <sisl/options/options.h>
-#include <nuraft_grpc/simple_server.hpp>
+#include <sisl/utility/thread_buffer.hpp>
 
-#include "example_factory.h"
-#include "example_logger.h"
-#include "example_state_machine.h"
 #include "example_state_manager.h"
+#include "uuids.h"
 
-using namespace nuraft_grpc;
+SISL_OPTION_GROUP(server, (server_id, "", "server_id", "Servers ID (0-9)", cxxopts::value< uint32_t >(), ""),
+                  (start_group, "", "create", "Group Name to create initialy", cxxopts::value< std::string >(), ""))
 
-SISL_OPTION_GROUP(server, (server_id, "", "server_id", "Servers ID", cxxopts::value< uint32_t >(), ""))
+SISL_OPTIONS_ENABLE(logging, server, nuraft_mesg)
+SISL_LOGGING_INIT(nuraft, nuraft_mesg, grpc_server, flip)
 
-SISL_OPTIONS_ENABLE(logging, server)
-SISL_LOGGING_INIT(nuraft, nublox_logstore, HOMESTORE_LOG_MODS, grpc_server)
+constexpr auto rpc_backoff = 50;
+constexpr auto heartbeat_period = 100;
+constexpr auto elect_to_low = heartbeat_period * 2;
+constexpr auto elect_to_high = elect_to_low * 2;
+
+static bool k_stop;
+static std::condition_variable k_stop_cv;
+static std::mutex k_stop_cv_lock;
+
+void handle(int signal) {
+    switch (signal) {
+    case SIGINT:
+        [[fallthrough]];
+    case SIGTERM: {
+        LOGWARN("SIGNAL: {}", strsignal(signal));
+        {
+            auto lck = std::lock_guard< std::mutex >(k_stop_cv_lock);
+            k_stop = true;
+        }
+        k_stop_cv.notify_all();
+    } break;
+        ;
+    default:
+        LOGERROR("Unhandled SIGNAL: {}", strsignal(signal));
+        break;
+    }
+}
 
 int main(int argc, char** argv) {
-    SISL_OPTIONS_LOAD(argc, argv, logging, server);
-    auto server_id = SISL_OPTIONS["server_id"].as< uint32_t >();
-    auto server_address = format(FMT_STRING("0.0.0.0:{}"), 9000 + server_id);
+    SISL_OPTIONS_LOAD(argc, argv, logging, server, nuraft_mesg);
+
+    // The offset_id is just a simple way to refer to the uuids
+    // defined in uuids.h from the CLI without having to iterate
+    // and store multiple maps in the code and test script.
+    auto const offset_id = SISL_OPTIONS["server_id"].as< uint32_t >();
+    auto const server_uuid = uuids[offset_id];
 
     // Can start using LOG from this point onward.
-    sisl::logging::SetLogger(format(FMT_STRING("server_{}"), server_id));
+    sisl::logging::SetLogger(format(FMT_STRING("server_{}"), offset_id));
     spdlog::set_pattern("[%D %T] [%^%l%$] [%n] [%t] %v");
 
+    // We initialize the jungle layer here, it's used by the storage_managers
+    // we create later.
     jungle::GlobalConfig g_config;
     g_config.numFlusherThreads = 0;
     g_config.numCompactorThreads = 0;
     g_config.logFileReclaimerSleep_sec = 60;
     jungle::init(g_config);
 
-    // State manager (RAFT log store, config).
-    ptr< state_mgr > smgr = std::make_shared< simple_state_mgr >(server_id);
+    signal(SIGINT, handle);
+    signal(SIGTERM, handle);
 
-    // State machine.
-    ptr< state_machine > smachine = std::make_shared< echo_state_machine >();
+    auto const server_port = 9000 + offset_id;
+    LOGINFO("Server starting as: [{}], port: [{}]", server_uuid, server_port);
 
-    // Parameters.
-    raft_params params;
-    params.with_election_timeout_lower(400)
-        .with_election_timeout_upper(800)
-        .with_hb_interval(200)
-        .with_max_append_size(50)
-        .with_rpc_failure_backoff(100);
+    // Provide a method for the service layer to lookup an IPv4:port address
+    // from a uuid; however the process wants to do that.
+    auto messaging_params =
+        nuraft_mesg::consensus_component::params{server_uuid, server_port,
+                                                    [](std::string const& client) -> std::string {
+                                                        for (auto i = 0u; i < 5; ++i) {
+                                                            if (uuids[i] == client) {
+                                                                return format(FMT_STRING("127.0.0.1:{}"), 9000 + i);
+                                                            }
+                                                        }
+                                                        return client;
+                                                    },
+                                                    "none"};
 
-    ptr< logger > l = std::make_shared< example_logger >();
-    ptr< rpc_client_factory > rpc_cli_factory = std::make_shared< example_factory >(2, server_address);
-    ptr< asio_service > asio_svc_ = std::make_shared< asio_service >();
-    ptr< delayed_task_scheduler > scheduler = std::static_pointer_cast< delayed_task_scheduler >(asio_svc_);
-    ptr< rpc_listener > listener;
+    // Intitialize the messaging layer.
+    auto messaging = nuraft_mesg::service();
 
-    // Run server.
+    // RAFT server parameters
+    nuraft::raft_params r_params;
+    r_params.with_election_timeout_lower(elect_to_low)
+        .with_election_timeout_upper(elect_to_high)
+        .with_hb_interval(heartbeat_period)
+        .with_max_append_size(10)
+        .with_rpc_failure_backoff(rpc_backoff)
+        .with_auto_forwarding(true)
+        .with_snapshot_enabled(0);
+    // Each group has a type so we can attach different state_machines upon Join request.
+    // This callback should provide a mechanism to return a new state_manager.
+    auto group_type_params = nuraft_mesg::consensus_component::register_params{
+        r_params,
+        [server_uuid](int32_t const srv_id,
+                      std::string const& group_id) -> std::shared_ptr< nuraft_mesg::mesg_state_mgr > {
+            return std::make_shared< simple_state_mgr >(srv_id, server_uuid, group_id);
+        }};
+    messaging.register_mgr_type("test_package", group_type_params);
+
+    // This will start the RPC service and begin listening for incomming JOIN groups request.
+    // You can also call create_group and join_group following this operation.
+    messaging.start(messaging_params);
+
     {
-        auto server = std::make_shared< raft_server >(
-            new context(smgr, smachine, listener, l, rpc_cli_factory, scheduler, params));
-        auto grpc_svc_ = std::make_unique< nuraft_grpc::simple_server >(server);
-
-        auto grpc_server = std::unique_ptr< sisl::GrpcServer >(sisl::GrpcServer::make(server_address, 2, "", ""));
-        grpc_svc_->associate(grpc_server.get());
-        grpc_server->run();
-        grpc_svc_->bind(grpc_server.get());
-
-        std::condition_variable stop_cv;
-        std::mutex stop_cv_lock;
-        {
-            std::unique_lock< std::mutex > ulock(stop_cv_lock);
-            stop_cv.wait(ulock);
-            grpc_server->shutdown();
-        }
+        auto lck = std::lock_guard< std::mutex >(k_stop_cv_lock);
+        k_stop = false;
     }
-    sisl::GrpcAsyncClientWorker::shutdown_all();
+
+    // Create a new group with ourself as the only member
+    if (0 < SISL_OPTIONS.count("create")) {
+        messaging.create_group(SISL_OPTIONS["create"].as< std::string >(), "test_package");
+    }
+
+    // Just prevent main() from exiting, require a SIGNAL
+    {
+        std::unique_lock< std::mutex > ulock(k_stop_cv_lock);
+        k_stop_cv.wait(ulock, []() { return k_stop; });
+    }
+    LOGERROR("Stopping Service!");
     return 0;
 }

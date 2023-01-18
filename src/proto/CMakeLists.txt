@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.11)
 
 add_library(${PROJECT_NAME}-proto OBJECT
     raft_types.proto
-    raft_service.proto
+    messaging_service.proto
   )
 target_link_libraries(${PROJECT_NAME}-proto
       protobuf::libprotobuf
@@ -10,7 +10,7 @@ target_link_libraries(${PROJECT_NAME}-proto
   )
 
 protobuf_generate(LANGUAGE cpp TARGET ${PROJECT_NAME}-proto PROTOS raft_types.proto)
-protobuf_generate(LANGUAGE cpp TARGET ${PROJECT_NAME}-proto PROTOS raft_service.proto)
+protobuf_generate(LANGUAGE cpp TARGET ${PROJECT_NAME}-proto PROTOS messaging_service.proto)
 
 protobuf_generate(
     TARGET ${PROJECT_NAME}-proto

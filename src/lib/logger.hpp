@@ -12,52 +12,52 @@
  * specific language governing permissions and limitations under the License.
  *
  *********************************************************************************/
-
 #pragma once
 
+#include <libnuraft/logger.hxx>
 #include <sisl/logging/logging.h>
 
 SISL_LOGGING_DECL(nuraft)
+SISL_LOGGING_DECL(nuraft_mesg)
 
-struct example_logger : ::nuraft::logger {
-    void debug(const std::string& log_line) override { LOGDEBUGMOD(nuraft, "{}", log_line); }
+class nuraft_mesg_logger : public ::nuraft::logger {
+    std::string const _group_id;
+    std::shared_ptr< sisl::logging::logger_t > _custom_logger;
 
-    void info(const std::string& log_line) override { LOGINFOMOD(nuraft, "{}", log_line); }
-
-    void warn(const std::string& log_line) override { LOGWARNMOD(nuraft, "{}", log_line); }
-
-    void err(const std::string& log_line) override { LOGERRORMOD(nuraft, "{}", log_line); }
+public:
+    explicit nuraft_mesg_logger(std::string const& group_id, std::shared_ptr< sisl::logging::logger_t > custom_logger) :
+            ::nuraft::logger(), _group_id(group_id), _custom_logger(custom_logger) {}
 
     void set_level(int l) override {
-        LOGINFOMOD(nuraft, "Updating level to: {}", l);
+        LOGDEBUGMOD(nuraft_mesg, "Updating level to: {}", l);
         SISL_LOG_LEVEL(nuraft, static_cast< spdlog::level::level_enum >(abs(l - 6)));
     }
 
     void put_details(int level, const char* source_file, const char* func_name, size_t line_number,
                      const std::string& log_line) override {
+        auto const mesg =
+            fmt::format("[vol={}] {}:{}#{} : {}", _group_id, file_name(source_file), func_name, line_number, log_line);
         switch (level) {
-        case 1: {
-            LOGCRITICALMOD(nuraft, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line);
-        } break;
-            ;
+        case 1:
+            [[fallthrough]];
         case 2: {
-            LOGERRORMOD(nuraft, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line);
+            LOGERRORMOD_USING_LOGGER(nuraft, _custom_logger, "ERROR {}", mesg);
         } break;
             ;
         case 3: {
-            LOGWARNMOD(nuraft, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line);
+            LOGWARNMOD_USING_LOGGER(nuraft, _custom_logger, "WARNING {}", mesg);
         } break;
             ;
         case 4: {
-            LOGINFOMOD(nuraft, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line);
+            LOGINFOMOD_USING_LOGGER(nuraft, _custom_logger, "INFO {}", mesg);
         } break;
             ;
         case 5: {
-            LOGDEBUGMOD(nuraft, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line);
+            LOGDEBUGMOD_USING_LOGGER(nuraft, _custom_logger, "DEBUG {}", mesg);
         } break;
             ;
         default: {
-            LOGTRACEMOD(nuraft, "{}:{}#{} : {}", file_name(source_file), func_name, line_number, log_line);
+            LOGTRACEMOD_USING_LOGGER(nuraft, _custom_logger, "TRACE {}", mesg);
         } break;
             ;
         }

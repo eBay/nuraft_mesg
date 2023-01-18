@@ -1,26 +1,11 @@
-/*********************************************************************************
- * Modifications Copyright 2017-2019 eBay Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *    https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed
- * under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
- * CONDITIONS OF ANY KIND, either express or implied. See the License for the
- * specific language governing permissions and limitations under the License.
- *
- *********************************************************************************/
-
 #pragma once
 
-#include <libnuraft/nuraft.hxx>
+#include <nuraft_mesg/messaging_if.hpp>
 #include <sisl/logging/logging.h>
 
-class simple_state_mgr : public nuraft::state_mgr {
+class simple_state_mgr : public nuraft_mesg::mesg_state_mgr {
 public:
-    explicit simple_state_mgr(int32_t srv_id);
+    simple_state_mgr(int32_t srv_id, std::string const& srv_addr, std::string const& group_id);
 
     nuraft::ptr< nuraft::cluster_config > load_config() override;
     void save_config(const nuraft::cluster_config& config) override;
@@ -31,6 +16,13 @@ public:
 
     void system_exit(const int exit_code) override { LOGINFO("System exiting with code [{}]", exit_code); }
 
+    uint32_t get_logstore_id() const override;
+    std::shared_ptr< nuraft::state_machine > get_state_machine() override;
+    void leave() override;
+    void permanent_destroy() override;
+
 private:
     int32_t const _srv_id;
+    std::string const _srv_addr;
+    std::string const _group_id;
 };

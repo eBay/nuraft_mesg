@@ -8,10 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Serialize LogEntry timestamps from NuRaft structures across gRPC step() call.
-
 ### Changed
 
-- Switched CI to use Ubuntu 22.04 (GCC 11.3)
-
-[Unreleased]: https://github.corp.ebay.com/SDS/nuraft_grpc/compare/stable/v5.x...HEAD
+[Unreleased]: https://github.corp.ebay.com/SDS/nuraft_mesg/compare/stable/v5.x...HEAD

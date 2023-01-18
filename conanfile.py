@@ -1,13 +1,13 @@
 import os
 from conans import ConanFile, CMake, tools
 
-class NuRaftGRPCConan(ConanFile):
-    name = "nuraft_grpc"
-    version = "5.5.0"
-    homepage = "https://github.com/eBay/nuraft_grpc"
-    description = "A gRPC service for nuraft"
+class NuRaftMesgConan(ConanFile):
+    name = "nuraft_mesg"
+    version = "0.0.1"
+    homepage = "https://github.com/eBay/nuraft_mesg"
+    description = "A gRPC service for NuRAFT"
     topics = ("ebay", "nublox", "raft")
-    url = "https://github.com/eBay/nuraft_grpc"
+    url = "https://github.com/eBay/nuraft_mesg"
     license = "Apache-2.0"
 
     settings = "arch", "os", "compiler", "build_type"
@@ -15,11 +15,13 @@ class NuRaftGRPCConan(ConanFile):
                 "shared": ['True', 'False'],
                 "fPIC": ['True', 'False'],
                 "sanitize": ['True', 'False'],
+                "testing": ['True', 'False'],
                 }
     default_options = {
                 'shared': False,
                 'fPIC': True,
                 'sanitize': False,
+                'testing': False,
                 'sisl:prerelease': True,
             }
 
@@ -39,10 +41,17 @@ class NuRaftGRPCConan(ConanFile):
         if self.options.shared:
             del self.options.fPIC
 
+    def build_requirements(self):
+        self.build_requires("gtest/1.12.1")
+        if (self.options.testing):
+            self.build_requires("jungle_logstore/nbi.20230104@sds/master")
+
     def requirements(self):
         self.requires("nuraft/2.0.0")
         self.requires("openssl/1.1.1s")
         self.requires("sisl/[~=8.3, include_prerelease=True]@oss/master")
+
+        self.requires("lz4/1.9.4", override=True)
 
     def build(self):
         cmake = CMake(self)
@@ -57,13 +66,14 @@ class NuRaftGRPCConan(ConanFile):
 
         cmake.configure(defs=definitions)
         cmake.build()
-        cmake.test(target=test_target)
+        if (self.options.testing):
+            cmake.test(target=test_target)
 
     def package(self):
         self.copy(pattern="LICENSE", dst="licenses")
-        self.copy("*.h", dst="include/nuraft_grpc", excludes="*.pb.h", keep_path=False)
-        self.copy("*.pb.h", dst="include/nuraft_grpc/proto", keep_path=False)
-        self.copy("*.hpp", dst="include/nuraft_grpc", keep_path=False)
+        self.copy("*.h", dst="include/nuraft_mesg", excludes="*.pb.h", keep_path=False)
+        self.copy("*.pb.h", dst="include/nuraft_mesg/proto", keep_path=False)
+        self.copy("*.hpp", dst="include/nuraft_mesg", keep_path=False)
         self.copy("*.dll", dst="bin", keep_path=False)
         self.copy("*.dylib*", dst="lib", keep_path=False, symlinks=True)
         self.copy("*.so", dst="lib", keep_path=False, symlinks=True)
@@ -72,7 +82,7 @@ class NuRaftGRPCConan(ConanFile):
         self.copy("*.proto", dst="proto/", keep_path=False)
 
     def package_info(self):
-        self.cpp_info.libs = ["nuraft_grpc"]
+        self.cpp_info.libs = ["nuraft_mesg"]
         if self.settings.build_type == "Debug" and self.options.sanitize:
             self.cpp_info.sharedlinkflags.append("-fsanitize=address")
             self.cpp_info.exelinkflags.append("-fsanitize=address")

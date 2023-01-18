@@ -23,7 +23,7 @@
 
 #include <sisl/grpc/rpc_client.hpp>
 
-namespace nuraft_grpc {
+namespace nuraft_mesg {
 
 class grpc_resp : public nuraft::resp_msg {
 public:
@@ -74,11 +74,11 @@ public:
     void init() override {
         // Re-create channel only if current channel is busted.
         if (!_stub || !is_connection_ready()) {
-            LOGDEBUGMOD(nuraft, "Client init ({}) to {}", (!!_stub ? "Again" : "First"), _addr);
+            LOGDEBUGMOD(nuraft_mesg, "Client init ({}) to {}", (!!_stub ? "Again" : "First"), _addr);
             sisl::GrpcAsyncClient::init();
             _stub = sisl::GrpcAsyncClient::make_stub< TSERVICE >(_worker_name);
         } else {
-            LOGDEBUGMOD(nuraft, "Channel looks fine, re-using");
+            LOGDEBUGMOD(nuraft_mesg, "Channel looks fine, re-using");
         }
     }
 
@@ -88,4 +88,4 @@ protected:
     typename ::sisl::GrpcAsyncClient::AsyncStub< TSERVICE >::UPtr _stub;
 };
 
-} // namespace nuraft_grpc
+} // namespace nuraft_mesg

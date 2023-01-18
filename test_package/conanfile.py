@@ -8,17 +8,13 @@ class TestPackageConan(ConanFile):
     fail_timeout = '30s'
     abort_timeout = '35s'
 
-    def requirements(self):
-        self.requires("nlohmann_json/3.10.5")
-        self.requires("jungle_logstore/nbi.20230104@sds/master")
-        self.requires("lz4/1.9.4", override=True)
-
-        self.requires("nuraft/2.0.0", override=True)
-
     def build(self):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+
+    def requirements(self):
+        self.requires("jungle_logstore/nbi.20230104@sds/master")
 
     def test(self):
         with tools.environment_append(RunEnvironment(self).vars):

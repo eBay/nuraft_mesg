@@ -1,11 +1,13 @@
-cmake_minimum_required(VERSION 3.11)
 project(test_package)
+cmake_minimum_required(VERSION 2.8.11)
 
 include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-conan_basic_setup(TARGETS)
+conan_basic_setup()
 
 if (${CMAKE_BUILD_TYPE} STREQUAL Debug)
-  include (../cmake/debug_flags.cmake)
+  if (NOT ${CONAN_SETTINGS_COMPILER} STREQUAL "clang" AND NOT ${CONAN_SETTINGS_COMPILER} STREQUAL "apple-clang")
+    include (../cmake/debug_flags.cmake)
+  endif()
 endif()
 if  (${MEMORY_SANITIZER_ON})
   include (../cmake/mem_sanitizer.cmake)

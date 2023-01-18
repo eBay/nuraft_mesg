@@ -26,7 +26,7 @@
 
 SISL_LOGGING_DECL(nuraft)
 
-namespace nuraft_grpc {
+namespace nuraft_mesg {
 
 class grpc_factory : public nuraft::rpc_client_factory, public std::enable_shared_from_this< grpc_factory > {
     std::string _worker_name;
@@ -57,4 +57,4 @@ public:
     std::future< nuraft::cmd_result_code > rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);
 };
 
-} // namespace nuraft_grpc
+} // namespace nuraft_mesg

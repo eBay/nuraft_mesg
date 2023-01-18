@@ -19,7 +19,7 @@
 #include "grpc_server.hpp"
 #include "utils.hpp"
 
-namespace nuraft_grpc {
+namespace nuraft_mesg {
 
 static RCResponse* fromRCResponse(nuraft::resp_msg& rcmsg) {
     auto req = new RCResponse;
@@ -70,7 +70,7 @@ grpc_server::append_entries(std::vector< nuraft::ptr< nuraft::buffer > > const& 
 }
 
 ::grpc::Status grpc_server::step(const RaftMessage& request, RaftMessage& reply) {
-    LOGTRACEMOD(nuraft, "Stepping [{}] from: [{}] to: [{}]",
+    LOGTRACEMOD(nuraft_mesg, "Stepping [{}] from: [{}] to: [{}]",
                 nuraft::msg_type_to_string(nuraft::msg_type(request.base().type())), request.base().src(),
                 request.base().dest());
     auto rcreq = toRequest(request);
@@ -85,4 +85,4 @@ grpc_server::append_entries(std::vector< nuraft::ptr< nuraft::buffer > > const& 
     }
     return ::grpc::Status();
 }
-} // namespace nuraft_grpc
+} // namespace nuraft_mesg
