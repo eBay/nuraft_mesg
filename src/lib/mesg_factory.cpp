@@ -18,6 +18,7 @@
 #include "mesg_factory.hpp"
 #include "service.hpp"
 #include "proto/messaging_service.grpc.pb.h"
+#include "utils.hpp"
 
 SISL_LOGGING_DECL(nuraft_mesg)
 
@@ -61,9 +62,18 @@ public:
                                                         2 /* deadline in seconds */);
     }
 
-    void data_service_request(std::string const& request_name, sisl::generic_unary_callback_t const& response_cb,
-                              grpc::ByteBuffer& cli_buf) {
-        _generic_stub->call_unary(cli_buf, request_name, response_cb, 2 /* deadline in seconds */);
+    void data_service_request(std::string const& request_name, data_service_response_handler_t const& response_cb,
+                              std::vector< sisl::io_blob > const& cli_buf) {
+        grpc::ByteBuffer cli_byte_buf;
+        serializeToByteBuffer(cli_byte_buf, cli_buf);
+        _generic_stub->call_unary(
+            cli_byte_buf, request_name,
+            [response_cb](grpc::ByteBuffer& resp, ::grpc::Status& status) {
+                std::vector< sisl::io_blob > svr_buf;
+                deserializeFromByteBuffer(resp, svr_buf);
+                if (response_cb) { response_cb(svr_buf); }
+            },
+            2 /* deadline in seconds */);
     }
 
 protected:
@@ -107,8 +117,8 @@ public:
         _client->send(group_msg, complete);
     }
 
-    void data_service_request(std::string const& request_name, sisl::generic_unary_callback_t const& response_cb,
-                              grpc::ByteBuffer& cli_buf) {
+    void data_service_request(std::string const& request_name, data_service_response_handler_t const& response_cb,
+                              std::vector< sisl::io_blob > const& cli_buf) {
         _client->data_service_request(request_name, response_cb, cli_buf);
     }
 };
@@ -133,8 +143,8 @@ std::error_condition mesg_factory::reinit_client(const std::string& client, shar
 }
 
 std::error_condition mesg_factory::data_service_request(std::string const& request_name,
-                                                        sisl::generic_unary_callback_t const& response_cb,
-                                                        grpc::ByteBuffer& cli_buf) {
+                                                        data_service_response_handler_t const& response_cb,
+                                                        std::vector< sisl::io_blob > const& cli_buf) {
     std::lock_guard< std::mutex > lk(_client_lock);
     for (auto& nuraft_client : _clients) {
         auto g_client = std::dynamic_pointer_cast< nuraft_mesg::group_client >(nuraft_client.second);

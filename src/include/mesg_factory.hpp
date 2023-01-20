@@ -22,6 +22,11 @@
 #include "grpc_factory.hpp"
 #include <sisl/logging/logging.h>
 #include <sisl/metrics/metrics.hpp>
+#include "messaging_if.hpp"
+
+namespace sisl {
+struct io_blob;
+}
 
 namespace nuraft_mesg {
 
@@ -72,8 +77,8 @@ public:
     std::error_condition reinit_client(const std::string& client, shared< nuraft::rpc_client >& raft_client) override;
 
     std::error_condition data_service_request(std::string const& request_name,
-                                              sisl::generic_unary_callback_t const& response_cb,
-                                              grpc::ByteBuffer& cli_buf);
+                                              data_service_response_handler_t const& response_cb,
+                                              std::vector< sisl::io_blob > const& cli_buf);
 };
 
 } // namespace nuraft_mesg

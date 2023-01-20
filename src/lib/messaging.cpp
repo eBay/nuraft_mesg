@@ -424,13 +424,13 @@ void service::get_srv_config_all(std::string const& group_name,
 }
 
 void service::bind_data_service_request(std::string const& request_name,
-                                        sisl::generic_rpc_handler_cb_t const& request_handler) {
+                                        data_service_request_handler_t const& request_handler) {
     _data_service->bind(_grpc_server.get(), request_name, request_handler);
 }
 
 std::error_condition service::data_service_request(std::string const& group_id, std::string const& request_name,
-                                                   sisl::generic_unary_callback_t const& response_cb,
-                                                   grpc::ByteBuffer& cli_buf) {
+                                                   data_service_response_handler_t const& response_cb,
+                                                   std::vector< sisl::io_blob > const& cli_buf) {
     auto lk = std::unique_lock< std::mutex >(_manager_lock);
     auto it = _mesg_factories.find(group_id);
     if (it == _mesg_factories.end()) { return std::error_condition(std::errc::invalid_argument); }

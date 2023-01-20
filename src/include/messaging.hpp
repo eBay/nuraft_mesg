@@ -90,10 +90,10 @@ public:
 
     // data service APIs
     void bind_data_service_request(std::string const& request_name,
-                                   sisl::generic_rpc_handler_cb_t const& request_handler) override;
+                                   data_service_request_handler_t const& request_handler) override;
     std::error_condition data_service_request(std::string const& group_id, std::string const& request_name,
-                                              sisl::generic_unary_callback_t const& response_cb,
-                                              grpc::ByteBuffer& cli_buf) override;
+                                              data_service_response_handler_t const& response_cb,
+                                              std::vector< sisl::io_blob > const& cli_buf) override;
 
     // for testing
     void get_srv_config_all(std::string const& group_name,

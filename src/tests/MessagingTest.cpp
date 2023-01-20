@@ -35,6 +35,7 @@
 #include "messaging.hpp"
 
 #include "test_state_manager.h"
+#include <sisl/fds/buffer.hpp>
 
 SISL_LOGGING_INIT(nuraft, nuraft_mesg, grpc_server)
 
@@ -286,13 +287,18 @@ TEST_F(MessagingFixture, SyncAddMember) {
 }
 
 static std::string const SEND_DATA{"send_data"};
+static std::string const REQUEST_DATA{"request_data"};
 static std::atomic< uint32_t > server_counter{0};
 static std::atomic< uint32_t > client_counter{0};
-bool receive_data(boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
+bool receive_data(std::vector< sisl::io_blob > const& incoming_buf) {
     server_counter++;
     return true;
 }
-void client_response_cb(grpc::ByteBuffer& reply, ::grpc::Status& status) { client_counter++; }
+bool request_data(std::vector< sisl::io_blob > const& incoming_buf) {
+    server_counter++;
+    return true;
+}
+void client_response_cb(std::vector< sisl::io_blob > const& incoming_buf) { client_counter++; }
 
 TEST_F(MessagingFixture, DataServiceBasic) {
     // create new servers
@@ -335,18 +341,22 @@ TEST_F(MessagingFixture, DataServiceBasic) {
 
     // bind data channel request methods
     instance_1->bind_data_service_request(SEND_DATA, receive_data);
+    instance_1->bind_data_service_request(REQUEST_DATA, request_data);
     instance_2->bind_data_service_request(SEND_DATA, receive_data);
+    instance_2->bind_data_service_request(REQUEST_DATA, request_data);
     instance_3->bind_data_service_request(SEND_DATA, receive_data);
+    instance_3->bind_data_service_request(REQUEST_DATA, request_data);
     instance_4->bind_data_service_request(SEND_DATA, receive_data);
     instance_5->bind_data_service_request(SEND_DATA, receive_data);
 
-    grpc::ByteBuffer cli_buf;
+    std::vector< sisl::io_blob > cli_buf;
     instance_1->data_service_request("test_group", SEND_DATA, client_response_cb, cli_buf);
     instance_4->data_service_request("data_service_test_group", SEND_DATA, client_response_cb, cli_buf);
+    instance_1->data_service_request("test_group", REQUEST_DATA, client_response_cb, cli_buf);
     std::this_thread::sleep_for(std::chrono::seconds(2));
-    // the count is 2 (from group test_group) + 3 (from data_service_test_group)
-    EXPECT_EQ(server_counter, 5);
-    EXPECT_EQ(client_counter, 5);
+    // the count is 4 (2 methods from group test_group) + 3 (from data_service_test_group)
+    EXPECT_EQ(server_counter, 7);
+    EXPECT_EQ(client_counter, 7);
 }
 
 int main(int argc, char* argv[]) {

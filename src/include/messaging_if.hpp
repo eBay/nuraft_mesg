@@ -26,20 +26,21 @@ class ByteBuffer;
 class Status;
 } // namespace grpc
 
-namespace boost {
-template < class T >
-class intrusive_ptr;
-}
-
 namespace sisl {
 class AuthManager;
 class TrfClient;
 class GenericRpcData;
-using generic_rpc_handler_cb_t = std::function< bool(boost::intrusive_ptr< GenericRpcData >&) >;
+struct io_blob;
 using generic_unary_callback_t = std::function< void(grpc::ByteBuffer&, ::grpc::Status& status) >;
 } // namespace sisl
 
 namespace nuraft_mesg {
+
+// called by the server after it receives the request
+using data_service_request_handler_t = std::function< bool(std::vector< sisl::io_blob > const& incoming_buf) >;
+
+// called by the client after it receives response to its request
+using data_service_response_handler_t = std::function< void(std::vector< sisl::io_blob > const& incoming_buf) >;
 
 class mesg_state_mgr : public nuraft::state_mgr {
 public:
@@ -100,10 +101,10 @@ public:
 
     // data channel APIs
     virtual void bind_data_service_request(std::string const& request_name,
-                                           sisl::generic_rpc_handler_cb_t const& request_handler) = 0;
+                                           data_service_request_handler_t const& request_handler) = 0;
     virtual std::error_condition data_service_request(std::string const& group_id, std::string const& request_name,
-                                                      sisl::generic_unary_callback_t const& response_cb,
-                                                      grpc::ByteBuffer& cli_buf) = 0;
+                                                      data_service_response_handler_t const& response_cb,
+                                                      std::vector< sisl::io_blob > const& cli_buf) = 0;
 };
 
 } // namespace nuraft_mesg

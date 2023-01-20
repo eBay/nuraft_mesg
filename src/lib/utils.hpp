@@ -19,6 +19,7 @@
 #pragma once
 
 #include "common.hpp"
+#include <sisl/fds/buffer.hpp>
 
 namespace nuraft_mesg {
 
@@ -29,6 +30,27 @@ inline RCMsgBase* fromBaseRequest(nuraft::msg_base const& rcbase) {
     base->set_dest(rcbase.get_dst());
     base->set_type(rcbase.get_type());
     return base;
+}
+
+static void serializeToByteBuffer(grpc::ByteBuffer& cli_byte_buf, std::vector< sisl::io_blob > const& cli_buf) {
+    std::vector< grpc::Slice > slices;
+    slices.reserve(cli_buf.size());
+    for (auto const& blob : cli_buf) {
+        cli_byte_buf.Clear();
+        slices.emplace_back(blob.bytes, grpc::Slice::STATIC_SLICE);
+    }
+    grpc::ByteBuffer tmp(slices.data(), cli_buf.size());
+    cli_byte_buf.Swap(&tmp);
+}
+
+static void deserializeFromByteBuffer(grpc::ByteBuffer const& cli_byte_buf, std::vector< sisl::io_blob >& cli_buf) {
+    std::vector< grpc::Slice > slices;
+    cli_byte_buf.Dump(&slices);
+    cli_buf.clear();
+    cli_buf.reserve(cli_byte_buf.Length());
+    for (auto const& slice : slices) {
+        cli_buf.emplace_back(const_cast< uint8_t* >(slice.begin()), slice.size(), false);
+    }
 }
 
 } // namespace nuraft_mesg
