@@ -70,6 +70,10 @@ public:
     std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >& rpc_ptr) override;
 
     std::error_condition reinit_client(const std::string& client, shared< nuraft::rpc_client >& raft_client) override;
+
+    std::error_condition data_service_request(std::string const& request_name,
+                                              sisl::generic_unary_callback_t const& response_cb,
+                                              grpc::ByteBuffer& cli_buf);
 };
 
 } // namespace nuraft_mesg

@@ -27,7 +27,12 @@ std::string group_factory::m_ssl_cert;
 
 class messaging_client : public grpc_client< Messaging >, public std::enable_shared_from_this< messaging_client > {
 public:
-    using grpc_client< Messaging >::grpc_client;
+    messaging_client(std::string const& worker_name, std::string const& addr,
+                     const std::shared_ptr< sisl::TrfClient > trf_client, std::string const& target_domain = "",
+                     std::string const& ssl_cert = "") :
+            nuraft_mesg::grpc_client< Messaging >::grpc_client(worker_name, addr, trf_client, target_domain, ssl_cert) {
+        _generic_stub = sisl::GrpcAsyncClient::make_generic_stub(_worker_name);
+    }
     ~messaging_client() override = default;
 
     using grpc_base_client::send;
@@ -56,8 +61,14 @@ public:
                                                         2 /* deadline in seconds */);
     }
 
+    void data_service_request(std::string const& request_name, sisl::generic_unary_callback_t const& response_cb,
+                              grpc::ByteBuffer& cli_buf) {
+        _generic_stub->call_unary(cli_buf, request_name, response_cb, 2 /* deadline in seconds */);
+    }
+
 protected:
     void send(RaftMessage const&, handle_resp) override { throw std::runtime_error("Bad call!"); }
+    std::unique_ptr< sisl::GrpcAsyncClient::GenericAsyncStub > _generic_stub;
 };
 
 class group_client : public grpc_base_client {
@@ -95,6 +106,11 @@ public:
         group_msg.mutable_msg()->CopyFrom(message);
         _client->send(group_msg, complete);
     }
+
+    void data_service_request(std::string const& request_name, sisl::generic_unary_callback_t const& response_cb,
+                              grpc::ByteBuffer& cli_buf) {
+        _client->data_service_request(request_name, response_cb, cli_buf);
+    }
 };
 
 std::error_condition mesg_factory::create_client(const std::string& client,
@@ -113,6 +129,17 @@ std::error_condition mesg_factory::reinit_client(const std::string& client, shar
     auto new_raft_client = std::static_pointer_cast< nuraft::rpc_client >(g_client->realClient());
     if (auto err = _group_factory->reinit_client(client, new_raft_client); err) { return err; }
     g_client->setClient(std::dynamic_pointer_cast< messaging_client >(new_raft_client));
+    return std::error_condition();
+}
+
+std::error_condition mesg_factory::data_service_request(std::string const& request_name,
+                                                        sisl::generic_unary_callback_t const& response_cb,
+                                                        grpc::ByteBuffer& cli_buf) {
+    std::lock_guard< std::mutex > lk(_client_lock);
+    for (auto& nuraft_client : _clients) {
+        auto g_client = std::dynamic_pointer_cast< nuraft_mesg::group_client >(nuraft_client.second);
+        g_client->data_service_request(request_name, response_cb, cli_buf);
+    }
     return std::error_condition();
 }
 

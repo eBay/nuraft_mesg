@@ -12,6 +12,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     lib/grpc_server.cpp
     lib/mesg_factory.cpp
     lib/service.cpp
+    lib/data_service.cpp
     lib/messaging.cpp
     $<TARGET_OBJECTS:${PROJECT_NAME}-proto>
   )

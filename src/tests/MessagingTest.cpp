@@ -285,6 +285,70 @@ TEST_F(MessagingFixture, SyncAddMember) {
     EXPECT_EQ(srv_list.size(), 4u);
 }
 
+static std::string const SEND_DATA{"send_data"};
+static std::atomic< uint32_t > server_counter{0};
+static std::atomic< uint32_t > client_counter{0};
+bool receive_data(boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
+    server_counter++;
+    return true;
+}
+void client_response_cb(grpc::ByteBuffer& reply, ::grpc::Status& status) { client_counter++; }
+
+TEST_F(MessagingFixture, DataServiceBasic) {
+    // create new servers
+    std::unique_ptr< service > instance_4 = std::make_unique< service >();
+    std::string id_4 = to_string(boost::uuids::random_generator()());
+    std::unique_ptr< service > instance_5 = std::make_unique< service >();
+    std::string id_5 = to_string(boost::uuids::random_generator()());
+    // generate random_port
+    get_random_ports(2u);
+    lookup_map.emplace(id_4, fmt::format("127.0.0.1:{}", ports[3]));
+    lookup_map.emplace(id_5, fmt::format("127.0.0.1:{}", ports[4]));
+    auto params = consensus_component::params{id_4, ports[3], lookup_callback, "test_type"};
+    std::shared_ptr< test_state_mgr > sm_int_4;
+    auto register_params_4 = consensus_component::register_params{
+        r_params,
+        [this, srv_addr = id_4, &sm_int_4](int32_t const srv_id,
+                                           std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
+            sm_int_4 = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
+            return std::static_pointer_cast< mesg_state_mgr >(sm_int_4);
+        }};
+    std::shared_ptr< test_state_mgr > sm_int_5;
+    auto register_params_5 = consensus_component::register_params{
+        r_params,
+        [this, srv_addr = id_5, &sm_int_5](int32_t const srv_id,
+                                           std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
+            sm_int_5 = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
+            return std::static_pointer_cast< mesg_state_mgr >(sm_int_5);
+        }};
+    instance_4->start(params);
+    instance_4->register_mgr_type("test_type", register_params_4);
+    params.server_uuid = id_5, params.mesg_port = ports[4];
+    instance_5->start(params);
+    instance_5->register_mgr_type("test_type", register_params_5);
+
+    // create new group
+    instance_4->create_group("data_service_test_group", "test_type");
+    EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_1, true));
+    EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_2, true));
+    EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_5, true));
+
+    // bind data channel request methods
+    instance_1->bind_data_service_request(SEND_DATA, receive_data);
+    instance_2->bind_data_service_request(SEND_DATA, receive_data);
+    instance_3->bind_data_service_request(SEND_DATA, receive_data);
+    instance_4->bind_data_service_request(SEND_DATA, receive_data);
+    instance_5->bind_data_service_request(SEND_DATA, receive_data);
+
+    grpc::ByteBuffer cli_buf;
+    instance_1->data_service_request("test_group", SEND_DATA, client_response_cb, cli_buf);
+    instance_4->data_service_request("data_service_test_group", SEND_DATA, client_response_cb, cli_buf);
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    // the count is 2 (from group test_group) + 3 (from data_service_test_group)
+    EXPECT_EQ(server_counter, 5);
+    EXPECT_EQ(client_counter, 5);
+}
+
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
     SISL_OPTIONS_LOAD(argc, argv, logging)

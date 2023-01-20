@@ -30,6 +30,8 @@ namespace nuraft_mesg {
 
 class grpc_factory : public nuraft::rpc_client_factory, public std::enable_shared_from_this< grpc_factory > {
     std::string _worker_name;
+
+protected:
     std::mutex _client_lock;
     std::map< std::string, std::shared_ptr< nuraft::rpc_client > > _clients;
 

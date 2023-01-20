@@ -20,8 +20,24 @@
 #include <system_error>
 
 #include <libnuraft/nuraft.hxx>
-#include <sisl/auth_manager/trf_client.hpp>
-#include <sisl/auth_manager/auth_manager.hpp>
+
+namespace grpc {
+class ByteBuffer;
+class Status;
+} // namespace grpc
+
+namespace boost {
+template < class T >
+class intrusive_ptr;
+}
+
+namespace sisl {
+class AuthManager;
+class TrfClient;
+class GenericRpcData;
+using generic_rpc_handler_cb_t = std::function< bool(boost::intrusive_ptr< GenericRpcData >&) >;
+using generic_unary_callback_t = std::function< void(grpc::ByteBuffer&, ::grpc::Status& status) >;
+} // namespace sisl
 
 namespace nuraft_mesg {
 
@@ -81,6 +97,13 @@ public:
     virtual uint32_t logstore_id(std::string const& group_id) const = 0;
     virtual int32_t server_id() const = 0;
     virtual void restart_server() = 0;
+
+    // data channel APIs
+    virtual void bind_data_service_request(std::string const& request_name,
+                                           sisl::generic_rpc_handler_cb_t const& request_handler) = 0;
+    virtual std::error_condition data_service_request(std::string const& group_id, std::string const& request_name,
+                                                      sisl::generic_unary_callback_t const& response_cb,
+                                                      grpc::ByteBuffer& cli_buf) = 0;
 };
 
 } // namespace nuraft_mesg
