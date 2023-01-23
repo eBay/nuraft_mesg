@@ -36,21 +36,20 @@ static void serializeToByteBuffer(grpc::ByteBuffer& cli_byte_buf, std::vector< s
     std::vector< grpc::Slice > slices;
     slices.reserve(cli_buf.size());
     for (auto const& blob : cli_buf) {
-        cli_byte_buf.Clear();
-        slices.emplace_back(blob.bytes, grpc::Slice::STATIC_SLICE);
+        slices.emplace_back(blob.bytes, blob.size, grpc::Slice::STATIC_SLICE);
     }
+    cli_byte_buf.Clear();
     grpc::ByteBuffer tmp(slices.data(), cli_buf.size());
     cli_byte_buf.Swap(&tmp);
 }
 
-static void deserializeFromByteBuffer(grpc::ByteBuffer const& cli_byte_buf, std::vector< sisl::io_blob >& cli_buf) {
-    std::vector< grpc::Slice > slices;
-    cli_byte_buf.Dump(&slices);
-    cli_buf.clear();
-    cli_buf.reserve(cli_byte_buf.Length());
-    for (auto const& slice : slices) {
-        cli_buf.emplace_back(const_cast< uint8_t* >(slice.begin()), slice.size(), false);
-    }
+static grpc::Status deserializeFromByteBuffer(grpc::ByteBuffer const& cli_byte_buf, sisl::io_blob& cli_buf) {
+    grpc::Slice slice;
+    auto status = cli_byte_buf.DumpToSingleSlice(&slice);
+    if (!status.ok()) { return status; }
+    cli_buf.bytes = const_cast< uint8_t* >(slice.begin());
+    cli_buf.size = slice.size();
+    return status;
 }
 
 } // namespace nuraft_mesg

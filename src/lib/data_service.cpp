@@ -2,6 +2,8 @@
 #include "data_service.h"
 #include "utils.hpp"
 
+SISL_LOGGING_DECL(nuraft_mesg)
+
 namespace nuraft_mesg {
 
 void data_service::associate(sisl::GrpcServer* server) {
@@ -24,9 +26,17 @@ void data_service::bind(sisl::GrpcServer* server) {
 void data_service::bind(sisl::GrpcServer* server, std::string const& request_name,
                         data_service_request_handler_t const& request_cb) {
     RELEASE_ASSERT(server, "NULL server!");
+    if (!request_cb) {
+        LOGWARNMOD(nuraft_mesg, "request_cb null for the request {}, cannot bind.", request_name);
+        return;
+    }
     auto generic_handler_cb = [request_cb](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
-        std::vector< sisl::io_blob > svr_buf;
-        deserializeFromByteBuffer(rpc_data->request(), svr_buf);
+        sisl::io_blob svr_buf;
+        if (auto status = deserializeFromByteBuffer(rpc_data->request(), svr_buf); !status.ok()) {
+            LOGERRORMOD(nuraft_mesg, "ByteBuffer DumpToSingleSlice failed, {}", status.error_message());
+            rpc_data->set_status(status);
+            return true; // respond immediately
+        }
         return request_cb(svr_buf);
     };
     auto lk = std::unique_lock< std::mutex >(_req_lock);
@@ -37,7 +47,7 @@ void data_service::bind(sisl::GrpcServer* server, std::string const& request_nam
                 throw std::runtime_error(fmt::format("Could not register generic rpc {} with gRPC!", request_name));
             }
         } else {
-            LOGWARN("data service rpc {} exists", it->first);
+            LOGWARNMOD(nuraft_mesg, "data service rpc {} exists", it->first);
         }
     } else {
         throw std::runtime_error(

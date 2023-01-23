@@ -37,10 +37,10 @@ using generic_unary_callback_t = std::function< void(grpc::ByteBuffer&, ::grpc::
 namespace nuraft_mesg {
 
 // called by the server after it receives the request
-using data_service_request_handler_t = std::function< bool(std::vector< sisl::io_blob > const& incoming_buf) >;
+using data_service_request_handler_t = std::function< bool(sisl::io_blob const& incoming_buf) >;
 
 // called by the client after it receives response to its request
-using data_service_response_handler_t = std::function< void(std::vector< sisl::io_blob > const& incoming_buf) >;
+using data_service_response_handler_t = std::function< void(sisl::io_blob const& incoming_buf) >;
 
 class mesg_state_mgr : public nuraft::state_mgr {
 public:

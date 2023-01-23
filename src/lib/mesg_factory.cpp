@@ -68,10 +68,17 @@ public:
         serializeToByteBuffer(cli_byte_buf, cli_buf);
         _generic_stub->call_unary(
             cli_byte_buf, request_name,
-            [response_cb](grpc::ByteBuffer& resp, ::grpc::Status& status) {
-                std::vector< sisl::io_blob > svr_buf;
-                deserializeFromByteBuffer(resp, svr_buf);
-                if (response_cb) { response_cb(svr_buf); }
+            [response_cb, request_name](grpc::ByteBuffer& resp, ::grpc::Status& status) {
+                if (!status.ok()) {
+                    LOGERRORMOD(nuraft_mesg, "Failed to send data_service_request {}, error: {}", request_name,
+                                status.error_message());
+                    return;
+                }
+                if (response_cb) {
+                    sisl::io_blob svr_buf;
+                    deserializeFromByteBuffer(resp, svr_buf);
+                    response_cb(svr_buf);
+                }
             },
             2 /* deadline in seconds */);
     }
