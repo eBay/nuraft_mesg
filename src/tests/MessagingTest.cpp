@@ -361,7 +361,7 @@ TEST_F(MessagingFixture, DataServiceBasic) {
     instance_4->bind_data_service_request(SEND_DATA, receive_data);
     instance_5->bind_data_service_request(SEND_DATA, receive_data);
 
-    std::vector< sisl::io_blob > cli_buf;
+    io_blob_list_t cli_buf;
     for (int i = 0; i < data_size; i++) {
         cli_buf.emplace_back(sizeof(uint32_t));
         uint32_t* const write_buf{reinterpret_cast< uint32_t* >(cli_buf[i].bytes)};

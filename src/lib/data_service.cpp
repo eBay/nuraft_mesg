@@ -32,7 +32,7 @@ void data_service::bind(sisl::GrpcServer* server, std::string const& request_nam
     }
     auto generic_handler_cb = [request_cb](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
         sisl::io_blob svr_buf;
-        if (auto status = deserializeFromByteBuffer(rpc_data->request(), svr_buf); !status.ok()) {
+        if (auto status = deserialize_from_byte_buffer(rpc_data->request(), svr_buf); !status.ok()) {
             LOGERRORMOD(nuraft_mesg, "ByteBuffer DumpToSingleSlice failed, {}", status.error_message());
             rpc_data->set_status(status);
             return true; // respond immediately

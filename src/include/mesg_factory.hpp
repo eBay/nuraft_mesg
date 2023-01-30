@@ -78,7 +78,7 @@ public:
 
     std::error_condition data_service_request(std::string const& request_name,
                                               data_service_response_handler_t const& response_cb,
-                                              std::vector< sisl::io_blob > const& cli_buf);
+                                              io_blob_list_t const& cli_buf);
 };
 
 } // namespace nuraft_mesg

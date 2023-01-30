@@ -430,7 +430,7 @@ void service::bind_data_service_request(std::string const& request_name,
 
 std::error_condition service::data_service_request(std::string const& group_id, std::string const& request_name,
                                                    data_service_response_handler_t const& response_cb,
-                                                   std::vector< sisl::io_blob > const& cli_buf) {
+                                                   io_blob_list_t const& cli_buf) {
     auto lk = std::unique_lock< std::mutex >(_manager_lock);
     auto it = _mesg_factories.find(group_id);
     if (it == _mesg_factories.end()) { return std::error_condition(std::errc::invalid_argument); }

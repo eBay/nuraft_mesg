@@ -19,7 +19,7 @@
 #pragma once
 
 #include "common.hpp"
-#include <sisl/fds/buffer.hpp>
+#include "messaging_if.hpp"
 
 namespace nuraft_mesg {
 
@@ -32,9 +32,8 @@ inline RCMsgBase* fromBaseRequest(nuraft::msg_base const& rcbase) {
     return base;
 }
 
-static void serializeToByteBuffer(grpc::ByteBuffer& cli_byte_buf, std::vector< sisl::io_blob > const& cli_buf) {
-    std::vector< grpc::Slice > slices;
-    slices.reserve(cli_buf.size());
+static void serialize_to_byte_buffer(grpc::ByteBuffer& cli_byte_buf, io_blob_list_t const& cli_buf) {
+    folly::small_vector< grpc::Slice, 4 > slices;
     for (auto const& blob : cli_buf) {
         slices.emplace_back(blob.bytes, blob.size, grpc::Slice::STATIC_SLICE);
     }
@@ -43,7 +42,7 @@ static void serializeToByteBuffer(grpc::ByteBuffer& cli_byte_buf, std::vector< s
     cli_byte_buf.Swap(&tmp);
 }
 
-static grpc::Status deserializeFromByteBuffer(grpc::ByteBuffer const& cli_byte_buf, sisl::io_blob& cli_buf) {
+static grpc::Status deserialize_from_byte_buffer(grpc::ByteBuffer const& cli_byte_buf, sisl::io_blob& cli_buf) {
     grpc::Slice slice;
     auto status = cli_byte_buf.DumpToSingleSlice(&slice);
     if (!status.ok()) { return status; }

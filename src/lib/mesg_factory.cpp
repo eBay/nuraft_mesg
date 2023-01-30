@@ -63,20 +63,19 @@ public:
     }
 
     void data_service_request(std::string const& request_name, data_service_response_handler_t const& response_cb,
-                              std::vector< sisl::io_blob > const& cli_buf) {
+                              io_blob_list_t const& cli_buf) {
         grpc::ByteBuffer cli_byte_buf;
-        serializeToByteBuffer(cli_byte_buf, cli_buf);
+        serialize_to_byte_buffer(cli_byte_buf, cli_buf);
         _generic_stub->call_unary(
             cli_byte_buf, request_name,
-            [response_cb, request_name](grpc::ByteBuffer& resp, ::grpc::Status& status) {
+            [response_cb](grpc::ByteBuffer& resp, ::grpc::Status& status) {
                 if (!status.ok()) {
-                    LOGERRORMOD(nuraft_mesg, "Failed to send data_service_request {}, error: {}", request_name,
-                                status.error_message());
+                    LOGERRORMOD(nuraft_mesg, "Failed to send data_service_request, error: {}", status.error_message());
                     return;
                 }
                 if (response_cb) {
                     sisl::io_blob svr_buf;
-                    deserializeFromByteBuffer(resp, svr_buf);
+                    deserialize_from_byte_buffer(resp, svr_buf);
                     response_cb(svr_buf);
                 }
             },
@@ -125,7 +124,7 @@ public:
     }
 
     void data_service_request(std::string const& request_name, data_service_response_handler_t const& response_cb,
-                              std::vector< sisl::io_blob > const& cli_buf) {
+                              io_blob_list_t const& cli_buf) {
         _client->data_service_request(request_name, response_cb, cli_buf);
     }
 };
@@ -151,7 +150,7 @@ std::error_condition mesg_factory::reinit_client(const std::string& client, shar
 
 std::error_condition mesg_factory::data_service_request(std::string const& request_name,
                                                         data_service_response_handler_t const& response_cb,
-                                                        std::vector< sisl::io_blob > const& cli_buf) {
+                                                        io_blob_list_t const& cli_buf) {
     std::lock_guard< std::mutex > lk(_client_lock);
     for (auto& nuraft_client : _clients) {
         auto g_client = std::dynamic_pointer_cast< nuraft_mesg::group_client >(nuraft_client.second);

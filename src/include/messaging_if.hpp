@@ -18,8 +18,10 @@
 #include <memory>
 #include <string>
 #include <system_error>
+#include <folly/small_vector.h>
 
 #include <libnuraft/nuraft.hxx>
+#include <sisl/fds/buffer.hpp>
 
 namespace grpc {
 class ByteBuffer;
@@ -30,11 +32,12 @@ namespace sisl {
 class AuthManager;
 class TrfClient;
 class GenericRpcData;
-struct io_blob;
 using generic_unary_callback_t = std::function< void(grpc::ByteBuffer&, ::grpc::Status& status) >;
 } // namespace sisl
 
 namespace nuraft_mesg {
+
+using io_blob_list_t = folly::small_vector< sisl::io_blob, 4 >;
 
 // called by the server after it receives the request
 using data_service_request_handler_t = std::function< bool(sisl::io_blob const& incoming_buf) >;
@@ -104,7 +107,7 @@ public:
                                            data_service_request_handler_t const& request_handler) = 0;
     virtual std::error_condition data_service_request(std::string const& group_id, std::string const& request_name,
                                                       data_service_response_handler_t const& response_cb,
-                                                      std::vector< sisl::io_blob > const& cli_buf) = 0;
+                                                      io_blob_list_t const& cli_buf) = 0;
 };
 
 } // namespace nuraft_mesg
