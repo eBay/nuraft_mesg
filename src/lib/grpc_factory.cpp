@@ -126,7 +126,7 @@ class grpc_error_client : public grpc_base_client {
 nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string& client) {
     nuraft::ptr< nuraft::rpc_client > new_client;
 
-    std::lock_guard< std::mutex > lk(_client_lock);
+    std::unique_lock< client_factory_lock_type > lk(_client_lock);
     auto [it, happened] = _clients.emplace(client, nullptr);
     if (_clients.end() != it) {
         if (!happened) {

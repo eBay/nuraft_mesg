@@ -20,7 +20,7 @@
 
 #include <future>
 #include <memory>
-#include <mutex>
+#include <folly/SharedMutex.h>
 
 #include "common.hpp"
 
@@ -28,11 +28,13 @@ SISL_LOGGING_DECL(nuraft)
 
 namespace nuraft_mesg {
 
+using client_factory_lock_type = folly::SharedMutex;
+
 class grpc_factory : public nuraft::rpc_client_factory, public std::enable_shared_from_this< grpc_factory > {
     std::string _worker_name;
 
 protected:
-    std::mutex _client_lock;
+    client_factory_lock_type _client_lock;
     std::map< std::string, std::shared_ptr< nuraft::rpc_client > > _clients;
 
 public:
