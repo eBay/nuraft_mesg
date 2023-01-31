@@ -17,7 +17,7 @@
 #include "service.hpp"
 #include "mesg_factory.hpp"
 #include "logger.hpp"
-#include "data_service.h"
+#include "data_service.hpp"
 
 SISL_LOGGING_DECL(nuraft_mesg)
 

@@ -1,5 +1,5 @@
 #include <sisl/grpc/generic_service.hpp>
-#include "data_service.h"
+#include "data_service.hpp"
 #include "utils.hpp"
 
 SISL_LOGGING_DECL(nuraft_mesg)
