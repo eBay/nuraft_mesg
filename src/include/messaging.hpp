@@ -34,8 +34,6 @@ namespace nuraft_mesg {
 class group_factory;
 class msg_service;
 class group_metrics;
-class data_service;
-class mesg_factory;
 
 class service : public consensus_component {
     consensus_component::params _start_params;
@@ -55,9 +53,6 @@ class service : public consensus_component {
 
     nuraft::ptr< nuraft::delayed_task_scheduler > _scheduler;
     std::shared_ptr< sisl::logging::logger_t > _custom_logger;
-
-    std::unique_ptr< data_service > _data_service;
-    std::map< std::string, std::shared_ptr< mesg_factory > > _mesg_factories;
 
     std::error_condition group_init(int32_t const srv_id, std::string const& group_id, std::string const& group_type,
                                     nuraft::context*& ctx, std::shared_ptr< group_metrics > metrics);
@@ -89,7 +84,7 @@ public:
     void restart_server() override;
 
     // data service APIs
-    void bind_data_service_request(std::string const& request_name,
+    bool bind_data_service_request(std::string const& request_name,
                                    data_service_request_handler_t const& request_handler) override;
     std::error_condition data_service_request(std::string const& group_id, std::string const& request_name,
                                               data_service_response_handler_t const& response_cb,

@@ -14,6 +14,8 @@
 #include "libnuraft/async.hxx"
 #include "libnuraft/rpc_listener.hxx"
 #include "service.hpp"
+#include "data_service.hpp"
+#include "mesg_factory.hpp"
 
 SISL_LOGGING_DECL(nuraft_mesg)
 
@@ -29,9 +31,15 @@ grpc_server_wrapper::grpc_server_wrapper(group_name_t const& group_name) : m_ser
     if (0 < SISL_OPTIONS.count("msg_metrics")) m_metrics = std::make_shared< group_metrics >(group_name);
 }
 
+msg_service::msg_service(get_server_ctx_cb get_server_ctx, process_offload_cb process_offload,
+                         std::string const& service_address, bool const enable_data_service) :
+        _get_server_ctx(get_server_ctx), _get_process_offload(process_offload), _service_address(service_address) {
+    if (enable_data_service) { _data_service = std::unique_ptr< data_service >(new data_service()); }
+}
+
 shared< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, process_offload_cb poc,
-                                          std::string const& service_address) {
-    return std::shared_ptr< msg_service >(new msg_service(get_server_ctx, poc, service_address),
+                                          std::string const& service_address, bool const enable_data_service) {
+    return std::shared_ptr< msg_service >(new msg_service(get_server_ctx, poc, service_address, enable_data_service),
                                           [](msg_service* p) { delete p; });
 }
 
@@ -40,12 +48,15 @@ msg_service::~msg_service() {
     DEBUG_ASSERT(_raft_servers.empty(), "RAFT servers not fully terminated!");
 }
 
+bool msg_service::data_service_enabled() const { return _data_service != nullptr; }
+
 void msg_service::associate(::sisl::GrpcServer* server) {
     RELEASE_ASSERT(server, "NULL server!");
     if (!server->register_async_service< Messaging >()) {
         LOGERRORMOD(nuraft_mesg, "Could not register RaftSvc with gRPC!");
         abort();
     }
+    if (data_service_enabled()) { _data_service->associate(server); }
 }
 
 void msg_service::bind(::sisl::GrpcServer* server) {
@@ -56,6 +67,16 @@ void msg_service::bind(::sisl::GrpcServer* server) {
         LOGERRORMOD(nuraft_mesg, "Could not bind gRPC ::RaftStep to routine!");
         abort();
     }
+    if (data_service_enabled()) { _data_service->bind(server); }
+}
+
+bool msg_service::bind_data_service_request(sisl::GrpcServer* server, std::string const& request_name,
+                                            data_service_request_handler_t const& request_handler) {
+    if (!data_service_enabled()) {
+        LOGERRORMOD(nuraft_mesg, "Could not register data service method {}; data service is null", request_name);
+        return false;
+    }
+    return _data_service->bind(server, request_name, request_handler);
 }
 
 nuraft::cmd_result_code msg_service::add_srv(group_name_t const& group_name, nuraft::srv_config const& cfg) {
@@ -133,6 +154,22 @@ nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_na
     return nuraft::SERVER_NOT_FOUND;
 }
 
+std::error_condition msg_service::data_service_request(std::string const& group_name, std::string const& request_name,
+                                                       data_service_response_handler_t const& response_cb,
+                                                       io_blob_list_t const& cli_buf) {
+    if (!data_service_enabled()) { return std::error_condition(std::errc::not_supported); }
+    shared< mesg_factory > factory;
+    {
+        std::shared_lock< lock_type > rl(_raft_servers_lock);
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
+            factory = it->second.m_mesg_factory;
+        }
+    }
+
+    if (!factory) { return std::error_condition(std::errc::invalid_argument); }
+    return factory->data_service_request(request_name, response_cb, cli_buf);
+}
+
 void msg_service::setDefaultGroupType(std::string const& _type) {
     std::shared_lock< lock_type > rl(_raft_servers_lock);
     _default_group_type = _type;
@@ -163,7 +200,7 @@ bool msg_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg,
     // should emplace a corresponding server in the _raft_servers member.
     if (nuraft::join_cluster_request == base.type()) { joinRaftGroup(base.dest(), group_name, request.group_type()); }
 
-    // Find th RaftServer context based on the name of the group.
+    // Find the RaftServer context based on the name of the group.
     shared< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
@@ -260,6 +297,9 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
             ctx->rpc_listener_ = std::static_pointer_cast< nuraft::rpc_listener >(new_listner);
             auto server = std::make_shared< nuraft::raft_server >(ctx);
             it->second.m_server = std::make_shared< null_service >(server);
+            if (data_service_enabled()) {
+                it->second.m_mesg_factory = std::dynamic_pointer_cast< mesg_factory >(ctx->rpc_cli_factory_);
+            }
         }
     }
     return std::error_condition();

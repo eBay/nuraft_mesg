@@ -65,7 +65,7 @@ using namespace nuraft_mesg;
 using testing::_;
 using testing::Return;
 
-class MessagingFixture : public ::testing::Test {
+class MessagingFixtureBase : public ::testing::Test {
 protected:
     std::unique_ptr< service > instance_1;
     std::unique_ptr< service > instance_2;
@@ -84,6 +84,7 @@ protected:
     std::map< std::string, std::string > lookup_map;
     std::function< std::string(std::string const&) > lookup_callback;
     nuraft::raft_params r_params;
+    consensus_component::params params;
 
     uint32_t get_random_num() {
         static std::random_device dev;
@@ -119,7 +120,19 @@ protected:
             return (lookup_map.count(id) > 0) ? lookup_map[id] : std::string();
         };
 
-        auto params = consensus_component::params{id_1, ports[0], lookup_callback, "test_type"};
+        params.server_uuid = id_1;
+        params.mesg_port = ports[0];
+        params.lookup_peer = lookup_callback;
+        params.default_group_type = "test_type";
+    }
+
+    void TearDown() override {
+        instance_1.reset();
+        instance_2.reset();
+        instance_3.reset();
+    }
+
+    void start() {
         instance_1->start(params);
 
         // RAFT server parameters
@@ -168,14 +181,14 @@ protected:
         EXPECT_TRUE(instance_1->add_member("test_group", id_3, true));
         std::this_thread::sleep_for(std::chrono::seconds(2));
     }
+};
 
-    void TearDown() override {
-        instance_1.reset();
-        instance_2.reset();
-        instance_3.reset();
+class MessagingFixture : public MessagingFixtureBase {
+protected:
+    void SetUp() override {
+        MessagingFixtureBase::SetUp();
+        start();
     }
-
-public:
 };
 
 // Basic client request (append_entries)
@@ -290,6 +303,15 @@ TEST_F(MessagingFixture, SyncAddMember) {
     EXPECT_EQ(srv_list.size(), 4u);
 }
 
+class DataServiceFixture : public MessagingFixtureBase {
+protected:
+    void SetUp() override {
+        MessagingFixtureBase::SetUp();
+        params.enable_data_service = true;
+        start();
+    }
+};
+
 static std::string const SEND_DATA{"send_data"};
 static std::string const REQUEST_DATA{"request_data"};
 static std::atomic< uint32_t > server_counter{0};
@@ -312,7 +334,7 @@ bool request_data(sisl::io_blob const& incoming_buf) {
 }
 void client_response_cb(sisl::io_blob const& incoming_buf) { client_counter++; }
 
-TEST_F(MessagingFixture, DataServiceBasic) {
+TEST_F(DataServiceFixture, DataServiceBasic) {
     // create new servers
     std::unique_ptr< service > instance_4 = std::make_unique< service >();
     std::string id_4 = to_string(boost::uuids::random_generator()());
@@ -322,7 +344,7 @@ TEST_F(MessagingFixture, DataServiceBasic) {
     get_random_ports(2u);
     lookup_map.emplace(id_4, fmt::format("127.0.0.1:{}", ports[3]));
     lookup_map.emplace(id_5, fmt::format("127.0.0.1:{}", ports[4]));
-    auto params = consensus_component::params{id_4, ports[3], lookup_callback, "test_type"};
+    params.server_uuid = id_4, params.mesg_port = ports[3];
     std::shared_ptr< test_state_mgr > sm_int_4;
     auto register_params_4 = consensus_component::register_params{
         r_params,
@@ -352,14 +374,14 @@ TEST_F(MessagingFixture, DataServiceBasic) {
     EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_5, true));
 
     // bind data channel request methods
-    instance_1->bind_data_service_request(SEND_DATA, receive_data);
-    instance_1->bind_data_service_request(REQUEST_DATA, request_data);
-    instance_2->bind_data_service_request(SEND_DATA, receive_data);
-    instance_2->bind_data_service_request(REQUEST_DATA, request_data);
-    instance_3->bind_data_service_request(SEND_DATA, receive_data);
-    instance_3->bind_data_service_request(REQUEST_DATA, request_data);
-    instance_4->bind_data_service_request(SEND_DATA, receive_data);
-    instance_5->bind_data_service_request(SEND_DATA, receive_data);
+    EXPECT_TRUE(instance_1->bind_data_service_request(SEND_DATA, receive_data));
+    EXPECT_TRUE(instance_1->bind_data_service_request(REQUEST_DATA, request_data));
+    EXPECT_TRUE(instance_2->bind_data_service_request(SEND_DATA, receive_data));
+    EXPECT_TRUE(instance_2->bind_data_service_request(REQUEST_DATA, request_data));
+    EXPECT_TRUE(instance_3->bind_data_service_request(SEND_DATA, receive_data));
+    EXPECT_TRUE(instance_3->bind_data_service_request(REQUEST_DATA, request_data));
+    EXPECT_TRUE(instance_4->bind_data_service_request(SEND_DATA, receive_data));
+    EXPECT_TRUE(instance_5->bind_data_service_request(SEND_DATA, receive_data));
 
     io_blob_list_t cli_buf;
     for (int i = 0; i < data_size; i++) {
@@ -369,13 +391,13 @@ TEST_F(MessagingFixture, DataServiceBasic) {
         *write_buf = data_vec.back();
     }
 
-    instance_1->data_service_request("test_group", SEND_DATA, client_response_cb, cli_buf);
-    // instance_4->data_service_request("data_service_test_group", SEND_DATA, client_response_cb, cli_buf);
-    // instance_1->data_service_request("test_group", REQUEST_DATA, client_response_cb, cli_buf);
+    EXPECT_FALSE(instance_1->data_service_request("test_group", SEND_DATA, client_response_cb, cli_buf));
+    EXPECT_FALSE(instance_4->data_service_request("data_service_test_group", SEND_DATA, client_response_cb, cli_buf));
+    EXPECT_FALSE(instance_1->data_service_request("test_group", REQUEST_DATA, client_response_cb, cli_buf));
     std::this_thread::sleep_for(std::chrono::seconds(2));
     // the count is 4 (2 methods from group test_group) + 3 (from data_service_test_group)
-    // EXPECT_EQ(server_counter, 7);
-    // EXPECT_EQ(client_counter, 7);
+    EXPECT_EQ(server_counter, 7);
+    EXPECT_EQ(client_counter, 7);
 }
 
 int main(int argc, char* argv[]) {

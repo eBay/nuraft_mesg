@@ -17,7 +17,6 @@
 #include "service.hpp"
 #include "mesg_factory.hpp"
 #include "logger.hpp"
-#include "data_service.hpp"
 
 SISL_LOGGING_DECL(nuraft_mesg)
 
@@ -86,10 +85,8 @@ void service::start(consensus_component::params& start_params) {
             auto const& type_params = _state_mgr_types[group_type];
             return type_params.process_req;
         },
-        _start_params.server_uuid);
+        _start_params.server_uuid, _start_params.enable_data_service);
     _mesg_service->setDefaultGroupType(_start_params.default_group_type);
-
-    _data_service = std::unique_ptr< data_service >(new data_service());
 
     // Start a gRPC server and create and associate nuraft_mesg services.
     restart_server();
@@ -104,10 +101,9 @@ void service::restart_server() {
     _grpc_server = std::unique_ptr< sisl::GrpcServer >(sisl::GrpcServer::make(
         listen_address, _start_params.auth_mgr, grpc_server_threads, _start_params.ssl_key, _start_params.ssl_cert));
     _mesg_service->associate(_grpc_server.get());
-    _data_service->associate(_grpc_server.get());
+
     _grpc_server->run();
     _mesg_service->bind(_grpc_server.get());
-    _data_service->bind(_grpc_server.get());
 }
 
 void service::register_mgr_type(std::string const& group_type, register_params& params) {
@@ -198,22 +194,8 @@ std::error_condition service::group_init(int32_t const srv_id, std::string const
     }
 
     // RAFT client factory
-    std::shared_ptr< nuraft::rpc_client_factory > rpc_cli_factory;
-    {
-        std::lock_guard< std::mutex > lg(_manager_lock);
-        auto [it, happened] = _mesg_factories.emplace(group_id, nullptr);
-        if (it != _mesg_factories.end()) {
-            if (happened) {
-                it->second = std::make_shared< nuraft_mesg::mesg_factory >(_g_factory, group_id, group_type, metrics);
-            } else {
-                LOGWARN("mesg_factory exists for group {}", group_id);
-            }
-        } else {
-            return std::make_error_condition(std::errc::not_enough_memory);
-        }
-
-        rpc_cli_factory = it->second;
-    }
+    std::shared_ptr< nuraft::rpc_client_factory > rpc_cli_factory(
+        std::make_shared< nuraft_mesg::mesg_factory >(_g_factory, group_id, group_type, metrics));
 
     // RAFT service interface (stops gRPC service etc...) (TODO)
     std::shared_ptr< nuraft::rpc_listener > listener;
@@ -419,21 +401,17 @@ uint32_t service::logstore_id(std::string const& group_id) const {
 
 void service::get_srv_config_all(std::string const& group_name,
                                  std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) {
-    auto lk = std::unique_lock< std::mutex >(_manager_lock);
     _mesg_service->get_srv_config_all(group_name, configs_out);
 }
 
-void service::bind_data_service_request(std::string const& request_name,
+bool service::bind_data_service_request(std::string const& request_name,
                                         data_service_request_handler_t const& request_handler) {
-    _data_service->bind(_grpc_server.get(), request_name, request_handler);
+    return _mesg_service->bind_data_service_request(_grpc_server.get(), request_name, request_handler);
 }
 
 std::error_condition service::data_service_request(std::string const& group_id, std::string const& request_name,
                                                    data_service_response_handler_t const& response_cb,
                                                    io_blob_list_t const& cli_buf) {
-    auto lk = std::unique_lock< std::mutex >(_manager_lock);
-    auto it = _mesg_factories.find(group_id);
-    if (it == _mesg_factories.end()) { return std::error_condition(std::errc::invalid_argument); }
-    return it->second->data_service_request(request_name, response_cb, cli_buf);
+    return _mesg_service->data_service_request(group_id, request_name, response_cb, cli_buf);
 }
 } // namespace nuraft_mesg

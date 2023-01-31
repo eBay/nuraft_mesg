@@ -72,6 +72,7 @@ public:
         std::shared_ptr< sisl::TrfClient > trf_client{nullptr};
         std::string ssl_key{};
         std::string ssl_cert{};
+        bool enable_data_service{false};
     };
     virtual ~consensus_component() = default;
     virtual void start(consensus_component::params& start_params) = 0;
@@ -103,7 +104,7 @@ public:
     virtual void restart_server() = 0;
 
     // data channel APIs
-    virtual void bind_data_service_request(std::string const& request_name,
+    virtual bool bind_data_service_request(std::string const& request_name,
                                            data_service_request_handler_t const& request_handler) = 0;
     virtual std::error_condition data_service_request(std::string const& group_id, std::string const& request_name,
                                                       data_service_response_handler_t const& response_cb,
