@@ -51,8 +51,8 @@ using process_offload_cb = std::function< std::function< void(std::function< voi
 
 // This object can be stored by the caller and can be used to directly call raft/data operatons without taking
 // _raft_servers_lock
-struct raft_server_wrapper {
-    explicit raft_server_wrapper();
+struct repl_service_ctx {
+    explicit repl_service_ctx();
 
     shared< grpc_server > m_server;
     shared< mesg_factory > m_mesg_factory;
@@ -61,7 +61,7 @@ struct raft_server_wrapper {
 struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name);
 
-    raft_server_wrapper m_raft_server_wrapper;
+    repl_service_ctx m_repl_ctx;
     shared< group_metrics > m_metrics;
 };
 

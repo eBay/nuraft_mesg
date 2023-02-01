@@ -7,10 +7,10 @@ attribute "deprecated";
 
 table MesgFactoryConfig {
     // grpc client deadline for raft service requests
-    raft_request_deadline: uint16 = 2;
+    raft_request_deadline_secs: uint16 = 2;
 
     // grpc client deadline for data service requests
-    data_request_deadline: uint16 = 2;
+    data_request_deadline_secs: uint16 = 2;
 }
 
 table NuraftMesgConfig {

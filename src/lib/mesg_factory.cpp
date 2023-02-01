@@ -59,8 +59,9 @@ public:
             complete(*response.mutable_msg(), status);
         };
 
-        _stub->call_unary< RaftGroupMsg, RaftGroupMsg >(message, &Messaging::StubInterface::AsyncRaftStep, group_compl,
-                                                        NURAFT_MESG_CONFIG(mesg_factory_config->raft_request_deadline));
+        _stub->call_unary< RaftGroupMsg, RaftGroupMsg >(
+            message, &Messaging::StubInterface::AsyncRaftStep, group_compl,
+            NURAFT_MESG_CONFIG(mesg_factory_config->raft_request_deadline_secs));
     }
 
     void data_service_request(std::string const& request_name, data_service_response_handler_t const& response_cb,
@@ -80,7 +81,7 @@ public:
                     response_cb(svr_buf);
                 }
             },
-            NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline));
+            NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs));
     }
 
 protected:
