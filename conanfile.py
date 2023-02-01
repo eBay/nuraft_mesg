@@ -49,7 +49,7 @@ class NuRaftMesgConan(ConanFile):
     def requirements(self):
         self.requires("nuraft/2.0.0")
         self.requires("openssl/1.1.1s")
-        self.requires("sisl/[~=8.3, include_prerelease=True]@oss/master")
+        self.requires("sisl/[~=9, include_prerelease=True]@oss/master")
 
         self.requires("lz4/1.9.4", override=True)
 
