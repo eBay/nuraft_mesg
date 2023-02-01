@@ -84,11 +84,9 @@ public:
     void restart_server() override;
 
     // data service APIs
+    bool get_replication_service_ctx(std::string const& group_id, repl_service_ctx& repl_ctx) override;
     bool bind_data_service_request(std::string const& request_name,
                                    data_service_request_handler_t const& request_handler) override;
-    std::error_condition data_service_request(std::string const& group_id, std::string const& request_name,
-                                              data_service_response_handler_t const& response_cb,
-                                              io_blob_list_t const& cli_buf) override;
 
     // for testing
     void get_srv_config_all(std::string const& group_name,

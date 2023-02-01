@@ -45,6 +45,17 @@ using data_service_request_handler_t = std::function< bool(sisl::io_blob const& 
 // called by the client after it receives response to its request
 using data_service_response_handler_t = std::function< void(sisl::io_blob const& incoming_buf) >;
 
+// This object can be stored by the caller and can be used to directly call raft/data operatons without taking
+// _raft_servers_lock
+class mesg_factory;
+class grpc_server;
+struct repl_service_ctx {
+    repl_service_ctx();
+
+    std::shared_ptr< grpc_server > m_server;
+    std::shared_ptr< mesg_factory > m_mesg_factory;
+};
+
 class mesg_state_mgr : public nuraft::state_mgr {
 public:
     using nuraft::state_mgr::state_mgr;
@@ -104,11 +115,9 @@ public:
     virtual void restart_server() = 0;
 
     // data channel APIs
+    virtual bool get_replication_service_ctx(std::string const& group_id, repl_service_ctx& repl_ctx) = 0;
     virtual bool bind_data_service_request(std::string const& request_name,
                                            data_service_request_handler_t const& request_handler) = 0;
-    virtual std::error_condition data_service_request(std::string const& group_id, std::string const& request_name,
-                                                      data_service_response_handler_t const& response_cb,
-                                                      io_blob_list_t const& cli_buf) = 0;
 };
 
 } // namespace nuraft_mesg

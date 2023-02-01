@@ -33,6 +33,7 @@
 #include "libnuraft/cluster_config.hxx"
 #include "libnuraft/state_machine.hxx"
 #include "messaging.hpp"
+#include "mesg_factory.hpp"
 
 #include "test_state_manager.h"
 #include <sisl/fds/buffer.hpp>
@@ -391,13 +392,23 @@ TEST_F(DataServiceFixture, DataServiceBasic) {
         *write_buf = data_vec.back();
     }
 
-    EXPECT_FALSE(instance_1->data_service_request("test_group", SEND_DATA, client_response_cb, cli_buf));
-    EXPECT_FALSE(instance_4->data_service_request("data_service_test_group", SEND_DATA, client_response_cb, cli_buf));
-    EXPECT_FALSE(instance_1->data_service_request("test_group", REQUEST_DATA, client_response_cb, cli_buf));
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-    // the count is 4 (2 methods from group test_group) + 3 (from data_service_test_group)
-    EXPECT_EQ(server_counter, 7);
-    EXPECT_EQ(client_counter, 7);
+    repl_service_ctx repl_ctx1, repl_ctx4;
+    EXPECT_TRUE(instance_1->get_replication_service_ctx("test_group", repl_ctx1));
+    EXPECT_TRUE(instance_4->get_replication_service_ctx("data_service_test_group", repl_ctx4));
+
+    EXPECT_FALSE(repl_ctx1.m_mesg_factory->data_service_request(SEND_DATA, cli_buf, client_response_cb));
+    EXPECT_FALSE(repl_ctx4.m_mesg_factory->data_service_request(SEND_DATA, cli_buf, client_response_cb));
+    EXPECT_FALSE(repl_ctx1.m_mesg_factory->data_service_request(REQUEST_DATA, cli_buf, client_response_cb));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    // add a new member to data_service_test_group and check if repl_ctx4 sends data to newly added member
+    EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_3, true));
+    EXPECT_FALSE(repl_ctx4.m_mesg_factory->data_service_request(SEND_DATA, cli_buf, client_response_cb));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    // the count is 4 (2 methods from group test_group) + 7 (from data_service_test_group)
+    EXPECT_EQ(server_counter, 11);
+    EXPECT_EQ(client_counter, 11);
 }
 
 int main(int argc, char* argv[]) {

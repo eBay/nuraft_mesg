@@ -20,6 +20,7 @@
 
 #include "common.hpp"
 #include "messaging_if.hpp"
+#include "proto/raft_types.pb.h"
 
 namespace nuraft_mesg {
 

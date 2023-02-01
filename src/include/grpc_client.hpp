@@ -25,6 +25,8 @@
 
 namespace nuraft_mesg {
 
+class RaftMessage;
+
 class grpc_resp : public nuraft::resp_msg {
 public:
     using nuraft::resp_msg::resp_msg;

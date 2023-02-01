@@ -29,6 +29,8 @@ class GrpcServer;
 
 namespace nuraft_mesg {
 
+class RaftMessage;
+
 class grpc_server : public nuraft::raft_server_handler {
     shared< nuraft::raft_server > _raft_server;
 

@@ -64,8 +64,8 @@ public:
             NURAFT_MESG_CONFIG(mesg_factory_config->raft_request_deadline_secs));
     }
 
-    void data_service_request(std::string const& request_name, data_service_response_handler_t const& response_cb,
-                              io_blob_list_t const& cli_buf) {
+    void data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
+                              data_service_response_handler_t const& response_cb) {
         grpc::ByteBuffer cli_byte_buf;
         serialize_to_byte_buffer(cli_byte_buf, cli_buf);
         _generic_stub->call_unary(
@@ -125,9 +125,9 @@ public:
         _client->send(group_msg, complete);
     }
 
-    void data_service_request(std::string const& request_name, data_service_response_handler_t const& response_cb,
-                              io_blob_list_t const& cli_buf) {
-        _client->data_service_request(request_name, response_cb, cli_buf);
+    void data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
+                              data_service_response_handler_t const& response_cb) {
+        _client->data_service_request(request_name, cli_buf, response_cb);
     }
 };
 
@@ -150,13 +150,12 @@ std::error_condition mesg_factory::reinit_client(const std::string& client, shar
     return std::error_condition();
 }
 
-std::error_condition mesg_factory::data_service_request(std::string const& request_name,
-                                                        data_service_response_handler_t const& response_cb,
-                                                        io_blob_list_t const& cli_buf) {
+std::error_condition mesg_factory::data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
+                                                        data_service_response_handler_t const& response_cb) {
     std::shared_lock< client_factory_lock_type > rl(_client_lock);
     for (auto& nuraft_client : _clients) {
         auto g_client = std::dynamic_pointer_cast< nuraft_mesg::group_client >(nuraft_client.second);
-        g_client->data_service_request(request_name, response_cb, cli_buf);
+        g_client->data_service_request(request_name, cli_buf, response_cb);
     }
     return std::error_condition();
 }

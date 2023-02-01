@@ -404,14 +404,12 @@ void service::get_srv_config_all(std::string const& group_name,
     _mesg_service->get_srv_config_all(group_name, configs_out);
 }
 
+bool service::get_replication_service_ctx(std::string const& group_id, repl_service_ctx& repl_ctx) {
+    return _mesg_service->get_replication_service_ctx(group_id, repl_ctx);
+}
+
 bool service::bind_data_service_request(std::string const& request_name,
                                         data_service_request_handler_t const& request_handler) {
     return _mesg_service->bind_data_service_request(_grpc_server.get(), request_name, request_handler);
-}
-
-std::error_condition service::data_service_request(std::string const& group_id, std::string const& request_name,
-                                                   data_service_response_handler_t const& response_cb,
-                                                   io_blob_list_t const& cli_buf) {
-    return _mesg_service->data_service_request(group_id, request_name, response_cb, cli_buf);
 }
 } // namespace nuraft_mesg

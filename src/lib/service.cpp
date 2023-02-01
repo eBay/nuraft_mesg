@@ -52,6 +52,22 @@ msg_service::~msg_service() {
 
 bool msg_service::data_service_enabled() const { return _data_service != nullptr; }
 
+bool msg_service::get_replication_service_ctx(std::string const& group_name, repl_service_ctx& repl_ctx) {
+    if (!data_service_enabled()) {
+        LOGERRORMOD(nuraft_mesg, "data service not enabled");
+        return false;
+    }
+    {
+        std::shared_lock< lock_type > rl(_raft_servers_lock);
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
+            repl_ctx = it->second.m_repl_ctx;
+            return true;
+        }
+    }
+    LOGERRORMOD(nuraft_mesg, "Group name {} not found", group_name);
+    return false;
+}
+
 void msg_service::associate(::sisl::GrpcServer* server) {
     RELEASE_ASSERT(server, "NULL server!");
     if (!server->register_async_service< Messaging >()) {
@@ -164,22 +180,6 @@ nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_na
         } catch (std::runtime_error& rte) { LOGERRORMOD(nuraft_mesg, "Caught exception during step(): {}", rte.what()); }
     }
     return nuraft::SERVER_NOT_FOUND;
-}
-
-std::error_condition msg_service::data_service_request(std::string const& group_name, std::string const& request_name,
-                                                       data_service_response_handler_t const& response_cb,
-                                                       io_blob_list_t const& cli_buf) {
-    if (!data_service_enabled()) { return std::error_condition(std::errc::not_supported); }
-    shared< mesg_factory > factory;
-    {
-        std::shared_lock< lock_type > rl(_raft_servers_lock);
-        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
-            factory = it->second.m_repl_ctx.m_mesg_factory;
-        }
-    }
-
-    if (!factory) { return std::error_condition(std::errc::invalid_argument); }
-    return factory->data_service_request(request_name, response_cb, cli_buf);
 }
 
 void msg_service::setDefaultGroupType(std::string const& _type) {

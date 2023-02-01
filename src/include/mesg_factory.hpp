@@ -76,9 +76,8 @@ public:
 
     std::error_condition reinit_client(const std::string& client, shared< nuraft::rpc_client >& raft_client) override;
 
-    std::error_condition data_service_request(std::string const& request_name,
-                                              data_service_response_handler_t const& response_cb,
-                                              io_blob_list_t const& cli_buf);
+    std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
+                                              data_service_response_handler_t const& response_cb);
 };
 
 } // namespace nuraft_mesg
