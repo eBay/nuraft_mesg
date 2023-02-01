@@ -49,12 +49,20 @@ using get_server_ctx_cb = std::function< std::error_condition(int32_t srv_id, gr
 // A calback that returns the registered callback for for offloading RAFT request processing
 using process_offload_cb = std::function< std::function< void(std::function< void() >) >(group_type_t const&) >;
 
+// This object can be stored by the caller and can be used to directly call raft/data operatons without taking
+// _raft_servers_lock
+struct raft_server_wrapper {
+    explicit raft_server_wrapper();
+
+    shared< grpc_server > m_server;
+    shared< mesg_factory > m_mesg_factory;
+};
+
 struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name);
 
-    shared< grpc_server > m_server;
+    raft_server_wrapper m_raft_server_wrapper;
     shared< group_metrics > m_metrics;
-    shared< mesg_factory > m_mesg_factory;
 };
 
 class msg_service : public std::enable_shared_from_this< msg_service > {

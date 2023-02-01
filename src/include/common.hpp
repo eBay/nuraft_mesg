@@ -23,7 +23,6 @@
 #include <libnuraft/nuraft.hxx>
 #include <sisl/logging/logging.h>
 #include <sisl/settings/settings.hpp>
-#include "generated/nuraft_mesg_config_generated.h"
 #include "proto/raft_types.pb.h"
 
 SISL_LOGGING_DECL(nuraft_mesg)
@@ -37,11 +36,3 @@ template < typename T >
 using shared = std::shared_ptr< T >;
 
 } // namespace nuraft_mesg
-
-SETTINGS_INIT(nuraftmesgcfg::NuraftMesgConfig, nuraft_mesg_config);
-
-#define NURAFT_MESG_CONFIG_WITH(...) SETTINGS(nuraft_mesg_config, __VA_ARGS__)
-#define NURAFT_MESG_CONFIG_THIS(...) SETTINGS_THIS(nuraft_mesg_config, __VA_ARGS__)
-#define NURAFT_MESG_CONFIG(...) SETTINGS_VALUE(nuraft_mesg_config, __VA_ARGS__)
-
-#define NURAFT_MESG_SETTINGS_FACTORY() SETTINGS_FACTORY(nuraft_mesg_config)

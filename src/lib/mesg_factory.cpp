@@ -19,6 +19,7 @@
 #include "service.hpp"
 #include "proto/messaging_service.grpc.pb.h"
 #include "utils.hpp"
+#include "nuraft_mesg_config.hpp"
 
 SISL_LOGGING_DECL(nuraft_mesg)
 
