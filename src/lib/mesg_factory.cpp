@@ -18,6 +18,8 @@
 #include "mesg_factory.hpp"
 #include "service.hpp"
 #include "proto/messaging_service.grpc.pb.h"
+#include "utils.hpp"
+#include "nuraft_mesg_config.hpp"
 
 SISL_LOGGING_DECL(nuraft_mesg)
 
@@ -27,7 +29,12 @@ std::string group_factory::m_ssl_cert;
 
 class messaging_client : public grpc_client< Messaging >, public std::enable_shared_from_this< messaging_client > {
 public:
-    using grpc_client< Messaging >::grpc_client;
+    messaging_client(std::string const& worker_name, std::string const& addr,
+                     const std::shared_ptr< sisl::TrfClient > trf_client, std::string const& target_domain = "",
+                     std::string const& ssl_cert = "") :
+            nuraft_mesg::grpc_client< Messaging >::grpc_client(worker_name, addr, trf_client, target_domain, ssl_cert) {
+        _generic_stub = sisl::GrpcAsyncClient::make_generic_stub(_worker_name);
+    }
     ~messaging_client() override = default;
 
     using grpc_base_client::send;
@@ -52,12 +59,34 @@ public:
             complete(*response.mutable_msg(), status);
         };
 
-        _stub->call_unary< RaftGroupMsg, RaftGroupMsg >(message, &Messaging::StubInterface::AsyncRaftStep, group_compl,
-                                                        2 /* deadline in seconds */);
+        _stub->call_unary< RaftGroupMsg, RaftGroupMsg >(
+            message, &Messaging::StubInterface::AsyncRaftStep, group_compl,
+            NURAFT_MESG_CONFIG(mesg_factory_config->raft_request_deadline_secs));
+    }
+
+    void data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
+                              data_service_response_handler_t const& response_cb) {
+        grpc::ByteBuffer cli_byte_buf;
+        serialize_to_byte_buffer(cli_byte_buf, cli_buf);
+        _generic_stub->call_unary(
+            cli_byte_buf, request_name,
+            [response_cb](grpc::ByteBuffer& resp, ::grpc::Status& status) {
+                if (!status.ok()) {
+                    LOGERRORMOD(nuraft_mesg, "Failed to send data_service_request, error: {}", status.error_message());
+                    return;
+                }
+                if (response_cb) {
+                    sisl::io_blob svr_buf;
+                    deserialize_from_byte_buffer(resp, svr_buf);
+                    response_cb(svr_buf);
+                }
+            },
+            NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs));
     }
 
 protected:
     void send(RaftMessage const&, handle_resp) override { throw std::runtime_error("Bad call!"); }
+    std::unique_ptr< sisl::GrpcAsyncClient::GenericAsyncStub > _generic_stub;
 };
 
 class group_client : public grpc_base_client {
@@ -95,6 +124,11 @@ public:
         group_msg.mutable_msg()->CopyFrom(message);
         _client->send(group_msg, complete);
     }
+
+    void data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
+                              data_service_response_handler_t const& response_cb) {
+        _client->data_service_request(request_name, cli_buf, response_cb);
+    }
 };
 
 std::error_condition mesg_factory::create_client(const std::string& client,
@@ -113,6 +147,16 @@ std::error_condition mesg_factory::reinit_client(const std::string& client, shar
     auto new_raft_client = std::static_pointer_cast< nuraft::rpc_client >(g_client->realClient());
     if (auto err = _group_factory->reinit_client(client, new_raft_client); err) { return err; }
     g_client->setClient(std::dynamic_pointer_cast< messaging_client >(new_raft_client));
+    return std::error_condition();
+}
+
+std::error_condition mesg_factory::data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
+                                                        data_service_response_handler_t const& response_cb) {
+    std::shared_lock< client_factory_lock_type > rl(_client_lock);
+    for (auto& nuraft_client : _clients) {
+        auto g_client = std::dynamic_pointer_cast< nuraft_mesg::group_client >(nuraft_client.second);
+        g_client->data_service_request(request_name, cli_buf, response_cb);
+    }
     return std::error_condition();
 }
 

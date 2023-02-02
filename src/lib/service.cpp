@@ -14,6 +14,8 @@
 #include "libnuraft/async.hxx"
 #include "libnuraft/rpc_listener.hxx"
 #include "service.hpp"
+#include "data_service.hpp"
+#include "mesg_factory.hpp"
 
 SISL_LOGGING_DECL(nuraft_mesg)
 
@@ -25,13 +27,21 @@ namespace nuraft_mesg {
 
 using AsyncRaftSvc = Messaging::AsyncService;
 
-grpc_server_wrapper::grpc_server_wrapper(group_name_t const& group_name) : m_server() {
+repl_service_ctx::repl_service_ctx() : m_server() {}
+
+grpc_server_wrapper::grpc_server_wrapper(group_name_t const& group_name) : m_repl_ctx() {
     if (0 < SISL_OPTIONS.count("msg_metrics")) m_metrics = std::make_shared< group_metrics >(group_name);
 }
 
+msg_service::msg_service(get_server_ctx_cb get_server_ctx, process_offload_cb process_offload,
+                         std::string const& service_address, bool const enable_data_service) :
+        _get_server_ctx(get_server_ctx), _get_process_offload(process_offload), _service_address(service_address) {
+    if (enable_data_service) { _data_service = std::make_unique< data_service >(); }
+}
+
 shared< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, process_offload_cb poc,
-                                          std::string const& service_address) {
-    return std::shared_ptr< msg_service >(new msg_service(get_server_ctx, poc, service_address),
+                                          std::string const& service_address, bool const enable_data_service) {
+    return std::shared_ptr< msg_service >(new msg_service(get_server_ctx, poc, service_address, enable_data_service),
                                           [](msg_service* p) { delete p; });
 }
 
@@ -40,12 +50,31 @@ msg_service::~msg_service() {
     DEBUG_ASSERT(_raft_servers.empty(), "RAFT servers not fully terminated!");
 }
 
+bool msg_service::data_service_enabled() const { return _data_service != nullptr; }
+
+bool msg_service::get_replication_service_ctx(std::string const& group_name, repl_service_ctx& repl_ctx) {
+    if (!data_service_enabled()) {
+        LOGERRORMOD(nuraft_mesg, "data service not enabled");
+        return false;
+    }
+    {
+        std::shared_lock< lock_type > rl(_raft_servers_lock);
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
+            repl_ctx = it->second.m_repl_ctx;
+            return true;
+        }
+    }
+    LOGERRORMOD(nuraft_mesg, "Group name {} not found", group_name);
+    return false;
+}
+
 void msg_service::associate(::sisl::GrpcServer* server) {
     RELEASE_ASSERT(server, "NULL server!");
     if (!server->register_async_service< Messaging >()) {
         LOGERRORMOD(nuraft_mesg, "Could not register RaftSvc with gRPC!");
         abort();
     }
+    if (data_service_enabled()) { _data_service->associate(server); }
 }
 
 void msg_service::bind(::sisl::GrpcServer* server) {
@@ -56,13 +85,25 @@ void msg_service::bind(::sisl::GrpcServer* server) {
         LOGERRORMOD(nuraft_mesg, "Could not bind gRPC ::RaftStep to routine!");
         abort();
     }
+    if (data_service_enabled()) { _data_service->bind(server); }
+}
+
+bool msg_service::bind_data_service_request(sisl::GrpcServer* server, std::string const& request_name,
+                                            data_service_request_handler_t const& request_handler) {
+    if (!data_service_enabled()) {
+        LOGERRORMOD(nuraft_mesg, "Could not register data service method {}; data service is null", request_name);
+        return false;
+    }
+    return _data_service->bind(server, request_name, request_handler);
 }
 
 nuraft::cmd_result_code msg_service::add_srv(group_name_t const& group_name, nuraft::srv_config const& cfg) {
     shared< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
-        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
+            server = it->second.m_repl_ctx.m_server;
+        }
     }
     if (server) {
         try {
@@ -76,7 +117,9 @@ nuraft::cmd_result_code msg_service::rm_srv(group_name_t const& group_name, int 
     shared< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
-        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
+            server = it->second.m_repl_ctx.m_server;
+        }
     }
     if (server) {
         try {
@@ -90,7 +133,9 @@ bool msg_service::request_leadership(group_name_t const& group_name) {
     shared< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
-        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
+            server = it->second.m_repl_ctx.m_server;
+        }
     }
     if (server) {
         try {
@@ -108,7 +153,9 @@ void msg_service::get_srv_config_all(group_name_t const& group_name,
     shared< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
-        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
+            server = it->second.m_repl_ctx.m_server;
+        }
     }
     if (server) {
         try {
@@ -123,7 +170,9 @@ nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_na
     shared< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
-        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
+            server = it->second.m_repl_ctx.m_server;
+        }
     }
     if (server) {
         try {
@@ -163,13 +212,13 @@ bool msg_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg,
     // should emplace a corresponding server in the _raft_servers member.
     if (nuraft::join_cluster_request == base.type()) { joinRaftGroup(base.dest(), group_name, request.group_type()); }
 
-    // Find th RaftServer context based on the name of the group.
+    // Find the RaftServer context based on the name of the group.
     shared< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
             if (it->second.m_metrics) COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
-            server = it->second.m_server;
+            server = it->second.m_repl_ctx.m_server;
         }
     }
 
@@ -259,7 +308,10 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
             auto new_listner = std::make_shared< msg_group_listner >(shared_from_this(), group_name);
             ctx->rpc_listener_ = std::static_pointer_cast< nuraft::rpc_listener >(new_listner);
             auto server = std::make_shared< nuraft::raft_server >(ctx);
-            it->second.m_server = std::make_shared< null_service >(server);
+            it->second.m_repl_ctx.m_server = std::make_shared< null_service >(server);
+            if (data_service_enabled()) {
+                it->second.m_repl_ctx.m_mesg_factory = std::dynamic_pointer_cast< mesg_factory >(ctx->rpc_cli_factory_);
+            }
         }
     }
     return std::error_condition();
@@ -271,7 +323,7 @@ void msg_service::partRaftGroup(group_name_t const& group_name) {
     {
         std::unique_lock< lock_type > lck(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
-            server = it->second.m_server;
+            server = it->second.m_repl_ctx.m_server;
         } else {
             LOGWARNMOD(nuraft_mesg, "Unknown RAFT group: {} cannot part.", group_name);
             return;
@@ -292,7 +344,7 @@ void msg_service::shutdown() {
     {
         std::unique_lock< lock_type > lck(_raft_servers_lock);
         for (auto& [k, v] : _raft_servers) {
-            servers.push_back(v.m_server);
+            servers.push_back(v.m_repl_ctx.m_server);
         }
     }
 

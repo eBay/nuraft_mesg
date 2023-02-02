@@ -6,12 +6,13 @@
 
 #include <condition_variable>
 #include <map>
-#include <shared_mutex>
+#include <folly/SharedMutex.h>
 #include "grpc_server.hpp"
 #include <sisl/grpc/rpc_server.hpp>
 #include <sisl/metrics/metrics.hpp>
 
 #include "proto/messaging_service.grpc.pb.h"
+#include "messaging_if.hpp"
 
 namespace nuraft_mesg {
 
@@ -25,8 +26,10 @@ using group_name_t = std::string;
 using group_type_t = std::string;
 
 class msg_service;
+class mesg_factory;
+class data_service;
 
-using lock_type = std::shared_mutex;
+using lock_type = folly::SharedMutex;
 
 class group_metrics : public sisl::MetricsGroupWrapper {
 public:
@@ -49,7 +52,7 @@ using process_offload_cb = std::function< std::function< void(std::function< voi
 struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name);
 
-    shared< grpc_server > m_server;
+    repl_service_ctx m_repl_ctx;
     shared< group_metrics > m_metrics;
 };
 
@@ -62,15 +65,17 @@ class msg_service : public std::enable_shared_from_this< msg_service > {
     std::map< group_name_t, grpc_server_wrapper > _raft_servers;
     std::string const _service_address;
     std::string _default_group_type;
+    std::unique_ptr< data_service > _data_service{nullptr};
 
     msg_service(get_server_ctx_cb get_server_ctx, process_offload_cb process_offload,
-                std::string const& service_address) :
-            _get_server_ctx(get_server_ctx), _get_process_offload(process_offload), _service_address(service_address) {}
+                std::string const& service_address, bool const enable_data_service);
     ~msg_service();
+
+    bool data_service_enabled() const;
 
 public:
     static shared< msg_service > create(get_server_ctx_cb get_server_ctx, process_offload_cb poc,
-                                        std::string const& service_address);
+                                        std::string const& service_address, bool const enable_data_service);
 
     msg_service(msg_service const&) = delete;
     msg_service& operator=(msg_service const&) = delete;
@@ -87,6 +92,9 @@ public:
 
     void associate(sisl::GrpcServer* server);
     void bind(sisl::GrpcServer* server);
+    bool bind_data_service_request(sisl::GrpcServer* server, std::string const& request_name,
+                                   data_service_request_handler_t const& request_handler);
+    bool get_replication_service_ctx(std::string const& group_name, repl_service_ctx& repl_ctx);
 
     //::grpc::Status raftStep(RaftGroupMsg& request, RaftGroupMsg& response);
     bool raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);

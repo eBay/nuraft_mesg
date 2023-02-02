@@ -33,8 +33,10 @@
 #include "libnuraft/cluster_config.hxx"
 #include "libnuraft/state_machine.hxx"
 #include "messaging.hpp"
+#include "mesg_factory.hpp"
 
 #include "test_state_manager.h"
+#include <sisl/fds/buffer.hpp>
 
 SISL_LOGGING_INIT(nuraft, nuraft_mesg, grpc_server)
 
@@ -64,7 +66,7 @@ using namespace nuraft_mesg;
 using testing::_;
 using testing::Return;
 
-class MessagingFixture : public ::testing::Test {
+class MessagingFixtureBase : public ::testing::Test {
 protected:
     std::unique_ptr< service > instance_1;
     std::unique_ptr< service > instance_2;
@@ -83,14 +85,19 @@ protected:
     std::map< std::string, std::string > lookup_map;
     std::function< std::string(std::string const&) > lookup_callback;
     nuraft::raft_params r_params;
+    consensus_component::params params;
 
-    void get_random_ports(const uint16_t n) {
+    uint32_t get_random_num() {
         static std::random_device dev;
         static std::mt19937 rng(dev());
         std::uniform_int_distribution< std::mt19937::result_type > dist(1001u, 99999u);
+        return dist(rng);
+    }
+
+    void get_random_ports(const uint16_t n) {
         auto cur_size = ports.size();
         for (; ports.size() < cur_size + n;) {
-            uint32_t r = dist(rng);
+            uint32_t r = get_random_num();
             if (std::find(ports.begin(), ports.end(), r) == ports.end()) { ports.emplace_back(r); }
         }
     }
@@ -114,7 +121,19 @@ protected:
             return (lookup_map.count(id) > 0) ? lookup_map[id] : std::string();
         };
 
-        auto params = consensus_component::params{id_1, ports[0], lookup_callback, "test_type"};
+        params.server_uuid = id_1;
+        params.mesg_port = ports[0];
+        params.lookup_peer = lookup_callback;
+        params.default_group_type = "test_type";
+    }
+
+    void TearDown() override {
+        instance_1.reset();
+        instance_2.reset();
+        instance_3.reset();
+    }
+
+    void start() {
         instance_1->start(params);
 
         // RAFT server parameters
@@ -163,14 +182,14 @@ protected:
         EXPECT_TRUE(instance_1->add_member("test_group", id_3, true));
         std::this_thread::sleep_for(std::chrono::seconds(2));
     }
+};
 
-    void TearDown() override {
-        instance_1.reset();
-        instance_2.reset();
-        instance_3.reset();
+class MessagingFixture : public MessagingFixtureBase {
+protected:
+    void SetUp() override {
+        MessagingFixtureBase::SetUp();
+        start();
     }
-
-public:
 };
 
 // Basic client request (append_entries)
@@ -283,6 +302,113 @@ TEST_F(MessagingFixture, SyncAddMember) {
     srv_list.clear();
     instance_1->get_srv_config_all("test_group", srv_list);
     EXPECT_EQ(srv_list.size(), 4u);
+}
+
+class DataServiceFixture : public MessagingFixtureBase {
+protected:
+    void SetUp() override {
+        MessagingFixtureBase::SetUp();
+        params.enable_data_service = true;
+        start();
+    }
+};
+
+static std::string const SEND_DATA{"send_data"};
+static std::string const REQUEST_DATA{"request_data"};
+static std::atomic< uint32_t > server_counter{0};
+static std::atomic< uint32_t > client_counter{0};
+static int const data_size{8};
+static std::vector< uint32_t > data_vec;
+
+bool receive_data(sisl::io_blob const& incoming_buf) {
+    EXPECT_EQ(incoming_buf.size / sizeof(uint32_t), data_size);
+    for (size_t read_sz{0}; read_sz < incoming_buf.size; read_sz += sizeof(uint32_t)) {
+        uint32_t const data{*reinterpret_cast< uint32_t* >(incoming_buf.bytes + read_sz)};
+        EXPECT_EQ(data, data_vec[read_sz / sizeof(uint32_t)]);
+    }
+    server_counter++;
+    return true;
+}
+bool request_data(sisl::io_blob const& incoming_buf) {
+    server_counter++;
+    return true;
+}
+void client_response_cb(sisl::io_blob const& incoming_buf) { client_counter++; }
+
+TEST_F(DataServiceFixture, DataServiceBasic) {
+    // create new servers
+    std::unique_ptr< service > instance_4 = std::make_unique< service >();
+    std::string id_4 = to_string(boost::uuids::random_generator()());
+    std::unique_ptr< service > instance_5 = std::make_unique< service >();
+    std::string id_5 = to_string(boost::uuids::random_generator()());
+    // generate random_port
+    get_random_ports(2u);
+    lookup_map.emplace(id_4, fmt::format("127.0.0.1:{}", ports[3]));
+    lookup_map.emplace(id_5, fmt::format("127.0.0.1:{}", ports[4]));
+    params.server_uuid = id_4, params.mesg_port = ports[3];
+    std::shared_ptr< test_state_mgr > sm_int_4;
+    auto register_params_4 = consensus_component::register_params{
+        r_params,
+        [this, srv_addr = id_4, &sm_int_4](int32_t const srv_id,
+                                           std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
+            sm_int_4 = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
+            return std::static_pointer_cast< mesg_state_mgr >(sm_int_4);
+        }};
+    std::shared_ptr< test_state_mgr > sm_int_5;
+    auto register_params_5 = consensus_component::register_params{
+        r_params,
+        [this, srv_addr = id_5, &sm_int_5](int32_t const srv_id,
+                                           std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
+            sm_int_5 = std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id);
+            return std::static_pointer_cast< mesg_state_mgr >(sm_int_5);
+        }};
+    instance_4->start(params);
+    instance_4->register_mgr_type("test_type", register_params_4);
+    params.server_uuid = id_5, params.mesg_port = ports[4];
+    instance_5->start(params);
+    instance_5->register_mgr_type("test_type", register_params_5);
+
+    // create new group
+    instance_4->create_group("data_service_test_group", "test_type");
+    EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_1, true));
+    EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_2, true));
+    EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_5, true));
+
+    // bind data channel request methods
+    EXPECT_TRUE(instance_1->bind_data_service_request(SEND_DATA, receive_data));
+    EXPECT_TRUE(instance_1->bind_data_service_request(REQUEST_DATA, request_data));
+    EXPECT_TRUE(instance_2->bind_data_service_request(SEND_DATA, receive_data));
+    EXPECT_TRUE(instance_2->bind_data_service_request(REQUEST_DATA, request_data));
+    EXPECT_TRUE(instance_3->bind_data_service_request(SEND_DATA, receive_data));
+    EXPECT_TRUE(instance_3->bind_data_service_request(REQUEST_DATA, request_data));
+    EXPECT_TRUE(instance_4->bind_data_service_request(SEND_DATA, receive_data));
+    EXPECT_TRUE(instance_5->bind_data_service_request(SEND_DATA, receive_data));
+
+    io_blob_list_t cli_buf;
+    for (int i = 0; i < data_size; i++) {
+        cli_buf.emplace_back(sizeof(uint32_t));
+        uint32_t* const write_buf{reinterpret_cast< uint32_t* >(cli_buf[i].bytes)};
+        data_vec.emplace_back(get_random_num());
+        *write_buf = data_vec.back();
+    }
+
+    repl_service_ctx repl_ctx1, repl_ctx4;
+    EXPECT_TRUE(instance_1->get_replication_service_ctx("test_group", repl_ctx1));
+    EXPECT_TRUE(instance_4->get_replication_service_ctx("data_service_test_group", repl_ctx4));
+
+    EXPECT_FALSE(repl_ctx1.m_mesg_factory->data_service_request(SEND_DATA, cli_buf, client_response_cb));
+    EXPECT_FALSE(repl_ctx4.m_mesg_factory->data_service_request(SEND_DATA, cli_buf, client_response_cb));
+    EXPECT_FALSE(repl_ctx1.m_mesg_factory->data_service_request(REQUEST_DATA, cli_buf, client_response_cb));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    // add a new member to data_service_test_group and check if repl_ctx4 sends data to newly added member
+    EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_3, true));
+    EXPECT_FALSE(repl_ctx4.m_mesg_factory->data_service_request(SEND_DATA, cli_buf, client_response_cb));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    // the count is 4 (2 methods from group test_group) + 7 (from data_service_test_group)
+    EXPECT_EQ(server_counter, 11);
+    EXPECT_EQ(client_counter, 11);
 }
 
 int main(int argc, char* argv[]) {

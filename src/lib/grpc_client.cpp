@@ -18,6 +18,7 @@
 //
 #include "grpc_client.hpp"
 #include "utils.hpp"
+#include "proto/raft_types.pb.h"
 
 namespace nuraft_mesg {
 

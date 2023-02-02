@@ -85,10 +85,10 @@ void service::start(consensus_component::params& start_params) {
             auto const& type_params = _state_mgr_types[group_type];
             return type_params.process_req;
         },
-        _start_params.server_uuid);
+        _start_params.server_uuid, _start_params.enable_data_service);
     _mesg_service->setDefaultGroupType(_start_params.default_group_type);
 
-    // Start a gRPC server and create and associate nuraft_mesg service.
+    // Start a gRPC server and create and associate nuraft_mesg services.
     restart_server();
 }
 
@@ -101,6 +101,7 @@ void service::restart_server() {
     _grpc_server = std::unique_ptr< sisl::GrpcServer >(sisl::GrpcServer::make(
         listen_address, _start_params.auth_mgr, grpc_server_threads, _start_params.ssl_key, _start_params.ssl_cert));
     _mesg_service->associate(_grpc_server.get());
+
     _grpc_server->run();
     _mesg_service->bind(_grpc_server.get());
 }
@@ -400,7 +401,15 @@ uint32_t service::logstore_id(std::string const& group_id) const {
 
 void service::get_srv_config_all(std::string const& group_name,
                                  std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) {
-    auto lk = std::unique_lock< std::mutex >(_manager_lock);
     _mesg_service->get_srv_config_all(group_name, configs_out);
+}
+
+bool service::get_replication_service_ctx(std::string const& group_id, repl_service_ctx& repl_ctx) {
+    return _mesg_service->get_replication_service_ctx(group_id, repl_ctx);
+}
+
+bool service::bind_data_service_request(std::string const& request_name,
+                                        data_service_request_handler_t const& request_handler) {
+    return _mesg_service->bind_data_service_request(_grpc_server.get(), request_name, request_handler);
 }
 } // namespace nuraft_mesg

@@ -18,12 +18,43 @@
 #include <memory>
 #include <string>
 #include <system_error>
+#include <folly/small_vector.h>
 
 #include <libnuraft/nuraft.hxx>
-#include <sisl/auth_manager/trf_client.hpp>
-#include <sisl/auth_manager/auth_manager.hpp>
+#include <sisl/fds/buffer.hpp>
+
+namespace grpc {
+class ByteBuffer;
+class Status;
+} // namespace grpc
+
+namespace sisl {
+class AuthManager;
+class TrfClient;
+class GenericRpcData;
+using generic_unary_callback_t = std::function< void(grpc::ByteBuffer&, ::grpc::Status& status) >;
+} // namespace sisl
 
 namespace nuraft_mesg {
+
+using io_blob_list_t = folly::small_vector< sisl::io_blob, 4 >;
+
+// called by the server after it receives the request
+using data_service_request_handler_t = std::function< bool(sisl::io_blob const& incoming_buf) >;
+
+// called by the client after it receives response to its request
+using data_service_response_handler_t = std::function< void(sisl::io_blob const& incoming_buf) >;
+
+// This object can be stored by the caller and can be used to directly call raft/data operatons without taking
+// _raft_servers_lock
+class mesg_factory;
+class grpc_server;
+struct repl_service_ctx {
+    repl_service_ctx();
+
+    std::shared_ptr< grpc_server > m_server;
+    std::shared_ptr< mesg_factory > m_mesg_factory;
+};
 
 class mesg_state_mgr : public nuraft::state_mgr {
 public:
@@ -52,6 +83,7 @@ public:
         std::shared_ptr< sisl::TrfClient > trf_client{nullptr};
         std::string ssl_key{};
         std::string ssl_cert{};
+        bool enable_data_service{false};
     };
     virtual ~consensus_component() = default;
     virtual void start(consensus_component::params& start_params) = 0;
@@ -81,6 +113,11 @@ public:
     virtual uint32_t logstore_id(std::string const& group_id) const = 0;
     virtual int32_t server_id() const = 0;
     virtual void restart_server() = 0;
+
+    // data channel APIs
+    virtual bool get_replication_service_ctx(std::string const& group_id, repl_service_ctx& repl_ctx) = 0;
+    virtual bool bind_data_service_request(std::string const& request_name,
+                                           data_service_request_handler_t const& request_handler) = 0;
 };
 
 } // namespace nuraft_mesg

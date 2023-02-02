@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.11)
 find_package(sisl REQUIRED)
 find_package(nuraft REQUIRED)
 
+include(${sisl_INCLUDE_DIRS}/../cmake/settings_gen.cmake)
+
 add_subdirectory (proto)
 
 add_library(${PROJECT_NAME})
@@ -12,9 +14,11 @@ target_sources(${PROJECT_NAME} PRIVATE
     lib/grpc_server.cpp
     lib/mesg_factory.cpp
     lib/service.cpp
+    lib/data_service.cpp
     lib/messaging.cpp
     $<TARGET_OBJECTS:${PROJECT_NAME}-proto>
   )
+settings_gen_cpp($<TARGET_FILE:flatbuffers::flatc> ${CMAKE_CURRENT_BINARY_DIR}/generated/ ${PROJECT_NAME} lib/nuraft_mesg_config.fbs)
 target_link_libraries(${PROJECT_NAME}
     sisl::sisl
     nuraft::nuraft

@@ -83,6 +83,11 @@ public:
     void get_peers(std::string const& group_id, std::list< std::string >&) const override;
     void restart_server() override;
 
+    // data service APIs
+    bool get_replication_service_ctx(std::string const& group_id, repl_service_ctx& repl_ctx) override;
+    bool bind_data_service_request(std::string const& request_name,
+                                   data_service_request_handler_t const& request_handler) override;
+
     // for testing
     void get_srv_config_all(std::string const& group_name,
                             std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out);

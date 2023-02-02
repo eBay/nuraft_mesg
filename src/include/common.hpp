@@ -22,8 +22,7 @@
 
 #include <libnuraft/nuraft.hxx>
 #include <sisl/logging/logging.h>
-
-#include "proto/raft_types.pb.h"
+#include <sisl/settings/settings.hpp>
 
 SISL_LOGGING_DECL(nuraft_mesg)
 
