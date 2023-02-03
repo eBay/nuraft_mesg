@@ -49,11 +49,13 @@ using data_service_response_handler_t = std::function< void(sisl::io_blob const&
 // _raft_servers_lock
 class mesg_factory;
 class grpc_server;
-struct repl_service_ctx {
-    repl_service_ctx();
-
+class repl_service_ctx {
+public:
+    repl_service_ctx() = default;
     std::shared_ptr< grpc_server > m_server;
-    std::shared_ptr< mesg_factory > m_mesg_factory;
+
+    virtual std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
+                                                      data_service_response_handler_t const& response_cb) = 0;
 };
 
 class mesg_state_mgr : public nuraft::state_mgr {
@@ -116,7 +118,7 @@ public:
 
     // data channel APIs
     virtual bool get_replication_service_ctx(std::string const& group_id, repl_service_ctx& repl_ctx) = 0;
-    virtual bool bind_data_service_request(std::string const& request_name,
+    virtual bool bind_data_service_request(std::string const& request_name, std::string const& group_id,
                                            data_service_request_handler_t const& request_handler) = 0;
 };
 

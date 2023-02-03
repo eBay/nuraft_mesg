@@ -52,4 +52,10 @@ static grpc::Status deserialize_from_byte_buffer(grpc::ByteBuffer const& cli_byt
     return status;
 }
 
+// generic rpc server looks up rpc name in a map and calls the corresponding callback. To avoid another lookup in this
+// layer, we registed one callback for each (group_id, request_name) pair. The rpc_name is their concatenation.
+static std::string get_generic_method_name(std::string const& request_name, std::string const& group_id) {
+    return fmt::format("{}|{}", request_name, group_id);
+}
+
 } // namespace nuraft_mesg
