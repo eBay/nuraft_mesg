@@ -408,8 +408,17 @@ bool service::get_replication_service_ctx(std::string const& group_id, repl_serv
     return _mesg_service->get_replication_service_ctx(group_id, repl_ctx);
 }
 
-bool service::bind_data_service_request(std::string const& request_name,
+bool service::bind_data_service_request(std::string const& request_name, std::string const& group_id,
                                         data_service_request_handler_t const& request_handler) {
-    return _mesg_service->bind_data_service_request(_grpc_server.get(), request_name, request_handler);
+    return _mesg_service->bind_data_service_request(request_name, group_id, request_handler);
+}
+
+std::error_condition repl_service_ctx_grpc::data_service_request(std::string const& request_name,
+                                                                 io_blob_list_t const& cli_buf,
+                                                                 data_service_response_handler_t const& response_cb) {
+
+    return (m_mesg_factory) ? m_mesg_factory->data_service_request(request_name, cli_buf, response_cb)
+                            : std::make_error_condition(std::errc::no_such_device);
+    ;
 }
 } // namespace nuraft_mesg

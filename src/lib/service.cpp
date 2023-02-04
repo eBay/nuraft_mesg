@@ -14,7 +14,6 @@
 #include "libnuraft/async.hxx"
 #include "libnuraft/rpc_listener.hxx"
 #include "service.hpp"
-#include "data_service.hpp"
 #include "mesg_factory.hpp"
 
 SISL_LOGGING_DECL(nuraft_mesg)
@@ -27,17 +26,16 @@ namespace nuraft_mesg {
 
 using AsyncRaftSvc = Messaging::AsyncService;
 
-repl_service_ctx::repl_service_ctx() : m_server() {}
-
 grpc_server_wrapper::grpc_server_wrapper(group_name_t const& group_name) : m_repl_ctx() {
     if (0 < SISL_OPTIONS.count("msg_metrics")) m_metrics = std::make_shared< group_metrics >(group_name);
 }
 
 msg_service::msg_service(get_server_ctx_cb get_server_ctx, process_offload_cb process_offload,
                          std::string const& service_address, bool const enable_data_service) :
-        _get_server_ctx(get_server_ctx), _get_process_offload(process_offload), _service_address(service_address) {
-    if (enable_data_service) { _data_service = std::make_unique< data_service >(); }
-}
+        _get_server_ctx(get_server_ctx),
+        _get_process_offload(process_offload),
+        _service_address(service_address),
+        _data_service_enabled(enable_data_service) {}
 
 shared< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, process_offload_cb poc,
                                           std::string const& service_address, bool const enable_data_service) {
@@ -50,17 +48,16 @@ msg_service::~msg_service() {
     DEBUG_ASSERT(_raft_servers.empty(), "RAFT servers not fully terminated!");
 }
 
-bool msg_service::data_service_enabled() const { return _data_service != nullptr; }
-
 bool msg_service::get_replication_service_ctx(std::string const& group_name, repl_service_ctx& repl_ctx) {
-    if (!data_service_enabled()) {
+    if (!_data_service_enabled) {
         LOGERRORMOD(nuraft_mesg, "data service not enabled");
         return false;
     }
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
-            repl_ctx = it->second.m_repl_ctx;
+            auto& repl_ctx_grpc = static_cast< repl_service_ctx_t& >(repl_ctx);
+            repl_ctx_grpc = it->second.m_repl_ctx;
             return true;
         }
     }
@@ -74,7 +71,10 @@ void msg_service::associate(::sisl::GrpcServer* server) {
         LOGERRORMOD(nuraft_mesg, "Could not register RaftSvc with gRPC!");
         abort();
     }
-    if (data_service_enabled()) { _data_service->associate(server); }
+    if (_data_service_enabled) {
+        _data_service.set_grpc_server(server);
+        _data_service.associate();
+    }
 }
 
 void msg_service::bind(::sisl::GrpcServer* server) {
@@ -85,16 +85,16 @@ void msg_service::bind(::sisl::GrpcServer* server) {
         LOGERRORMOD(nuraft_mesg, "Could not bind gRPC ::RaftStep to routine!");
         abort();
     }
-    if (data_service_enabled()) { _data_service->bind(server); }
+    if (_data_service_enabled) { _data_service.bind(); }
 }
 
-bool msg_service::bind_data_service_request(sisl::GrpcServer* server, std::string const& request_name,
+bool msg_service::bind_data_service_request(std::string const& request_name, std::string const& group_id,
                                             data_service_request_handler_t const& request_handler) {
-    if (!data_service_enabled()) {
+    if (!_data_service_enabled) {
         LOGERRORMOD(nuraft_mesg, "Could not register data service method {}; data service is null", request_name);
         return false;
     }
-    return _data_service->bind(server, request_name, request_handler);
+    return _data_service.bind(request_name, group_id, request_handler);
 }
 
 nuraft::cmd_result_code msg_service::add_srv(group_name_t const& group_name, nuraft::srv_config const& cfg) {
@@ -309,7 +309,7 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
             ctx->rpc_listener_ = std::static_pointer_cast< nuraft::rpc_listener >(new_listner);
             auto server = std::make_shared< nuraft::raft_server >(ctx);
             it->second.m_repl_ctx.m_server = std::make_shared< null_service >(server);
-            if (data_service_enabled()) {
+            if (_data_service_enabled) {
                 it->second.m_repl_ctx.m_mesg_factory = std::dynamic_pointer_cast< mesg_factory >(ctx->rpc_cli_factory_);
             }
         }

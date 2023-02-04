@@ -155,7 +155,7 @@ std::error_condition mesg_factory::data_service_request(std::string const& reque
     std::shared_lock< client_factory_lock_type > rl(_client_lock);
     for (auto& nuraft_client : _clients) {
         auto g_client = std::dynamic_pointer_cast< nuraft_mesg::group_client >(nuraft_client.second);
-        g_client->data_service_request(request_name, cli_buf, response_cb);
+        g_client->data_service_request(get_generic_method_name(request_name, _group_name), cli_buf, response_cb);
     }
     return std::error_condition();
 }

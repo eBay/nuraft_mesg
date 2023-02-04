@@ -375,14 +375,18 @@ TEST_F(DataServiceFixture, DataServiceBasic) {
     EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_5, true));
 
     // bind data channel request methods
-    EXPECT_TRUE(instance_1->bind_data_service_request(SEND_DATA, receive_data));
-    EXPECT_TRUE(instance_1->bind_data_service_request(REQUEST_DATA, request_data));
-    EXPECT_TRUE(instance_2->bind_data_service_request(SEND_DATA, receive_data));
-    EXPECT_TRUE(instance_2->bind_data_service_request(REQUEST_DATA, request_data));
-    EXPECT_TRUE(instance_3->bind_data_service_request(SEND_DATA, receive_data));
-    EXPECT_TRUE(instance_3->bind_data_service_request(REQUEST_DATA, request_data));
-    EXPECT_TRUE(instance_4->bind_data_service_request(SEND_DATA, receive_data));
-    EXPECT_TRUE(instance_5->bind_data_service_request(SEND_DATA, receive_data));
+#define BIND_DATA_SERVICE_REQ(instance, group)                                                                         \
+    EXPECT_TRUE(instance->bind_data_service_request(SEND_DATA, group, receive_data));                                  \
+    EXPECT_TRUE(instance->bind_data_service_request(REQUEST_DATA, group, request_data));
+
+    BIND_DATA_SERVICE_REQ(instance_1, "test_group");
+    BIND_DATA_SERVICE_REQ(instance_2, "test_group");
+    BIND_DATA_SERVICE_REQ(instance_3, "test_group");
+
+    BIND_DATA_SERVICE_REQ(instance_1, "data_service_test_group");
+    BIND_DATA_SERVICE_REQ(instance_2, "data_service_test_group");
+    BIND_DATA_SERVICE_REQ(instance_4, "data_service_test_group");
+    BIND_DATA_SERVICE_REQ(instance_5, "data_service_test_group");
 
     io_blob_list_t cli_buf;
     for (int i = 0; i < data_size; i++) {
@@ -392,17 +396,18 @@ TEST_F(DataServiceFixture, DataServiceBasic) {
         *write_buf = data_vec.back();
     }
 
-    repl_service_ctx repl_ctx1, repl_ctx4;
+    repl_service_ctx_grpc repl_ctx1, repl_ctx4;
     EXPECT_TRUE(instance_1->get_replication_service_ctx("test_group", repl_ctx1));
     EXPECT_TRUE(instance_4->get_replication_service_ctx("data_service_test_group", repl_ctx4));
 
-    EXPECT_FALSE(repl_ctx1.m_mesg_factory->data_service_request(SEND_DATA, cli_buf, client_response_cb));
-    EXPECT_FALSE(repl_ctx4.m_mesg_factory->data_service_request(SEND_DATA, cli_buf, client_response_cb));
-    EXPECT_FALSE(repl_ctx1.m_mesg_factory->data_service_request(REQUEST_DATA, cli_buf, client_response_cb));
+    EXPECT_FALSE(repl_ctx1.data_service_request(SEND_DATA, cli_buf, client_response_cb));
+    EXPECT_FALSE(repl_ctx4.data_service_request(SEND_DATA, cli_buf, client_response_cb));
+    EXPECT_FALSE(repl_ctx1.data_service_request(REQUEST_DATA, cli_buf, client_response_cb));
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // add a new member to data_service_test_group and check if repl_ctx4 sends data to newly added member
     EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_3, true));
+    BIND_DATA_SERVICE_REQ(instance_3, "data_service_test_group");
     EXPECT_FALSE(repl_ctx4.m_mesg_factory->data_service_request(SEND_DATA, cli_buf, client_response_cb));
     std::this_thread::sleep_for(std::chrono::seconds(1));
 

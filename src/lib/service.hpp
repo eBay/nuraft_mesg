@@ -13,6 +13,8 @@
 
 #include "proto/messaging_service.grpc.pb.h"
 #include "messaging_if.hpp"
+#include "messaging.hpp"
+#include "data_service_grpc.hpp"
 
 namespace nuraft_mesg {
 
@@ -27,7 +29,7 @@ using group_type_t = std::string;
 
 class msg_service;
 class mesg_factory;
-class data_service;
+class repl_service_ctx_grpc;
 
 using lock_type = folly::SharedMutex;
 
@@ -46,13 +48,18 @@ public:
 using get_server_ctx_cb = std::function< std::error_condition(int32_t srv_id, group_name_t const&, group_type_t const&,
                                                               nuraft::context*& ctx_out,
                                                               shared< group_metrics > metrics) >;
+
+// pluggable types for data service and repl ctx
+using repl_service_ctx_t = repl_service_ctx_grpc;
+using data_service_t = data_service_grpc;
+
 // A calback that returns the registered callback for for offloading RAFT request processing
 using process_offload_cb = std::function< std::function< void(std::function< void() >) >(group_type_t const&) >;
 
 struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name);
 
-    repl_service_ctx m_repl_ctx;
+    repl_service_ctx_t m_repl_ctx;
     shared< group_metrics > m_metrics;
 };
 
@@ -65,13 +72,12 @@ class msg_service : public std::enable_shared_from_this< msg_service > {
     std::map< group_name_t, grpc_server_wrapper > _raft_servers;
     std::string const _service_address;
     std::string _default_group_type;
-    std::unique_ptr< data_service > _data_service{nullptr};
+    data_service_t _data_service;
+    bool _data_service_enabled;
 
     msg_service(get_server_ctx_cb get_server_ctx, process_offload_cb process_offload,
                 std::string const& service_address, bool const enable_data_service);
     ~msg_service();
-
-    bool data_service_enabled() const;
 
 public:
     static shared< msg_service > create(get_server_ctx_cb get_server_ctx, process_offload_cb poc,
@@ -92,7 +98,7 @@ public:
 
     void associate(sisl::GrpcServer* server);
     void bind(sisl::GrpcServer* server);
-    bool bind_data_service_request(sisl::GrpcServer* server, std::string const& request_name,
+    bool bind_data_service_request(std::string const& request_name, std::string const& group_id,
                                    data_service_request_handler_t const& request_handler);
     bool get_replication_service_ctx(std::string const& group_name, repl_service_ctx& repl_ctx);
 
