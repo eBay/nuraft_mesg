@@ -3,7 +3,7 @@ from conans import ConanFile, CMake, tools
 
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "0.0.3"
+    version = "0.0.4"
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
     topics = ("ebay", "nublox", "raft")
@@ -42,7 +42,7 @@ class NuRaftMesgConan(ConanFile):
             del self.options.fPIC
 
     def build_requirements(self):
-        self.build_requires("gtest/1.12.1")
+        self.build_requires("gtest/1.13.0")
         if (self.options.testing):
             self.build_requires("jungle_logstore/nbi.20230104@sds/master")
 
