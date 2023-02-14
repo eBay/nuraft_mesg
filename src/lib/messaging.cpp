@@ -175,7 +175,11 @@ std::error_condition service::group_init(int32_t const srv_id, std::string const
     nuraft::raft_params params;
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
-        auto const& type_params = _state_mgr_types[group_type];
+        auto def_group = _state_mgr_types.end();
+        if (def_group = _state_mgr_types.find(group_type); _state_mgr_types.end() == def_group) {
+            return std::make_error_condition(std::errc::invalid_argument);
+        }
+        auto const& type_params = def_group->second;
         params = type_params.raft_params;
 
         auto [it, happened] = _state_managers.emplace(group_id, nullptr);
