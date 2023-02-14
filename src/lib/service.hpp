@@ -49,8 +49,7 @@ using get_server_ctx_cb = std::function< std::error_condition(int32_t srv_id, gr
                                                               nuraft::context*& ctx_out,
                                                               shared< group_metrics > metrics) >;
 
-// pluggable types for data service and repl ctx
-using repl_service_ctx_t = repl_service_ctx_grpc;
+// pluggable type for data service
 using data_service_t = data_service_grpc;
 
 // A calback that returns the registered callback for for offloading RAFT request processing
@@ -59,7 +58,7 @@ using process_offload_cb = std::function< std::function< void(std::function< voi
 struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name);
 
-    repl_service_ctx_t m_repl_ctx;
+    shared< grpc_server > m_server;
     shared< group_metrics > m_metrics;
 };
 
@@ -100,7 +99,6 @@ public:
     void bind(sisl::GrpcServer* server);
     bool bind_data_service_request(std::string const& request_name, std::string const& group_id,
                                    data_service_request_handler_t const& request_handler);
-    bool get_replication_service_ctx(std::string const& group_name, repl_service_ctx& repl_ctx);
 
     //::grpc::Status raftStep(RaftGroupMsg& request, RaftGroupMsg& response);
     bool raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);

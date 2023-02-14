@@ -49,24 +49,31 @@ using data_service_response_handler_t = std::function< void(sisl::io_blob const&
 // _raft_servers_lock
 class mesg_factory;
 class grpc_server;
-class repl_service_ctx {
-public:
-    repl_service_ctx() = default;
-    std::shared_ptr< grpc_server > m_server;
 
-    virtual std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
-                                                      data_service_response_handler_t const& response_cb) = 0;
+class repl_service_ctx_grpc {
+public:
+    repl_service_ctx_grpc(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory);
+    std::shared_ptr< mesg_factory > m_mesg_factory;
+    // we do not own this pointer. Use this only if the lyfe cycle of the pointer is well known
+    grpc_server* m_server;
+
+    std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
+                                              data_service_response_handler_t const& response_cb);
 };
 
 class mesg_state_mgr : public nuraft::state_mgr {
 public:
     using nuraft::state_mgr::state_mgr;
+    void make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory >& cli_factory);
 
     virtual void become_ready() {}
     virtual uint32_t get_logstore_id() const = 0;
     virtual std::shared_ptr< nuraft::state_machine > get_state_machine() = 0;
     virtual void permanent_destroy() = 0;
     virtual void leave() = 0;
+
+protected:
+    std::unique_ptr< repl_service_ctx_grpc > m_repl_svc_ctx;
 };
 
 class consensus_component {
@@ -117,7 +124,6 @@ public:
     virtual void restart_server() = 0;
 
     // data channel APIs
-    virtual bool get_replication_service_ctx(std::string const& group_id, repl_service_ctx& repl_ctx) = 0;
     virtual bool bind_data_service_request(std::string const& request_name, std::string const& group_id,
                                            data_service_request_handler_t const& request_handler) = 0;
 };
