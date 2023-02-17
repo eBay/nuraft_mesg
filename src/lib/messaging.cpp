@@ -13,10 +13,12 @@
 #include <libnuraft/async.hxx>
 #include <sisl/options/options.h>
 #include <sisl/grpc/rpc_server.hpp>
+#include <sisl/grpc/generic_service.hpp>
 
 #include "service.hpp"
 #include "mesg_factory.hpp"
 #include "logger.hpp"
+#include "utils.hpp"
 
 SISL_LOGGING_DECL(nuraft_mesg)
 
@@ -430,8 +432,20 @@ std::error_condition repl_service_ctx_grpc::data_service_request(std::string con
     ;
 }
 
+repl_service_ctx::repl_service_ctx(grpc_server* server) : m_server(server) {}
+
+bool repl_service_ctx::is_raft_leader() const { return m_server->raft_server()->is_leader(); }
+
 repl_service_ctx_grpc::repl_service_ctx_grpc(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory) :
-        m_server(server), m_mesg_factory(cli_factory) {}
+        repl_service_ctx(server), m_mesg_factory(cli_factory) {}
+
+void repl_service_ctx_grpc::send_data_service_response(io_blob_list_t const& outgoing_buf, void* rpc_data) {
+    auto generic_rpc_data =
+        boost::intrusive_ptr< sisl::GenericRpcData >{static_cast< sisl::GenericRpcData* >(rpc_data)};
+
+    serialize_to_byte_buffer(generic_rpc_data->response(), outgoing_buf);
+    generic_rpc_data->send_response();
+}
 
 void mesg_state_mgr::make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory >& cli_factory) {
     m_repl_svc_ctx = std::make_unique< repl_service_ctx_grpc >(server, cli_factory);

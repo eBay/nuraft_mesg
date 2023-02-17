@@ -7,7 +7,7 @@ struct io_blob;
 }
 namespace nuraft_mesg {
 
-using data_service_request_handler_t = std::function< bool(sisl::io_blob const& incoming_buf) >;
+using data_service_request_handler_t = std::function< void(sisl::io_blob const& incoming_buf, void* rpc_data) >;
 
 class data_service {
 

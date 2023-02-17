@@ -94,4 +94,14 @@ public:
                             std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out);
 };
 
+class repl_service_ctx_grpc : public repl_service_ctx {
+public:
+    repl_service_ctx_grpc(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory);
+    std::shared_ptr< mesg_factory > m_mesg_factory;
+
+    std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
+                                              data_service_response_handler_t const& response_cb) override;
+    void send_data_service_response(io_blob_list_t const& outgoing_buf, void* rpc_data) override;
+};
+
 } // namespace nuraft_mesg

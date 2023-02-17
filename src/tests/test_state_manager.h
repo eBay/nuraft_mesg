@@ -19,6 +19,10 @@
 
 class test_state_machine;
 
+namespace nuraft_mesg {
+class service;
+}
+
 class test_state_mgr : public nuraft_mesg::mesg_state_mgr {
 public:
     test_state_mgr(int32_t srv_id, std::string const& srv_addr, std::string const& group_id);
@@ -37,16 +41,26 @@ public:
     void permanent_destroy() override;
     void leave() override;
 
-    // data service helper
+    ///// data service helper apis
     std::error_condition data_service_request(std::string const& request_name,
                                               nuraft_mesg::io_blob_list_t const& cli_buf,
-                                              nuraft_mesg::data_service_response_handler_t const& response_cb) {
-        return m_repl_svc_ctx->data_service_request(request_name, cli_buf, response_cb);
-    }
+                                              nuraft_mesg::data_service_response_handler_t const& response_cb);
 
+    bool register_data_service_apis(nuraft_mesg::service* messaging);
+    static void fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf);
+    static uint32_t get_random_num();
+    static uint32_t get_server_counter();
+    static void verify_data(sisl::io_blob const& buf);
+
+private:
 private:
     int32_t const _srv_id;
     std::string const _srv_addr;
     std::string const _group_id;
     std::shared_ptr< test_state_machine > _state_machine;
+
+    inline static std::atomic< uint32_t > server_counter{0};
+    static std::vector< uint32_t > data_vec;
+    inline static std::string const SEND_DATA{"send_data"};
+    inline static std::string const REQUEST_DATA{"request_data"};
 };

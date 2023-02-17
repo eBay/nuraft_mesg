@@ -23,7 +23,6 @@
 #include <sisl/logging/logging.h>
 #include <sisl/options/options.h>
 #include <nlohmann/json.hpp>
-#include <random>
 
 #include <sisl/utility/thread_buffer.hpp>
 
@@ -87,19 +86,12 @@ protected:
     nuraft::raft_params r_params;
     consensus_component::params params;
     // Store state mgrs for each instance and group. key is "group_id" + "_sm{instance_number}".
-    std::map< std::string, std::shared_ptr< test_state_mgr > > state_mgr_map;
-
-    uint32_t get_random_num() {
-        static std::random_device dev;
-        static std::mt19937 rng(dev());
-        std::uniform_int_distribution< std::mt19937::result_type > dist(1001u, 99999u);
-        return dist(rng);
-    }
+    std::map< std::string, std::pair< std::shared_ptr< test_state_mgr >, service* > > state_mgr_map;
 
     void get_random_ports(const uint16_t n) {
         auto cur_size = ports.size();
         for (; ports.size() < cur_size + n;) {
-            uint32_t r = get_random_num();
+            uint32_t r = test_state_mgr::get_random_num();
             if (std::find(ports.begin(), ports.end(), r) == ports.end()) { ports.emplace_back(r); }
         }
     }
@@ -151,9 +143,10 @@ protected:
             r_params,
             [this, srv_addr = id_1](int32_t const srv_id,
                                     std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
-                auto [it, happened] = state_mgr_map.emplace(
-                    std::make_pair(group_id + "_sm1", std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id)));
-                sm_int_1 = it->second;
+                auto [it, happened] = state_mgr_map.emplace(std::make_pair(
+                    group_id + "_sm1",
+                    std::make_pair(std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id), instance_1.get())));
+                sm_int_1 = it->second.first;
                 return std::static_pointer_cast< mesg_state_mgr >(sm_int_1);
             }};
         instance_1->register_mgr_type("test_type", register_params);
@@ -163,9 +156,10 @@ protected:
         register_params.create_state_mgr =
             [this, srv_addr = id_2](int32_t const srv_id,
                                     std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
-            auto [it, happened] = state_mgr_map.emplace(
-                std::make_pair(group_id + "_sm2", std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id)));
-            sm_int_2 = it->second;
+            auto [it, happened] = state_mgr_map.emplace(std::make_pair(
+                group_id + "_sm2",
+                std::make_pair(std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id), instance_2.get())));
+            sm_int_2 = it->second.first;
             return std::static_pointer_cast< mesg_state_mgr >(sm_int_2);
         };
         instance_2->start(params);
@@ -176,9 +170,10 @@ protected:
         register_params.create_state_mgr =
             [this, srv_addr = id_3](int32_t const srv_id,
                                     std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
-            auto [it, happened] = state_mgr_map.emplace(
-                std::make_pair(group_id + "_sm3", std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id)));
-            sm_int_3 = it->second;
+            auto [it, happened] = state_mgr_map.emplace(std::make_pair(
+                group_id + "_sm3",
+                std::make_pair(std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id), instance_3.get())));
+            sm_int_3 = it->second.first;
             return std::static_pointer_cast< mesg_state_mgr >(sm_int_3);
         };
         instance_3->start(params);
@@ -314,6 +309,8 @@ TEST_F(MessagingFixture, SyncAddMember) {
 
 class DataServiceFixture : public MessagingFixtureBase {
 protected:
+    std::unique_ptr< service > instance_4;
+    std::unique_ptr< service > instance_5;
     void SetUp() override {
         MessagingFixtureBase::SetUp();
         params.enable_data_service = true;
@@ -321,33 +318,17 @@ protected:
     }
 };
 
-static std::string const SEND_DATA{"send_data"};
-static std::string const REQUEST_DATA{"request_data"};
-static std::atomic< uint32_t > server_counter{0};
 static std::atomic< uint32_t > client_counter{0};
-static int const data_size{8};
-static std::vector< uint32_t > data_vec;
-
-bool receive_data(sisl::io_blob const& incoming_buf) {
-    EXPECT_EQ(incoming_buf.size / sizeof(uint32_t), data_size);
-    for (size_t read_sz{0}; read_sz < incoming_buf.size; read_sz += sizeof(uint32_t)) {
-        uint32_t const data{*reinterpret_cast< uint32_t* >(incoming_buf.bytes + read_sz)};
-        EXPECT_EQ(data, data_vec[read_sz / sizeof(uint32_t)]);
-    }
-    server_counter++;
-    return true;
+void client_response_cb(sisl::io_blob const& incoming_buf) {
+    test_state_mgr::verify_data(incoming_buf);
+    client_counter++;
 }
-bool request_data(sisl::io_blob const& incoming_buf) {
-    server_counter++;
-    return true;
-}
-void client_response_cb(sisl::io_blob const& incoming_buf) { client_counter++; }
 
 TEST_F(DataServiceFixture, DataServiceBasic) {
     // create new servers
-    std::unique_ptr< service > instance_4 = std::make_unique< service >();
+    instance_4 = std::make_unique< service >();
     std::string id_4 = to_string(boost::uuids::random_generator()());
-    std::unique_ptr< service > instance_5 = std::make_unique< service >();
+    instance_5 = std::make_unique< service >();
     std::string id_5 = to_string(boost::uuids::random_generator()());
     // generate random_port
     get_random_ports(2u);
@@ -359,9 +340,10 @@ TEST_F(DataServiceFixture, DataServiceBasic) {
         r_params,
         [this, srv_addr = id_4, &sm_int_4](int32_t const srv_id,
                                            std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
-            auto [it, happened] = state_mgr_map.emplace(
-                std::make_pair(group_id + "_sm4", std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id)));
-            sm_int_4 = it->second;
+            auto [it, happened] = state_mgr_map.emplace(std::make_pair(
+                group_id + "_sm4",
+                std::make_pair(std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id), instance_4.get())));
+            sm_int_4 = it->second.first;
             return std::static_pointer_cast< mesg_state_mgr >(sm_int_4);
         }};
     std::shared_ptr< test_state_mgr > sm_int_5;
@@ -369,9 +351,10 @@ TEST_F(DataServiceFixture, DataServiceBasic) {
         r_params,
         [this, srv_addr = id_5, &sm_int_5](int32_t const srv_id,
                                            std::string const& group_id) -> std::shared_ptr< mesg_state_mgr > {
-            auto [it, happened] = state_mgr_map.emplace(
-                std::make_pair(group_id + "_sm5", std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id)));
-            sm_int_5 = it->second;
+            auto [it, happened] = state_mgr_map.emplace(std::make_pair(
+                group_id + "_sm5",
+                std::make_pair(std::make_shared< test_state_mgr >(srv_id, srv_addr, group_id), instance_5.get())));
+            sm_int_5 = it->second.first;
             return std::static_pointer_cast< mesg_state_mgr >(sm_int_5);
         }};
     instance_4->start(params);
@@ -386,30 +369,18 @@ TEST_F(DataServiceFixture, DataServiceBasic) {
     EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_2, true));
     EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_5, true));
 
-    // bind data channel request methods
-#define BIND_DATA_SERVICE_REQ(instance, group)                                                                         \
-    EXPECT_TRUE(instance->bind_data_service_request(SEND_DATA, group, receive_data));                                  \
-    EXPECT_TRUE(instance->bind_data_service_request(REQUEST_DATA, group, request_data));
-
-    BIND_DATA_SERVICE_REQ(instance_1, "test_group");
-    BIND_DATA_SERVICE_REQ(instance_2, "test_group");
-    BIND_DATA_SERVICE_REQ(instance_3, "test_group");
-
-    BIND_DATA_SERVICE_REQ(instance_1, "data_service_test_group");
-    BIND_DATA_SERVICE_REQ(instance_2, "data_service_test_group");
-    BIND_DATA_SERVICE_REQ(instance_4, "data_service_test_group");
-    BIND_DATA_SERVICE_REQ(instance_5, "data_service_test_group");
-
-    io_blob_list_t cli_buf;
-    for (int i = 0; i < data_size; i++) {
-        cli_buf.emplace_back(sizeof(uint32_t));
-        uint32_t* const write_buf{reinterpret_cast< uint32_t* >(cli_buf[i].bytes)};
-        data_vec.emplace_back(get_random_num());
-        *write_buf = data_vec.back();
+    for (auto& [key, smgr] : state_mgr_map) {
+        smgr.first->register_data_service_apis(smgr.second);
     }
 
-    auto sm1 = state_mgr_map["test_group_sm1"];
-    auto sm4 = state_mgr_map["data_service_test_group_sm4"];
+    io_blob_list_t cli_buf;
+    test_state_mgr::fill_data_vec(cli_buf);
+
+    auto sm1 = state_mgr_map["test_group_sm1"].first;
+    auto sm4 = state_mgr_map["data_service_test_group_sm4"].first;
+
+    std::string const SEND_DATA{"send_data"};
+    std::string const REQUEST_DATA{"request_data"};
 
     EXPECT_FALSE(sm1->data_service_request(SEND_DATA, cli_buf, client_response_cb));
     EXPECT_FALSE(sm4->data_service_request(SEND_DATA, cli_buf, client_response_cb));
@@ -418,12 +389,13 @@ TEST_F(DataServiceFixture, DataServiceBasic) {
 
     // add a new member to data_service_test_group and check if repl_ctx4 sends data to newly added member
     EXPECT_TRUE(instance_4->add_member("data_service_test_group", id_3, true));
-    BIND_DATA_SERVICE_REQ(instance_3, "data_service_test_group");
+    auto sm3 = state_mgr_map["data_service_test_group_sm3"].first;
+    sm3->register_data_service_apis(instance_3.get());
     EXPECT_FALSE(sm4->data_service_request(SEND_DATA, cli_buf, client_response_cb));
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // the count is 4 (2 methods from group test_group) + 7 (from data_service_test_group)
-    EXPECT_EQ(server_counter, 11);
+    EXPECT_EQ(test_state_mgr::get_server_counter(), 11);
     EXPECT_EQ(client_counter, 11);
 }
 

@@ -22,8 +22,13 @@
 #include <libnuraft/state_machine.hxx>
 
 #include "test_state_machine.h"
+#include "messaging.hpp"
+#include <gtest/gtest.h>
+#include <random>
 
 using json = nlohmann::json;
+
+std::vector< uint32_t > test_state_mgr::data_vec;
 
 std::error_condition jsonObjectFromFile(std::string const& filename, json& json_object) {
     std::ifstream istrm(filename, std::ios::binary);
@@ -155,3 +160,52 @@ std::shared_ptr< nuraft::state_machine > test_state_mgr::get_state_machine() {
 void test_state_mgr::permanent_destroy() {}
 
 void test_state_mgr::leave() {}
+
+///// data service api helpers
+
+std::error_condition
+test_state_mgr::data_service_request(std::string const& request_name, nuraft_mesg::io_blob_list_t const& cli_buf,
+                                     nuraft_mesg::data_service_response_handler_t const& response_cb) {
+    return m_repl_svc_ctx->data_service_request(request_name, cli_buf, response_cb);
+}
+
+bool test_state_mgr::register_data_service_apis(nuraft_mesg::service* messaging) {
+    return messaging->bind_data_service_request(SEND_DATA, _group_id,
+                                                [this](sisl::io_blob const& incoming_buf, void* rpc_data) {
+                                                    verify_data(incoming_buf);
+                                                    server_counter++;
+                                                    m_repl_svc_ctx->send_data_service_response(
+                                                        nuraft_mesg::io_blob_list_t{incoming_buf}, rpc_data);
+                                                }) &&
+        messaging->bind_data_service_request(
+            REQUEST_DATA, _group_id, [this](sisl::io_blob const& incoming_buf, void* rpc_data) {
+                server_counter++;
+                m_repl_svc_ctx->send_data_service_response(nuraft_mesg::io_blob_list_t{incoming_buf}, rpc_data);
+            });
+}
+
+void test_state_mgr::verify_data(sisl::io_blob const& buf) {
+    for (size_t read_sz{0}; read_sz < buf.size; read_sz += sizeof(uint32_t)) {
+        uint32_t const data{*reinterpret_cast< uint32_t* >(buf.bytes + read_sz)};
+        EXPECT_EQ(data, data_vec[read_sz / sizeof(uint32_t)]);
+    }
+}
+
+void test_state_mgr::fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf) {
+    static int const data_size{8};
+    for (int i = 0; i < data_size; i++) {
+        cli_buf.emplace_back(sizeof(uint32_t));
+        uint32_t* const write_buf{reinterpret_cast< uint32_t* >(cli_buf[i].bytes)};
+        data_vec.emplace_back(get_random_num());
+        *write_buf = data_vec.back();
+    }
+}
+
+uint32_t test_state_mgr::get_random_num() {
+    static std::random_device dev;
+    static std::mt19937 rng(dev());
+    std::uniform_int_distribution< std::mt19937::result_type > dist(1001u, 99999u);
+    return dist(rng);
+}
+
+uint32_t test_state_mgr::get_server_counter() { return server_counter.load(); }
