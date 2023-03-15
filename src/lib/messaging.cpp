@@ -408,10 +408,6 @@ void service::get_srv_config_all(std::string const& group_name,
     _mesg_service->get_srv_config_all(group_name, configs_out);
 }
 
-bool service::get_replication_service_ctx(std::string const& group_id, repl_service_ctx& repl_ctx) {
-    return _mesg_service->get_replication_service_ctx(group_id, repl_ctx);
-}
-
 bool service::bind_data_service_request(std::string const& request_name, std::string const& group_id,
                                         data_service_request_handler_t const& request_handler) {
     return _mesg_service->bind_data_service_request(request_name, group_id, request_handler);
@@ -425,4 +421,12 @@ std::error_condition repl_service_ctx_grpc::data_service_request(std::string con
                             : std::make_error_condition(std::errc::no_such_device);
     ;
 }
+
+repl_service_ctx_grpc::repl_service_ctx_grpc(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory) :
+        m_server(server), m_mesg_factory(cli_factory) {}
+
+void mesg_state_mgr::make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory >& cli_factory) {
+    m_repl_svc_ctx = std::make_unique< repl_service_ctx_grpc >(server, cli_factory);
+}
+
 } // namespace nuraft_mesg

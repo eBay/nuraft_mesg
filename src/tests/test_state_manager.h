@@ -37,6 +37,13 @@ public:
     void permanent_destroy() override;
     void leave() override;
 
+    // data service helper
+    std::error_condition data_service_request(std::string const& request_name,
+                                              nuraft_mesg::io_blob_list_t const& cli_buf,
+                                              nuraft_mesg::data_service_response_handler_t const& response_cb) {
+        return m_repl_svc_ctx->data_service_request(request_name, cli_buf, response_cb);
+    }
+
 private:
     int32_t const _srv_id;
     std::string const _srv_addr;
