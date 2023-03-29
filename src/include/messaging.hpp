@@ -43,7 +43,7 @@ class service : public consensus_component {
 
     std::shared_ptr< group_factory > _g_factory;
     std::shared_ptr< msg_service > _mesg_service;
-    std::unique_ptr< ::sisl::GrpcServer > _grpc_server;
+    std::unique_ptr<::sisl::GrpcServer > _grpc_server;
 
     std::mutex mutable _manager_lock;
     std::map< std::string, std::shared_ptr< mesg_state_mgr > > _state_managers;
@@ -67,6 +67,8 @@ public:
     int32_t server_id() const override { return _srv_id; }
 
     void register_mgr_type(std::string const& group_type, register_params& params) override;
+
+    std::shared_ptr< mesg_state_mgr > lookup_state_manager(std::string const& group_id) const override;
 
     std::error_condition create_group(std::string const& group_id, std::string const& group_type) override;
     std::error_condition join_group(std::string const& group_id, std::string const& group_type,

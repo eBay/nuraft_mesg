@@ -76,6 +76,8 @@ protected:
     std::unique_ptr< repl_service_ctx_grpc > m_repl_svc_ctx;
 };
 
+extern int32_t to_server_id(std::string const& server_addr);
+
 class consensus_component {
 public:
     using lookup_peer_cb = std::function< std::string(std::string const&) >;
