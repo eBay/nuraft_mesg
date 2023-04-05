@@ -66,7 +66,7 @@ toResponse(RaftMessage const& raft_msg) {
 std::atomic_uint64_t grpc_base_client::_client_counter = 0ul;
 
 void
-grpc_base_client::send(shared<nuraft::req_msg>& req, nuraft::rpc_handler& complete) {
+grpc_base_client::send(shared<nuraft::req_msg>& req, nuraft::rpc_handler& complete,  uint64_t timeout_ms) {
     assert(req && complete);
     RaftMessage grpc_request;
     grpc_request.set_allocated_base(fromBaseRequest(*req));

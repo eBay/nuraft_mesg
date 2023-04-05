@@ -12,6 +12,7 @@
 
 #include "common.hpp"
 
+#include <libnuraft/raft_server_handler.hxx>
 #include <grpcpp/server.h>
 
 namespace sds::grpc {
@@ -20,7 +21,7 @@ class GrpcServer;
 
 namespace sds {
 
-class grpc_server {
+class grpc_server : public nuraft::raft_server_handler {
     shared< nuraft::raft_server > _raft_server;
 
 public:
