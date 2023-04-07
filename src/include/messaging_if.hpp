@@ -76,6 +76,8 @@ protected:
     std::unique_ptr< repl_service_ctx_grpc > m_repl_svc_ctx;
 };
 
+extern int32_t to_server_id(std::string const& server_addr);
+
 class consensus_component {
 public:
     using lookup_peer_cb = std::function< std::string(std::string const&) >;
@@ -105,6 +107,7 @@ public:
     };
     virtual void register_mgr_type(std::string const& group_type, register_params& params) = 0;
 
+    virtual std::shared_ptr< mesg_state_mgr > lookup_state_manager(std::string const& group_id) const = 0;
     virtual std::error_condition create_group(std::string const& group_id, std::string const& group_type) = 0;
     virtual std::error_condition join_group(std::string const& group_id, std::string const& group_type,
                                             std::shared_ptr< mesg_state_mgr > smgr) = 0;

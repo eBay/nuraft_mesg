@@ -27,6 +27,11 @@ constexpr auto grpc_server_threads = 1u;
 
 namespace nuraft_mesg {
 
+int32_t to_server_id(std::string const& server_addr) {
+    boost::hash< boost::uuids::uuid > uuid_hasher;
+    return uuid_hasher(boost::uuids::string_generator()(server_addr)) >> 33;
+}
+
 class engine_factory : public group_factory {
     consensus_component::lookup_peer_cb _lookup_endpoint_func;
 
@@ -52,8 +57,7 @@ service::~service() {
 
 void service::start(consensus_component::params& start_params) {
     _start_params = start_params;
-    boost::hash< boost::uuids::uuid > uuid_hasher;
-    _srv_id = uuid_hasher(boost::uuids::string_generator()(_start_params.server_uuid)) >> 33;
+    _srv_id = to_server_id(_start_params.server_uuid);
 
     _g_factory = std::make_shared< engine_factory >(grpc_client_threads, _start_params);
     auto logger_name = fmt::format("nuraft_{}", _start_params.server_uuid);
@@ -217,10 +221,9 @@ bool service::add_member(std::string const& group_id, std::string const& server_
     return add_member(group_id, server_id, false);
 }
 
-bool service::add_member(std::string const& group_id, std::string const& server_id, bool const wait_for_completion) {
-    boost::hash< boost::uuids::uuid > uuid_hasher;
-    int32_t const srv_id = uuid_hasher(boost::uuids::string_generator()(server_id)) >> 33;
-    auto cfg = nuraft::srv_config(srv_id, server_id);
+bool service::add_member(std::string const& group_id, std::string const& new_id, bool const wait_for_completion) {
+    int32_t const srv_id = to_server_id(new_id);
+    auto cfg = nuraft::srv_config(srv_id, new_id);
     nuraft::cmd_result_code rc = nuraft::SERVER_IS_JOINING;
     while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
         rc = _mesg_service->add_srv(group_id, cfg);
@@ -238,19 +241,18 @@ bool service::add_member(std::string const& group_id, std::string const& server_
     if (!wait_for_completion) { return nuraft::OK == rc; }
 
     auto lk = std::unique_lock< std::mutex >(_manager_lock);
-    return (nuraft::OK == rc) && _config_change.wait_for(lk, cfg_change_timeout * 20, [this, &group_id, &server_id]() {
+    return (nuraft::OK == rc) && _config_change.wait_for(lk, cfg_change_timeout * 20, [this, &group_id, &new_id]() {
         std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
         _mesg_service->get_srv_config_all(group_id, srv_list);
         return std::find_if(srv_list.begin(), srv_list.end(),
-                            [&server_id](const std::shared_ptr< nuraft::srv_config >& cfg) {
-                                return server_id == cfg->get_endpoint();
+                            [&new_id](const std::shared_ptr< nuraft::srv_config >& cfg) {
+                                return new_id == cfg->get_endpoint();
                             }) != srv_list.end();
     });
 }
 
-bool service::rem_member(std::string const& group_id, std::string const& server_id) {
-    boost::hash< boost::uuids::uuid > uuid_hasher;
-    int32_t const srv_id = uuid_hasher(boost::uuids::string_generator()(server_id)) >> 33;
+bool service::rem_member(std::string const& group_id, std::string const& old_id) {
+    int32_t const srv_id = to_server_id(old_id);
 
     nuraft::cmd_result_code rc = nuraft::SERVER_IS_JOINING;
     while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
@@ -266,6 +268,12 @@ bool service::rem_member(std::string const& group_id, std::string const& server_
         LOGERROR("Unknown failure to add member: [{}]", static_cast< uint32_t >(rc));
     }
     return nuraft::OK == rc;
+}
+
+std::shared_ptr< mesg_state_mgr > service::lookup_state_manager(std::string const& group_id) const {
+    std::lock_guard< std::mutex > lg(_manager_lock);
+    if (auto it = _state_managers.find(group_id); _state_managers.end() != it) return it->second;
+    return nullptr;
 }
 
 std::error_condition service::create_group(std::string const& group_id, std::string const& group_type_name) {

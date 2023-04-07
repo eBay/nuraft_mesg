@@ -68,6 +68,8 @@ public:
 
     void register_mgr_type(std::string const& group_type, register_params& params) override;
 
+    std::shared_ptr< mesg_state_mgr > lookup_state_manager(std::string const& group_id) const override;
+
     std::error_condition create_group(std::string const& group_id, std::string const& group_type) override;
     std::error_condition join_group(std::string const& group_id, std::string const& group_type,
                                     std::shared_ptr< mesg_state_mgr > smgr) override;
