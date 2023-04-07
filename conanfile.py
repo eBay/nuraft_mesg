@@ -43,7 +43,7 @@ class NuRaftGRPCConan(ConanFile):
         self.requires("nuraft/nbi.2.0.0")
         self.requires("grpc_helper/4.0.1")
         self.requires("openssl/1.1.1s")
-        self.requires("sisl/8.2.7")
+        self.requires("sisl/8.2.8")
 
     def build(self):
         cmake = CMake(self)
