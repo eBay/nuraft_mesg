@@ -2,10 +2,9 @@
 
 ## Brief
 
-NuRAFT Messaging is a Protobuf translation layer for [nuraft](https://github.com/eBay/nuraft)
+nuRAFT Messaging is a multi-group service layer for [nuraft](https://github.com/eBay/nuraft)
 
-This project provides a the wiring to use Protobuf for marshalling NuRaft calls between services as an alternative
-to the native Boost::ASIO RPC service.
+This project provides a middleware to nuRaft which manages multple NuRaft servers multiplex through a single client/server.
 
 ## Changes
 
@@ -13,7 +12,7 @@ See the [Changelog](CHANGELOG.md) for release information.
 
 ## Usage
 
-This library only provides the nuraft message marshalling. In essense, it translates NuRaft types into comparable
+This library only provides the nuraft message marshalling and routing. In essense, it translates nuRaft types into comparable
 Protobuf objects which can be used when defining a gRPC service. A Protobuf schema is included for use
 with embedding these message types into downstream .proto service files.
 
@@ -56,7 +55,7 @@ $ conan create --build missing . <user>/<channel>
 Copyright 2021 eBay Inc.
 
 Primary Author: Brian Szmyd
-Primary Developers: [Brian Szmyd](https://github.com/szmyd), [Ravi Nagarjun Akella](https://github.com/https://github.com/raakella1), [Harihara Kadayam](https://github.com/hkadayam)
+Primary Developers: [Brian Szmyd](https://github.com/szmyd), [Ravi Nagarjun Akella](https://github.com/raakella1), [Harihara Kadayam](https://github.com/hkadayam)
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0.
 
