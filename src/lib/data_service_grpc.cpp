@@ -30,6 +30,8 @@ bool data_service_grpc::bind(std::string const& request_name, std::string const&
         LOGWARNMOD(nuraft_mesg, "request_cb null for the request {}, cannot bind.", request_name);
         return false;
     }
+    // This is an async call, hence the "return false". The user should invoke rpc_data->send_response to finish the
+    // call
     auto generic_handler_cb = [request_cb](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
         sisl::io_blob svr_buf;
         if (auto status = deserialize_from_byte_buffer(rpc_data->request(), svr_buf); !status.ok()) {
@@ -37,7 +39,8 @@ bool data_service_grpc::bind(std::string const& request_name, std::string const&
             rpc_data->set_status(status);
             return true; // respond immediately
         }
-        return request_cb(svr_buf);
+        request_cb(svr_buf, static_cast< void* >(rpc_data.get()));
+        return false;
     };
     auto lk = std::unique_lock< data_lock_type >(_req_lock);
     auto [it, happened] = _request_map.emplace(get_generic_method_name(request_name, group_id), generic_handler_cb);

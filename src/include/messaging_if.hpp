@@ -40,7 +40,7 @@ namespace nuraft_mesg {
 using io_blob_list_t = folly::small_vector< sisl::io_blob, 4 >;
 
 // called by the server after it receives the request
-using data_service_request_handler_t = std::function< bool(sisl::io_blob const& incoming_buf) >;
+using data_service_request_handler_t = std::function< void(sisl::io_blob const& incoming_buf, void* rpc_data) >;
 
 // called by the client after it receives response to its request
 using data_service_response_handler_t = std::function< void(sisl::io_blob const& incoming_buf) >;
@@ -50,15 +50,20 @@ using data_service_response_handler_t = std::function< void(sisl::io_blob const&
 class mesg_factory;
 class grpc_server;
 
-class repl_service_ctx_grpc {
+class repl_service_ctx {
 public:
-    repl_service_ctx_grpc(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory);
-    std::shared_ptr< mesg_factory > m_mesg_factory;
+    repl_service_ctx(grpc_server* server);
+
     // we do not own this pointer. Use this only if the lyfe cycle of the pointer is well known
     grpc_server* m_server;
+    bool is_raft_leader() const;
 
-    std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
-                                              data_service_response_handler_t const& response_cb);
+    // data service api client call
+    virtual std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
+                                                      data_service_response_handler_t const& response_cb) = 0;
+
+    // Send response to a data service request and finish the async call.
+    virtual void send_data_service_response(io_blob_list_t const& outgoing_buf, void* rpc_data) = 0;
 };
 
 class mesg_state_mgr : public nuraft::state_mgr {
@@ -73,7 +78,7 @@ public:
     virtual void leave() = 0;
 
 protected:
-    std::unique_ptr< repl_service_ctx_grpc > m_repl_svc_ctx;
+    std::unique_ptr< repl_service_ctx > m_repl_svc_ctx;
 };
 
 extern int32_t to_server_id(std::string const& server_addr);
