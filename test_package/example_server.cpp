@@ -65,8 +65,7 @@ int main(int argc, char** argv) {
             new context(smgr, smachine, listener, l, rpc_cli_factory, scheduler, params));
         auto grpc_svc_ = std::make_unique< nuraft_grpc::simple_server >(server);
 
-        auto grpc_server =
-            std::unique_ptr< grpc_helper::GrpcServer >(grpc_helper::GrpcServer::make(server_address, 2, "", ""));
+        auto grpc_server = std::unique_ptr< sisl::GrpcServer >(sisl::GrpcServer::make(server_address, 2, "", ""));
         grpc_svc_->associate(grpc_server.get());
         grpc_server->run();
         grpc_svc_->bind(grpc_server.get());
@@ -79,6 +78,6 @@ int main(int argc, char** argv) {
             grpc_server->shutdown();
         }
     }
-    grpc_helper::GrpcAsyncClientWorker::shutdown_all();
+    sisl::GrpcAsyncClientWorker::shutdown_all();
     return 0;
 }

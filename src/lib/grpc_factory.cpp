@@ -8,7 +8,7 @@
 //   grpc_factory static functions that makes for easy client creation.
 //
 
-#include <grpc_helper/rpc_client.hpp>
+#include <sisl/grpc/rpc_client.hpp>
 
 #include "grpc_client.hpp"
 #include "grpc_factory.hpp"
@@ -105,7 +105,7 @@ void respHandler(shared< ContextType > ctx, shared< nuraft::resp_msg >& rsp, sha
 grpc_factory::grpc_factory(int const cli_thread_count, std::string const& name) :
         rpc_client_factory(), _worker_name(name) {
     if (0 < cli_thread_count) {
-        grpc_helper::GrpcAsyncClientWorker::create_worker(_worker_name.data(), cli_thread_count);
+        sisl::GrpcAsyncClientWorker::create_worker(_worker_name.data(), cli_thread_count);
     }
 }
 
