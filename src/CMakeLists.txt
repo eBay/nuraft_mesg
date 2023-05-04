@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.11)
 
-find_package(grpc_helper REQUIRED)
+find_package(sisl REQUIRED)
 find_package(nuraft REQUIRED)
 
 add_subdirectory (proto)
@@ -13,7 +13,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     $<TARGET_OBJECTS:${PROJECT_NAME}-proto>
   )
 target_link_libraries(${PROJECT_NAME}
-    grpc_helper::grpc_helper
+    sisl::sisl
     nuraft::nuraft
   )
 target_include_directories(${PROJECT_NAME} PRIVATE "include")
