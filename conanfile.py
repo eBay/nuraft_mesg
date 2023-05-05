@@ -1,9 +1,9 @@
 import os
 from conans import ConanFile, CMake, tools
 
-class NuRaftMesgConan(ConanFile):
-    name = "nuraft_mesg"
-    version = "0.0.7"
+class NuRaftGrpcConan(ConanFile):
+    name = "nuraft_grpc"
+    version = "6.0.0"
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
     topics = ("ebay", "nublox", "raft")
@@ -44,7 +44,7 @@ class NuRaftMesgConan(ConanFile):
     def build_requirements(self):
         self.build_requires("gtest/1.13.0")
         if (self.options.testing):
-            self.build_requires("jungle_logstore/nbi.20230104@sds/master")
+            self.build_requires("jungle_logstore/nbi.20230104")
 
     def requirements(self):
         self.requires("nuraft/nbi.2.0.0")
@@ -82,7 +82,7 @@ class NuRaftMesgConan(ConanFile):
         self.copy("*.proto", dst="proto/", keep_path=False)
 
     def package_info(self):
-        self.cpp_info.libs = ["nuraft_mesg"]
+        self.cpp_info.libs = ["nuraft_grpc"]
         if self.settings.build_type == "Debug" and self.options.sanitize:
             self.cpp_info.sharedlinkflags.append("-fsanitize=address")
             self.cpp_info.exelinkflags.append("-fsanitize=address")

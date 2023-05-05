@@ -10,7 +10,7 @@ if (jungle_logstore_FOUND)
                 test_state_manager.cpp
               )
     target_link_libraries (messaging_test
-          nuraft_mesg
+          nuraft_grpc
           jungle_logstore::jungle_logstore
           GTest::gmock
         )
