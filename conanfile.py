@@ -47,9 +47,9 @@ class NuRaftGrpcConan(ConanFile):
             self.build_requires("jungle_logstore/nbi.20230104")
 
     def requirements(self):
-        self.requires("nuraft/nbi.2.0.0")
+        self.requires("nuraft/nbi.2.1.1")
         self.requires("openssl/1.1.1s")
-        self.requires("sisl/8.5.1")
+        self.requires("sisl/8.5.2")
 
         self.requires("lz4/1.9.4", override=True)
 
