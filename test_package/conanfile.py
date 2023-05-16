@@ -15,7 +15,7 @@ class TestPackageConan(ConanFile):
 
     def requirements(self):
         self.requires("jungle_logstore/nbi.20230104")
-        self.requires("nuraft/nbi.2.0.0")
+        self.requires("nuraft/nbi.2.1.1")
 
     def test(self):
         with tools.environment_append(RunEnvironment(self).vars):
