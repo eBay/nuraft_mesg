@@ -44,7 +44,7 @@ class NuRaftMesgConan(ConanFile):
     def build_requirements(self):
         self.build_requires("gtest/1.13.0")
         if (self.options.testing):
-            self.build_requires("jungle_logstore/nbi.20230104")
+            self.build_requires("jungle_logstore/nbi.20230516")
 
     def requirements(self):
         self.requires("sisl/[~=9,           include_prerelease=True]@oss/master")
