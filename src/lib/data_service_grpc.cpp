@@ -17,15 +17,16 @@ void data_service_grpc::associate() {
 
 void data_service_grpc::bind() {
     auto lk = std::unique_lock< data_lock_type >(_req_lock);
-    for (auto const& [request_name, request_cb] : _request_map) {
-        if (!_grpc_server->register_generic_rpc(request_name, request_cb)) {
+    for (auto const& [request_name, cb_pair] : _request_map) {
+        if (!_grpc_server->register_generic_rpc(request_name, cb_pair.first, cb_pair.second)) {
             throw std::runtime_error(fmt::format("Could not register generic rpc {} with gRPC!", request_name));
         }
     }
 }
 
 bool data_service_grpc::bind(std::string const& request_name, std::string const& group_id,
-                             data_service_request_handler_t const& request_cb) {
+                             data_service_request_handler_t const& request_cb,
+                             data_service_comp_handler_t const& comp_cb) {
     RELEASE_ASSERT(_grpc_server, "NULL _grpc_server!");
     if (!request_cb) {
         LOGWARNMOD(nuraft_mesg, "request_cb null for the request {}, cannot bind.", request_name);
@@ -40,14 +41,15 @@ bool data_service_grpc::bind(std::string const& request_name, std::string const&
             rpc_data->set_status(status);
             return true; // respond immediately
         }
-        request_cb(svr_buf, static_cast< void* >(rpc_data.get()));
+        request_cb(svr_buf, rpc_data);
         return false;
     };
     auto lk = std::unique_lock< data_lock_type >(_req_lock);
-    auto [it, happened] = _request_map.emplace(get_generic_method_name(request_name, group_id), generic_handler_cb);
+    auto [it, happened] = _request_map.emplace(get_generic_method_name(request_name, group_id),
+                                               std::make_pair(generic_handler_cb, comp_cb));
     if (it != _request_map.end()) {
         if (happened) {
-            if (!_grpc_server->register_generic_rpc(it->first, it->second)) {
+            if (!_grpc_server->register_generic_rpc(it->first, it->second.first, it->second.second)) {
                 throw std::runtime_error(fmt::format("Could not register generic rpc {} with gRPC!", request_name));
             }
         } else {
