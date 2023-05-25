@@ -59,7 +59,7 @@ jobs:
       run: |
         sed -i 's,nuraft/nbi.2.1.1,nuraft/2.1.0,' conanfile.py
         sed -i 's,openssl/1.1.1s,openssl/1.1.1q,' conanfile.py
-        conan install -o sisl:testing=False -o sisl:malloc_impl=libc -o sisl:prerelease=False -s build_type=${{ matrix.build-type }} --build missing .
+        conan install -o nuraft_mesg:testing=True -o sisl:testing=False -o sisl:malloc_impl=libc -o sisl:prerelease=False -s build_type=${{ matrix.build-type }} --build missing .
 
     - name: Build
       # Build your program with the given configuration
