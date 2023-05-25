@@ -4,12 +4,12 @@ pipeline {
     environment {
         ARTIFACTORY_PASS = credentials('ARTIFACTORY_PASS')
         CONAN_USER = 'oss'
-        TARGET_BRANCH = 'master'
+        TARGET_BRANCH = 'main'
         STABLE_BRANCH = 'stable/v*'
     }
 
     stages {
-        stage('Adjust Tag for Master/PR') {
+        stage('Adjust Tag for Main/PR') {
             when { not {
                 branch "${STABLE_BRANCH}"
             } }
