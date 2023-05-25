@@ -16,7 +16,7 @@
 
 #include <fstream>
 
-#include <jungle_log_store.h>
+#include "jungle_logstore/jungle_log_store.h"
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <libnuraft/state_machine.hxx>
