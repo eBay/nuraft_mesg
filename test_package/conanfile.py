@@ -14,7 +14,8 @@ class TestPackageConan(ConanFile):
         cmake.build()
 
     def requirements(self):
-        self.requires("jungle_logstore/nbi.20230104@sds/master")
+        self.requires("jungle_logstore/nbi.20230516")
+        self.requires("nuraft/nbi.2.1.1")
 
     def test(self):
         with tools.environment_append(RunEnvironment(self).vars):

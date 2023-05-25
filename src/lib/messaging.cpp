@@ -13,10 +13,12 @@
 #include <libnuraft/async.hxx>
 #include <sisl/options/options.h>
 #include <sisl/grpc/rpc_server.hpp>
+#include <sisl/grpc/generic_service.hpp>
 
 #include "service.hpp"
 #include "mesg_factory.hpp"
 #include "logger.hpp"
+#include "utils.hpp"
 
 SISL_LOGGING_DECL(nuraft_mesg)
 
@@ -221,9 +223,9 @@ bool service::add_member(std::string const& group_id, std::string const& server_
     return add_member(group_id, server_id, false);
 }
 
-bool service::add_member(std::string const& group_id, std::string const& server_id, bool const wait_for_completion) {
-    int32_t const srv_id = to_server_id(server_id);
-    auto cfg = nuraft::srv_config(srv_id, server_id);
+bool service::add_member(std::string const& group_id, std::string const& new_id, bool const wait_for_completion) {
+    int32_t const srv_id = to_server_id(new_id);
+    auto cfg = nuraft::srv_config(srv_id, new_id);
     nuraft::cmd_result_code rc = nuraft::SERVER_IS_JOINING;
     while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
         rc = _mesg_service->add_srv(group_id, cfg);
@@ -241,18 +243,18 @@ bool service::add_member(std::string const& group_id, std::string const& server_
     if (!wait_for_completion) { return nuraft::OK == rc; }
 
     auto lk = std::unique_lock< std::mutex >(_manager_lock);
-    return (nuraft::OK == rc) && _config_change.wait_for(lk, cfg_change_timeout * 20, [this, &group_id, &server_id]() {
+    return (nuraft::OK == rc) && _config_change.wait_for(lk, cfg_change_timeout * 20, [this, &group_id, &new_id]() {
         std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
         _mesg_service->get_srv_config_all(group_id, srv_list);
         return std::find_if(srv_list.begin(), srv_list.end(),
-                            [&server_id](const std::shared_ptr< nuraft::srv_config >& cfg) {
-                                return server_id == cfg->get_endpoint();
+                            [&new_id](const std::shared_ptr< nuraft::srv_config >& cfg) {
+                                return new_id == cfg->get_endpoint();
                             }) != srv_list.end();
     });
 }
 
-bool service::rem_member(std::string const& group_id, std::string const& server_id) {
-    int32_t const srv_id = to_server_id(server_id);
+bool service::rem_member(std::string const& group_id, std::string const& old_id) {
+    int32_t const srv_id = to_server_id(old_id);
 
     nuraft::cmd_result_code rc = nuraft::SERVER_IS_JOINING;
     while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
@@ -430,8 +432,20 @@ std::error_condition repl_service_ctx_grpc::data_service_request(std::string con
     ;
 }
 
+repl_service_ctx::repl_service_ctx(grpc_server* server) : m_server(server) {}
+
+bool repl_service_ctx::is_raft_leader() const { return m_server->raft_server()->is_leader(); }
+
 repl_service_ctx_grpc::repl_service_ctx_grpc(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory) :
-        m_server(server), m_mesg_factory(cli_factory) {}
+        repl_service_ctx(server), m_mesg_factory(cli_factory) {}
+
+void repl_service_ctx_grpc::send_data_service_response(io_blob_list_t const& outgoing_buf, void* rpc_data) {
+    auto generic_rpc_data =
+        boost::intrusive_ptr< sisl::GenericRpcData >{static_cast< sisl::GenericRpcData* >(rpc_data)};
+
+    serialize_to_byte_buffer(generic_rpc_data->response(), outgoing_buf);
+    generic_rpc_data->send_response();
+}
 
 void mesg_state_mgr::make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory >& cli_factory) {
     m_repl_svc_ctx = std::make_unique< repl_service_ctx_grpc >(server, cli_factory);
