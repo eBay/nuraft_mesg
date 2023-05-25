@@ -45,7 +45,7 @@ static void serialize_to_byte_buffer(grpc::ByteBuffer& cli_byte_buf, io_blob_lis
 
 static grpc::Status deserialize_from_byte_buffer(grpc::ByteBuffer const& cli_byte_buf, sisl::io_blob& cli_buf) {
     grpc::Slice slice;
-    auto status = cli_byte_buf.DumpToSingleSlice(&slice);
+    auto status = cli_byte_buf.TrySingleSlice(&slice);
     if (!status.ok()) { return status; }
     cli_buf.bytes = const_cast< uint8_t* >(slice.begin());
     cli_buf.size = slice.size();
