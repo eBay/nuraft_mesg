@@ -21,7 +21,7 @@ class NuRaftMesgConan(ConanFile):
                 'shared': False,
                 'fPIC': True,
                 'sanitize': False,
-                'testing': True,
+                'testing': False,
                 'sisl:prerelease': True,
             }
 
