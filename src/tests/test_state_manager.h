@@ -26,6 +26,7 @@ class service;
 class test_state_mgr : public nuraft_mesg::mesg_state_mgr {
 public:
     test_state_mgr(int32_t srv_id, std::string const& srv_addr, std::string const& group_id);
+    ~test_state_mgr() override = default;
 
     nuraft::ptr< nuraft::cluster_config > load_config() override;
     void save_config(const nuraft::cluster_config& config) override;

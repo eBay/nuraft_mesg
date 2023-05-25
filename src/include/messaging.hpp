@@ -97,6 +97,7 @@ public:
 class repl_service_ctx_grpc : public repl_service_ctx {
 public:
     repl_service_ctx_grpc(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory);
+    ~repl_service_ctx_grpc() override = default;
     std::shared_ptr< mesg_factory > m_mesg_factory;
 
     std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,

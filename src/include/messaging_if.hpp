@@ -53,6 +53,7 @@ class grpc_server;
 class repl_service_ctx {
 public:
     repl_service_ctx(grpc_server* server);
+    virtual ~repl_service_ctx() = default;
 
     // we do not own this pointer. Use this only if the lyfe cycle of the pointer is well known
     grpc_server* m_server;
@@ -69,6 +70,7 @@ public:
 class mesg_state_mgr : public nuraft::state_mgr {
 public:
     using nuraft::state_mgr::state_mgr;
+    virtual ~mesg_state_mgr() = default;
     void make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory >& cli_factory);
 
     virtual void become_ready() {}
