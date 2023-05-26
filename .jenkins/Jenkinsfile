@@ -94,8 +94,8 @@ pipeline {
 
         stage("Compile") {
             steps {
-                sh "sed -i 's,nuraft/2.1.0,nuraft/nbi.2.1.1,' conanfile.py
-                sh "sed -i 's,openssl/1.1.1q,openssl/1.1.1s,' conanfile.py
+                sh "sed -i 's,nuraft/2.1.0,nuraft/nbi.2.1.1,' conanfile.py"
+                sh "sed -i 's,openssl/1.1.1q,openssl/1.1.1s,' conanfile.py"
                 sh "conan create ${BUILD_MISSING} -o nuraft_mesg:testing=True -o sisl:prerelease=True -pr debug . ${PROJECT}/${TAG}"
                 sh "conan create ${BUILD_MISSING} -o nuraft_mesg:testing=True -o sisl:prerelease=True -pr test . ${PROJECT}/${TAG}"
                 sh "conan create ${BUILD_MISSING} -o nuraft_mesg:testing=True -o sisl:prerelease=False -pr test . ${PROJECT}/${TAG}"
