@@ -68,7 +68,7 @@ class NuRaftMesgConan(ConanFile):
         cmake.configure(defs=definitions)
         cmake.build()
         if (self.options.testing):
-            cmake.test(target=test_target)
+            cmake.test(target=test_target, output_on_failure=True)
 
     def package(self):
         self.copy(pattern="LICENSE", dst="licenses")
