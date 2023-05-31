@@ -3,7 +3,7 @@ from conans import ConanFile, CMake, tools
 
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "0.0.7"
+    version = "0.0.8"
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
     topics = ("ebay", "nublox", "raft")
@@ -68,7 +68,7 @@ class NuRaftMesgConan(ConanFile):
         cmake.configure(defs=definitions)
         cmake.build()
         if (self.options.testing):
-            cmake.test(target=test_target)
+            cmake.test(target=test_target, output_on_failure=True)
 
     def package(self):
         self.copy(pattern="LICENSE", dst="licenses")

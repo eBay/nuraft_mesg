@@ -87,7 +87,8 @@ public:
 
     // data service APIs
     bool bind_data_service_request(std::string const& request_name, std::string const& group_id,
-                                   data_service_request_handler_t const& request_handler) override;
+                                   data_service_request_handler_t const& request_handler,
+                                   data_service_comp_handler_t const& comp_handler) override;
 
     // for testing
     void get_srv_config_all(std::string const& group_name,
@@ -102,7 +103,8 @@ public:
 
     std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
                                               data_service_response_handler_t const& response_cb) override;
-    void send_data_service_response(io_blob_list_t const& outgoing_buf, void* rpc_data) override;
+    void send_data_service_response(io_blob_list_t const& outgoing_buf,
+                                    boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) override;
 };
 
 } // namespace nuraft_mesg

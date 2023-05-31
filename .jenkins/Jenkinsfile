@@ -99,6 +99,7 @@ pipeline {
                 sh "conan create ${BUILD_MISSING} -o nuraft_mesg:testing=True -o sisl:prerelease=True -pr debug . ${PROJECT}/${TAG}"
                 sh "conan create ${BUILD_MISSING} -o nuraft_mesg:testing=True -o sisl:prerelease=True -pr test . ${PROJECT}/${TAG}"
                 sh "conan create ${BUILD_MISSING} -o nuraft_mesg:testing=True -o sisl:prerelease=False -pr test . ${PROJECT}/${TAG}"
+                sh "conan create ${BUILD_MISSING} -o nuraft_mesg:testing=True -o sisl:prerelease=True -o nuraft_mesg:sanitize=True -pr debug . ${PROJECT}/${TAG}"
                 sh "conan remove -f ${PROJECT}/${TAG}"
                 sh "conan create ${BUILD_MISSING} -o sisl:prerelease=True -pr debug . ${PROJECT}/${TAG}"
                 sh "conan create ${BUILD_MISSING} -o sisl:prerelease=True -pr test . ${PROJECT}/${TAG}"

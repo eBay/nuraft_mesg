@@ -72,12 +72,13 @@ void msg_service::bind(::sisl::GrpcServer* server) {
 }
 
 bool msg_service::bind_data_service_request(std::string const& request_name, std::string const& group_id,
-                                            data_service_request_handler_t const& request_handler) {
+                                            data_service_request_handler_t const& request_handler,
+                                            data_service_comp_handler_t const& comp_handler) {
     if (!_data_service_enabled) {
         LOGERRORMOD(nuraft_mesg, "Could not register data service method {}; data service is null", request_name);
         return false;
     }
-    return _data_service.bind(request_name, group_id, request_handler);
+    return _data_service.bind(request_name, group_id, request_handler, comp_handler);
 }
 
 nuraft::cmd_result_code msg_service::add_srv(group_name_t const& group_name, nuraft::srv_config const& cfg) {

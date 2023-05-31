@@ -419,8 +419,9 @@ void service::get_srv_config_all(std::string const& group_name,
 }
 
 bool service::bind_data_service_request(std::string const& request_name, std::string const& group_id,
-                                        data_service_request_handler_t const& request_handler) {
-    return _mesg_service->bind_data_service_request(request_name, group_id, request_handler);
+                                        data_service_request_handler_t const& request_handler,
+                                        data_service_comp_handler_t const& comp_handler) {
+    return _mesg_service->bind_data_service_request(request_name, group_id, request_handler, comp_handler);
 }
 
 std::error_condition repl_service_ctx_grpc::data_service_request(std::string const& request_name,
@@ -439,12 +440,10 @@ bool repl_service_ctx::is_raft_leader() const { return m_server->raft_server()->
 repl_service_ctx_grpc::repl_service_ctx_grpc(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory) :
         repl_service_ctx(server), m_mesg_factory(cli_factory) {}
 
-void repl_service_ctx_grpc::send_data_service_response(io_blob_list_t const& outgoing_buf, void* rpc_data) {
-    auto generic_rpc_data =
-        boost::intrusive_ptr< sisl::GenericRpcData >{static_cast< sisl::GenericRpcData* >(rpc_data)};
-
-    serialize_to_byte_buffer(generic_rpc_data->response(), outgoing_buf);
-    generic_rpc_data->send_response();
+void repl_service_ctx_grpc::send_data_service_response(io_blob_list_t const& outgoing_buf,
+                                                       boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
+    serialize_to_byte_buffer(rpc_data->response(), outgoing_buf);
+    rpc_data->send_response();
 }
 
 void mesg_state_mgr::make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory >& cli_factory) {

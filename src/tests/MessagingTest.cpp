@@ -397,6 +397,11 @@ TEST_F(DataServiceFixture, DataServiceBasic) {
     // the count is 4 (2 methods from group test_group) + 7 (from data_service_test_group)
     EXPECT_EQ(test_state_mgr::get_server_counter(), 11);
     EXPECT_EQ(client_counter, 11);
+
+    // free client buf
+    for (auto& buf : cli_buf) {
+        buf.buf_free();
+    }
 }
 
 int main(int argc, char* argv[]) {
