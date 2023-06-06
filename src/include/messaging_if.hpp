@@ -48,9 +48,6 @@ using io_blob_list_t = folly::small_vector< sisl::io_blob, 4 >;
 using data_service_request_handler_t =
     std::function< void(sisl::io_blob const& incoming_buf, boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) >;
 
-// called by the server after the rpc is completed
-using data_service_comp_handler_t = std::function< void(boost::intrusive_ptr< sisl::GenericRpcData >&) >;
-
 // called by the client after it receives response to its request
 using data_service_response_handler_t = std::function< void(sisl::io_blob const& incoming_buf) >;
 
@@ -145,8 +142,7 @@ public:
 
     // data channel APIs
     virtual bool bind_data_service_request(std::string const& request_name, std::string const& group_id,
-                                           data_service_request_handler_t const& request_handler,
-                                           data_service_comp_handler_t const& comp_handler) = 0;
+                                           data_service_request_handler_t const& request_handler) = 0;
 };
 
 } // namespace nuraft_mesg

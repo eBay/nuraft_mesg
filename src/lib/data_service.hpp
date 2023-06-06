@@ -23,7 +23,7 @@ public:
 
     // register a new rpc
     virtual bool bind(std::string const& request_name, std::string const& group_id,
-                      data_service_request_handler_t const& request_cb, data_service_comp_handler_t const& comp_cb) = 0;
+                      data_service_request_handler_t const& request_cb) = 0;
 
     // register all the existing rpcs
     virtual void bind() = 0;

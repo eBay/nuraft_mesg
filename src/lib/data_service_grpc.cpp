@@ -17,16 +17,15 @@ void data_service_grpc::associate() {
 
 void data_service_grpc::bind() {
     auto lk = std::unique_lock< data_lock_type >(_req_lock);
-    for (auto const& [request_name, cb_pair] : _request_map) {
-        if (!_grpc_server->register_generic_rpc(request_name, cb_pair.first, cb_pair.second)) {
+    for (auto const& [request_name, cb] : _request_map) {
+        if (!_grpc_server->register_generic_rpc(request_name, cb)) {
             throw std::runtime_error(fmt::format("Could not register generic rpc {} with gRPC!", request_name));
         }
     }
 }
 
 bool data_service_grpc::bind(std::string const& request_name, std::string const& group_id,
-                             data_service_request_handler_t const& request_cb,
-                             data_service_comp_handler_t const& comp_cb) {
+                             data_service_request_handler_t const& request_cb) {
     RELEASE_ASSERT(_grpc_server, "NULL _grpc_server!");
     if (!request_cb) {
         LOGWARNMOD(nuraft_mesg, "request_cb null for the request {}, cannot bind.", request_name);
@@ -45,11 +44,10 @@ bool data_service_grpc::bind(std::string const& request_name, std::string const&
         return false;
     };
     auto lk = std::unique_lock< data_lock_type >(_req_lock);
-    auto [it, happened] = _request_map.emplace(get_generic_method_name(request_name, group_id),
-                                               std::make_pair(generic_handler_cb, comp_cb));
+    auto [it, happened] = _request_map.emplace(get_generic_method_name(request_name, group_id), generic_handler_cb);
     if (it != _request_map.end()) {
         if (happened) {
-            if (!_grpc_server->register_generic_rpc(it->first, it->second.first, it->second.second)) {
+            if (!_grpc_server->register_generic_rpc(it->first, it->second)) {
                 throw std::runtime_error(fmt::format("Could not register generic rpc {} with gRPC!", request_name));
             }
         } else {

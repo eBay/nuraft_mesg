@@ -419,9 +419,8 @@ void service::get_srv_config_all(std::string const& group_name,
 }
 
 bool service::bind_data_service_request(std::string const& request_name, std::string const& group_id,
-                                        data_service_request_handler_t const& request_handler,
-                                        data_service_comp_handler_t const& comp_handler) {
-    return _mesg_service->bind_data_service_request(request_name, group_id, request_handler, comp_handler);
+                                        data_service_request_handler_t const& request_handler) {
+    return _mesg_service->bind_data_service_request(request_name, group_id, request_handler);
 }
 
 std::error_condition repl_service_ctx_grpc::data_service_request(std::string const& request_name,
