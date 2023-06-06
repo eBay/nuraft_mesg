@@ -98,8 +98,7 @@ public:
     void associate(sisl::GrpcServer* server);
     void bind(sisl::GrpcServer* server);
     bool bind_data_service_request(std::string const& request_name, std::string const& group_id,
-                                   data_service_request_handler_t const& request_handler,
-                                   data_service_comp_handler_t const& comp_handler);
+                                   data_service_request_handler_t const& request_handler);
 
     //::grpc::Status raftStep(RaftGroupMsg& request, RaftGroupMsg& response);
     bool raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
