@@ -20,6 +20,8 @@
 #include "utils.hpp"
 #include "proto/raft_types.pb.h"
 
+SISL_LOGGING_DECL(nuraft_mesg)
+
 namespace nuraft_mesg {
 
 static RCResponse* fromRCResponse(nuraft::resp_msg& rcmsg) {
@@ -32,7 +34,7 @@ static RCResponse* fromRCResponse(nuraft::resp_msg& rcmsg) {
     return req;
 }
 
-static shared< nuraft::req_msg > toRequest(RaftMessage const& raft_msg) {
+static std::shared_ptr< nuraft::req_msg > toRequest(RaftMessage const& raft_msg) {
     assert(raft_msg.has_rc_request());
     auto const& base = raft_msg.base();
     auto const& req = raft_msg.rc_request();

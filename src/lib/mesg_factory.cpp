@@ -90,15 +90,16 @@ protected:
 };
 
 class group_client : public grpc_base_client {
-    shared< messaging_client > _client;
+    std::shared_ptr< messaging_client > _client;
     group_name_t const _group_name;
     group_type_t const _group_type;
-    shared< group_metrics > _metrics;
+    std::shared_ptr< group_metrics > _metrics;
     std::string const _client_addr;
 
 public:
-    group_client(shared< messaging_client > client, std::string const& client_addr, group_name_t const& grp_name,
-                 group_type_t const& grp_type, shared< sisl::MetricsGroupWrapper > metrics) :
+    group_client(std::shared_ptr< messaging_client > client, std::string const& client_addr,
+                 group_name_t const& grp_name, group_type_t const& grp_type,
+                 std::shared_ptr< sisl::MetricsGroupWrapper > metrics) :
             grpc_base_client(),
             _client(client),
             _group_name(grp_name),
@@ -108,8 +109,8 @@ public:
 
     ~group_client() override = default;
 
-    shared< messaging_client > realClient() { return _client; }
-    void setClient(shared< messaging_client > new_client) { _client = new_client; }
+    std::shared_ptr< messaging_client > realClient() { return _client; }
+    void setClient(std::shared_ptr< messaging_client > new_client) { _client = new_client; }
 
     void send(RaftMessage const& message, handle_resp complete) override {
         RaftGroupMsg group_msg;
@@ -141,7 +142,8 @@ std::error_condition mesg_factory::create_client(const std::string& client,
     return (!raft_client) ? std::make_error_condition(std::errc::invalid_argument) : std::error_condition();
 }
 
-std::error_condition mesg_factory::reinit_client(const std::string& client, shared< nuraft::rpc_client >& raft_client) {
+std::error_condition mesg_factory::reinit_client(const std::string& client,
+                                                 std::shared_ptr< nuraft::rpc_client >& raft_client) {
     LOGDEBUGMOD(nuraft_mesg, "Re-init client to {}", client);
     auto g_client = std::dynamic_pointer_cast< group_client >(raft_client);
     auto new_raft_client = std::static_pointer_cast< nuraft::rpc_client >(g_client->realClient());
@@ -161,7 +163,7 @@ std::error_condition mesg_factory::data_service_request(std::string const& reque
 }
 
 group_factory::group_factory(int const cli_thread_count, std::string const& name,
-                             shared< sisl::TrfClient > const trf_client, std::string const& ssl_cert) :
+                             std::shared_ptr< sisl::TrfClient > const trf_client, std::string const& ssl_cert) :
         grpc_factory(cli_thread_count, name), m_trf_client(trf_client) {
     m_ssl_cert = ssl_cert;
 }
@@ -178,7 +180,7 @@ std::error_condition group_factory::create_client(const std::string& client,
 }
 
 std::error_condition group_factory::reinit_client(const std::string& client,
-                                                  shared< nuraft::rpc_client >& raft_client) {
+                                                  std::shared_ptr< nuraft::rpc_client >& raft_client) {
     LOGDEBUGMOD(nuraft_mesg, "Re-init client to {}", client);
     assert(raft_client);
     auto mesg_client = std::dynamic_pointer_cast< messaging_client >(raft_client);
