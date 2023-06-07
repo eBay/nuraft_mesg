@@ -8,7 +8,7 @@ required_conan_version = ">=1.50.0"
 
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "0.0.9"
+    version = "0.0.10"
 
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
@@ -57,7 +57,7 @@ class NuRaftMesgConan(ConanFile):
 
     def requirements(self):
         self.requires("sisl/[~=9,           include_prerelease=True]@oss/master")
-        self.requires("nuraft/2.1.0")
+        self.requires("nuraft/2.2.0")
 
         self.requires("boost/1.79.0", override=True)
         self.requires("openssl/1.1.1q", override=True)

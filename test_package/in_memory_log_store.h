@@ -17,7 +17,7 @@ limitations under the License.
 
 #pragma once
 
-#include "event_awaiter.h"
+#include <libnuraft/event_awaiter.hxx>
 #include <libnuraft/internal_timer.hxx>
 #include <libnuraft/log_store.hxx>
 

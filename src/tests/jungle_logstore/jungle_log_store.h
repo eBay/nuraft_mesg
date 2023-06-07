@@ -2,7 +2,7 @@
 
 #include <libnuraft/nuraft.hxx>
 #include <libjungle/jungle.h>
-#include "event_awaiter.h"
+#include <libnuraft/event_awaiter.hxx>
 
 #include <memory>
 #include <thread>
