@@ -57,7 +57,7 @@ jobs:
     - name: Install dependencies
       # Build your program with the given configuration
       run: |
-        conan install -o nuraft_mesg:testing=True -o sisl:testing=False -o sisl:malloc_impl=libc -o sisl:prerelease=False -s build_type=${{ matrix.build-type }} --build missing .
+        conan install -o sisl:testing=False -o sisl:malloc_impl=libc -s build_type=${{ matrix.build-type }} --build missing .
 
     - name: Build
       # Build your program with the given configuration
