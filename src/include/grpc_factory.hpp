@@ -20,7 +20,9 @@
 
 #include <future>
 #include <memory>
+
 #include <folly/SharedMutex.h>
+#include <libnuraft/nuraft.hxx>
 
 SISL_LOGGING_DECL(nuraft)
 
