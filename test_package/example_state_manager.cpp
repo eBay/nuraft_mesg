@@ -3,8 +3,9 @@
 
 #include <fstream>
 
-#include <jungle_log_store.h>
 #include <nlohmann/json.hpp>
+
+#include "in_memory_log_store.h"
 
 using json = nlohmann::json;
 
@@ -86,7 +87,7 @@ nuraft::ptr< nuraft::cluster_config > simple_state_mgr::load_config() {
 }
 
 nuraft::ptr< nuraft::log_store > simple_state_mgr::load_log_store() {
-    return nuraft::cs_new< nuraft::jungle_log_store >(fmt::format(FMT_STRING("{}_s{}"), _group_id, _srv_id));
+    return nuraft::cs_new< nuraft::inmem_log_store >();
 }
 
 nuraft::ptr< nuraft::srv_state > simple_state_mgr::read_state() {

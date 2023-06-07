@@ -1,7 +1,6 @@
 #include <cassert>
 #include <csignal>
 
-#include <libjungle/jungle.h>
 #include <nuraft_mesg/messaging.hpp>
 #include <sisl/grpc/rpc_client.hpp>
 #include <sisl/grpc/rpc_server.hpp>
@@ -58,14 +57,6 @@ int main(int argc, char** argv) {
     // Can start using LOG from this point onward.
     sisl::logging::SetLogger(format(FMT_STRING("server_{}"), offset_id));
     spdlog::set_pattern("[%D %T] [%^%l%$] [%n] [%t] %v");
-
-    // We initialize the jungle layer here, it's used by the storage_managers
-    // we create later.
-    jungle::GlobalConfig g_config;
-    g_config.numFlusherThreads = 0;
-    g_config.numCompactorThreads = 0;
-    g_config.logFileReclaimerSleep_sec = 60;
-    jungle::init(g_config);
 
     signal(SIGINT, handle);
     signal(SIGTERM, handle);

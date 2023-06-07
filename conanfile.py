@@ -59,7 +59,6 @@ class NuRaftMesgConan(ConanFile):
 
         definitions = {'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON',
                        'MEMORY_SANITIZER_ON': 'OFF'}
-        test_target = None
 
         if self.settings.build_type == "Debug":
             if self.options.sanitize:
