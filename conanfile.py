@@ -44,7 +44,7 @@ class NuRaftGrpcConan(ConanFile):
     def build_requirements(self):
         self.build_requires("gtest/1.13.0")
         if (self.options.testing):
-            self.build_requires("jungle_logstore/nbi.20230516")
+            self.build_requires("jungle_logstore/nbi.20230607")
 
     def requirements(self):
         self.requires("boost/1.79.0")
