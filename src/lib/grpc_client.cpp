@@ -44,7 +44,7 @@ inline RCRequest* fromRCRequest(nuraft::req_msg& rcmsg) {
     return req;
 }
 
-inline shared< nuraft::resp_msg > toResponse(RaftMessage const& raft_msg) {
+inline std::shared_ptr< nuraft::resp_msg > toResponse(RaftMessage const& raft_msg) {
     if (!raft_msg.has_rc_response()) return nullptr;
     auto const& base = raft_msg.base();
     auto const& resp = raft_msg.rc_response();
@@ -65,7 +65,8 @@ inline shared< nuraft::resp_msg > toResponse(RaftMessage const& raft_msg) {
 
 std::atomic_uint64_t grpc_base_client::_client_counter = 0ul;
 
-void grpc_base_client::send(shared< nuraft::req_msg >& req, nuraft::rpc_handler& complete, uint64_t timeout_ms) {
+void grpc_base_client::send(std::shared_ptr< nuraft::req_msg >& req, nuraft::rpc_handler& complete,
+                            uint64_t timeout_ms) {
     assert(req && complete);
     RaftMessage grpc_request;
     grpc_request.set_allocated_base(fromBaseRequest(*req));
@@ -76,8 +77,8 @@ void grpc_base_client::send(shared< nuraft::req_msg >& req, nuraft::rpc_handler&
                 grpc_request.base().dest());
 
     send(grpc_request, [req, complete](RaftMessage& response, ::grpc::Status& status) mutable -> void {
-        shared< nuraft::rpc_exception > err;
-        shared< nuraft::resp_msg > resp;
+        std::shared_ptr< nuraft::rpc_exception > err;
+        std::shared_ptr< nuraft::resp_msg > resp;
 
         if (status.ok()) {
             resp = toResponse(response);

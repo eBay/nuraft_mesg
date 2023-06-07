@@ -20,9 +20,9 @@
 
 #include <future>
 #include <memory>
-#include <folly/SharedMutex.h>
 
-#include "common.hpp"
+#include <folly/SharedMutex.h>
+#include <libnuraft/nuraft.hxx>
 
 SISL_LOGGING_DECL(nuraft)
 
@@ -54,7 +54,7 @@ public:
                                                       nuraft::srv_config const& dest_cfg);
 
     // Send a client request to the cluster
-    std::future< nuraft::cmd_result_code > client_request(shared< nuraft::buffer > buf,
+    std::future< nuraft::cmd_result_code > client_request(std::shared_ptr< nuraft::buffer > buf,
                                                           nuraft::srv_config const& dest_cfg);
 
     // Construct and send a RemoveServer message to the cluster

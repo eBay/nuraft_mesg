@@ -29,25 +29,26 @@ struct client_ctx {
     int32_t _cur_dest;
     std::string const _new_srv_addr;
 
-    client_ctx(Payload payload, shared< grpc_factory > factory, int32_t dest, std::string const& new_srv_addr = "") :
+    client_ctx(Payload payload, std::shared_ptr< grpc_factory > factory, int32_t dest,
+               std::string const& new_srv_addr = "") :
             _cur_dest(dest), _new_srv_addr(new_srv_addr), _payload(payload), _cli_factory(factory) {}
 
     Payload payload() const { return _payload; }
-    shared< grpc_factory > cli_factory() const { return _cli_factory; }
+    std::shared_ptr< grpc_factory > cli_factory() const { return _cli_factory; }
     std::future< nuraft::cmd_result_code > future() { return _promise.get_future(); }
     void set(nuraft::cmd_result_code const code) { return _promise.set_value(code); }
 
 private:
     Payload const _payload;
-    shared< grpc_factory > _cli_factory;
+    std::shared_ptr< grpc_factory > _cli_factory;
     std::promise< nuraft::cmd_result_code > _promise;
 };
 
 template < typename PayloadType >
-shared< nuraft::req_msg > createMessage(PayloadType payload, std::string const& srv_addr = "");
+std::shared_ptr< nuraft::req_msg > createMessage(PayloadType payload, std::string const& srv_addr = "");
 
 template <>
-shared< nuraft::req_msg > createMessage(uint32_t const srv_id, std::string const& srv_addr) {
+std::shared_ptr< nuraft::req_msg > createMessage(uint32_t const srv_id, std::string const& srv_addr) {
     assert(!srv_addr.empty());
     auto srv_conf = nuraft::srv_config(srv_id, srv_addr);
     auto log = std::make_shared< nuraft::log_entry >(0, srv_conf.serialize(), nuraft::log_val_type::cluster_server);
@@ -57,7 +58,7 @@ shared< nuraft::req_msg > createMessage(uint32_t const srv_id, std::string const
 }
 
 template <>
-shared< nuraft::req_msg > createMessage(shared< nuraft::buffer > buf, std::string const&) {
+std::shared_ptr< nuraft::req_msg > createMessage(std::shared_ptr< nuraft::buffer > buf, std::string const&) {
     auto log = std::make_shared< nuraft::log_entry >(0, buf);
     auto msg = std::make_shared< nuraft::req_msg >(0, nuraft::msg_type::client_request, 0, 1, 0, 0, 0);
     msg->log_entries().push_back(log);
@@ -65,7 +66,7 @@ shared< nuraft::req_msg > createMessage(shared< nuraft::buffer > buf, std::strin
 }
 
 template <>
-shared< nuraft::req_msg > createMessage(int32_t const srv_id, std::string const&) {
+std::shared_ptr< nuraft::req_msg > createMessage(int32_t const srv_id, std::string const&) {
     auto buf = nuraft::buffer::alloc(sizeof(srv_id));
     buf->put(srv_id);
     buf->pos(0);
@@ -76,7 +77,8 @@ shared< nuraft::req_msg > createMessage(int32_t const srv_id, std::string const&
 }
 
 template < typename ContextType >
-void respHandler(shared< ContextType > ctx, shared< nuraft::resp_msg >& rsp, shared< nuraft::rpc_exception >& err) {
+void respHandler(std::shared_ptr< ContextType > ctx, std::shared_ptr< nuraft::resp_msg >& rsp,
+                 std::shared_ptr< nuraft::rpc_exception >& err) {
     auto factory = ctx->cli_factory();
     if (err || !rsp) {
         LOGERROR("{}", (err ? err->what() : "No response."));
@@ -98,13 +100,16 @@ void respHandler(shared< ContextType > ctx, shared< nuraft::resp_msg >& rsp, sha
 
     // Not accepted: means that `get_dst()` is a new leader.
     auto gresp = std::dynamic_pointer_cast< grpc_resp >(rsp);
-    LOGDEBUGMOD(nuraft_mesg, "Updating destination from {} to {}[{}]", ctx->_cur_dest, rsp->get_dst(), gresp->dest_addr);
+    LOGDEBUGMOD(nuraft_mesg, "Updating destination from {} to {}[{}]", ctx->_cur_dest, rsp->get_dst(),
+                gresp->dest_addr);
     ctx->_cur_dest = rsp->get_dst();
     auto client = factory->create_client(gresp->dest_addr);
 
     // We'll try again by forwarding the message
     auto handler = static_cast< nuraft::rpc_handler >(
-        [ctx](shared< nuraft::resp_msg >& rsp, shared< nuraft::rpc_exception >& err) { respHandler(ctx, rsp, err); });
+        [ctx](std::shared_ptr< nuraft::resp_msg >& rsp, std::shared_ptr< nuraft::rpc_exception >& err) {
+            respHandler(ctx, rsp, err);
+        });
 
     LOGDEBUGMOD(nuraft_mesg, "Creating new message: {}", ctx->_new_srv_addr);
     auto msg = createMessage(ctx->payload(), ctx->_new_srv_addr);
@@ -164,7 +169,9 @@ std::future< nuraft::cmd_result_code > grpc_factory::add_server(uint32_t const s
 
     auto ctx = std::make_shared< client_ctx< uint32_t > >(srv_id, shared_from_this(), dest_cfg.get_id(), srv_addr);
     auto handler = static_cast< nuraft::rpc_handler >(
-        [ctx](shared< nuraft::resp_msg >& rsp, shared< nuraft::rpc_exception >& err) { respHandler(ctx, rsp, err); });
+        [ctx](std::shared_ptr< nuraft::resp_msg >& rsp, std::shared_ptr< nuraft::rpc_exception >& err) {
+            respHandler(ctx, rsp, err);
+        });
 
     auto msg = createMessage(srv_id, srv_addr);
     client->send(msg, handler);
@@ -183,14 +190,16 @@ std::future< nuraft::cmd_result_code > grpc_factory::rem_server(uint32_t const s
 
     auto ctx = std::make_shared< client_ctx< int32_t > >(srv_id, shared_from_this(), dest_cfg.get_id());
     auto handler = static_cast< nuraft::rpc_handler >(
-        [ctx](shared< nuraft::resp_msg >& rsp, shared< nuraft::rpc_exception >& err) { respHandler(ctx, rsp, err); });
+        [ctx](std::shared_ptr< nuraft::resp_msg >& rsp, std::shared_ptr< nuraft::rpc_exception >& err) {
+            respHandler(ctx, rsp, err);
+        });
 
     auto msg = createMessage(static_cast< int32_t >(srv_id));
     client->send(msg, handler);
     return ctx->future();
 }
 
-std::future< nuraft::cmd_result_code > grpc_factory::client_request(shared< nuraft::buffer > buf,
+std::future< nuraft::cmd_result_code > grpc_factory::client_request(std::shared_ptr< nuraft::buffer > buf,
                                                                     nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
     assert(client);
@@ -200,9 +209,12 @@ std::future< nuraft::cmd_result_code > grpc_factory::client_request(shared< nura
         return p.get_future();
     }
 
-    auto ctx = std::make_shared< client_ctx< shared< nuraft::buffer > > >(buf, shared_from_this(), dest_cfg.get_id());
+    auto ctx =
+        std::make_shared< client_ctx< std::shared_ptr< nuraft::buffer > > >(buf, shared_from_this(), dest_cfg.get_id());
     auto handler = static_cast< nuraft::rpc_handler >(
-        [ctx](shared< nuraft::resp_msg >& rsp, shared< nuraft::rpc_exception >& err) { respHandler(ctx, rsp, err); });
+        [ctx](std::shared_ptr< nuraft::resp_msg >& rsp, std::shared_ptr< nuraft::rpc_exception >& err) {
+            respHandler(ctx, rsp, err);
+        });
 
     auto msg = createMessage(buf);
     client->send(msg, handler);

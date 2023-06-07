@@ -19,9 +19,6 @@
 namespace nuraft_mesg {
 
 template < typename T >
-using boxed = std::unique_ptr< T >;
-
-template < typename T >
 using shared = std::shared_ptr< T >;
 
 using group_name_t = std::string;
@@ -45,9 +42,9 @@ public:
     ~group_metrics() { deregister_me_from_farm(); }
 };
 
-using get_server_ctx_cb = std::function< std::error_condition(int32_t srv_id, group_name_t const&, group_type_t const&,
-                                                              nuraft::context*& ctx_out,
-                                                              shared< group_metrics > metrics) >;
+using get_server_ctx_cb =
+    std::function< std::error_condition(int32_t srv_id, group_name_t const&, group_type_t const&,
+                                        nuraft::context*& ctx_out, std::shared_ptr< group_metrics > metrics) >;
 
 // pluggable type for data service
 using data_service_t = data_service_grpc;
@@ -58,8 +55,8 @@ using process_offload_cb = std::function< std::function< void(std::function< voi
 struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name);
 
-    shared< grpc_server > m_server;
-    shared< group_metrics > m_metrics;
+    std::shared_ptr< grpc_server > m_server;
+    std::shared_ptr< group_metrics > m_metrics;
 };
 
 class msg_service : public std::enable_shared_from_this< msg_service > {
@@ -79,8 +76,8 @@ class msg_service : public std::enable_shared_from_this< msg_service > {
     ~msg_service();
 
 public:
-    static shared< msg_service > create(get_server_ctx_cb get_server_ctx, process_offload_cb poc,
-                                        std::string const& service_address, bool const enable_data_service);
+    static std::shared_ptr< msg_service > create(get_server_ctx_cb get_server_ctx, process_offload_cb poc,
+                                                 std::string const& service_address, bool const enable_data_service);
 
     msg_service(msg_service const&) = delete;
     msg_service& operator=(msg_service const&) = delete;
@@ -90,7 +87,8 @@ public:
     nuraft::cmd_result_code add_srv(group_name_t const& group_name, nuraft::srv_config const& cfg);
     nuraft::cmd_result_code rm_srv(group_name_t const& group_name, int const member_id);
     bool request_leadership(group_name_t const& group_name);
-    void get_srv_config_all(group_name_t const& group_name, std::vector< shared< nuraft::srv_config > >& configs_out);
+    void get_srv_config_all(group_name_t const& group_name,
+                            std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out);
 
     nuraft::cmd_result_code append_entries(group_name_t const& group_name,
                                            std::vector< nuraft::ptr< nuraft::buffer > > const& logs);

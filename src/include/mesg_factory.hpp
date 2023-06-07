@@ -35,35 +35,32 @@ using group_type_t = std::string;
 
 class mesg_client;
 
-template < typename T >
-using shared = std::shared_ptr< T >;
-
 class group_factory : public grpc_factory {
     std::shared_ptr< sisl::TrfClient > m_trf_client;
     static std::string m_ssl_cert;
 
 public:
-    group_factory(int const cli_thread_count, std::string const& name, shared< sisl::TrfClient > const trf_client,
+    group_factory(int const cli_thread_count, std::string const& name, std::shared_ptr< sisl::TrfClient > const trf_client,
                   std::string const& ssl_cert = "");
 
     using grpc_factory::create_client;
 
     std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >&) override;
 
-    std::error_condition reinit_client(std::string const& client, shared< nuraft::rpc_client >& raft_client) override;
+    std::error_condition reinit_client(std::string const& client, std::shared_ptr< nuraft::rpc_client >& raft_client) override;
 
     virtual std::string lookupEndpoint(std::string const& client) = 0;
 };
 
 class mesg_factory final : public grpc_factory {
-    shared< group_factory > _group_factory;
+    std::shared_ptr< group_factory > _group_factory;
     group_name_t const _group_name;
     group_type_t const _group_type;
-    shared< sisl::MetricsGroupWrapper > _metrics;
+    std::shared_ptr< sisl::MetricsGroupWrapper > _metrics;
 
 public:
-    mesg_factory(shared< group_factory > g_factory, group_name_t const& grp_id, group_type_t const& grp_type,
-                 shared< sisl::MetricsGroupWrapper > metrics = nullptr) :
+    mesg_factory(std::shared_ptr< group_factory > g_factory, group_name_t const& grp_id, group_type_t const& grp_type,
+                 std::shared_ptr< sisl::MetricsGroupWrapper > metrics = nullptr) :
             grpc_factory(0, grp_id),
             _group_factory(g_factory),
             _group_name(grp_id),
@@ -74,7 +71,7 @@ public:
 
     std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >& rpc_ptr) override;
 
-    std::error_condition reinit_client(const std::string& client, shared< nuraft::rpc_client >& raft_client) override;
+    std::error_condition reinit_client(const std::string& client, std::shared_ptr< nuraft::rpc_client >& raft_client) override;
 
     std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
                                               data_service_response_handler_t const& response_cb);

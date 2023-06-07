@@ -22,7 +22,7 @@ if (CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
 endif ()
 
-add_executable(raft_server example_server.cpp example_state_manager.cpp)
+add_executable(raft_server example_server.cpp example_state_manager.cpp in_memory_log_store.cpp)
 add_executable(raft_client example_client.cpp)
 
 conan_target_link_libraries(raft_server)

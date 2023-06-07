@@ -19,9 +19,11 @@
 //
 #pragma once
 
-#include "common.hpp"
-
+#include <libnuraft/nuraft.hxx>
 #include <sisl/grpc/rpc_client.hpp>
+#include <sisl/logging/logging.h>
+
+SISL_LOGGING_DECL(nuraft_mesg)
 
 namespace nuraft_mesg {
 
@@ -45,7 +47,7 @@ public:
     grpc_base_client() : nuraft::rpc_client::rpc_client(), _client_id(_client_counter++) {}
     ~grpc_base_client() override = default;
 
-    void send(shared< nuraft::req_msg >& req, nuraft::rpc_handler& complete, uint64_t timeout_ms = 0) override;
+    void send(std::shared_ptr< nuraft::req_msg >& req, nuraft::rpc_handler& complete, uint64_t timeout_ms = 0) override;
     bool is_abandoned() const override { return false; }
     uint64_t get_id() const override { return _client_id; }
 
