@@ -15,7 +15,7 @@ class NuRaftConan(ConanFile):
     topics = ("raft",)
     url = "https://github.com/conan-io/conan-center-index"
     license = "Apache-2.0"
-    version = "2.2.0":
+    version = "2.2.0"
     source_url = "https://github.com/eBay/nuraft/archive/62d73b52b6897d4ec1c02d77fe5f7909705399be.tar.gz"
 
     package_type = "library"
