@@ -81,7 +81,8 @@ jobs:
           ~/.conan/data/nuraft
         key: NuMesgDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}
 
-    - name: Build run: |
+    - name: Build
+      run: |
         conan create \
             -o sisl:prerelease=False \
             -o sisl:malloc_impl=${{ matrix.malloc-impl }} \
