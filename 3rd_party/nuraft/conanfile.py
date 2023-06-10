@@ -16,7 +16,6 @@ class NuRaftConan(ConanFile):
     url = "https://github.com/conan-io/conan-center-index"
     license = "Apache-2.0"
     version = "2.2.0"
-    source_url = "https://github.com/eBay/nuraft/archive/62d73b52b6897d4ec1c02d77fe5f7909705399be.tar.gz"
 
     package_type = "library"
     settings = "os", "arch", "compiler", "build_type"
@@ -41,9 +40,9 @@ class NuRaftConan(ConanFile):
         cmake_layout(self, src_folder="src")
 
     def requirements(self):
-        self.requires("openssl/[>=1.1 <4]")
+        self.requires("openssl/1.1.1q")
         if self.options.asio == "boost":
-            self.requires("boost/1.81.0")
+            self.requires("boost/1.79.0")
         else:
             self.requires("asio/1.27.0")
 
@@ -56,7 +55,7 @@ class NuRaftConan(ConanFile):
             check_min_cppstd(self, 11)
 
     def source(self):
-        get(self, self.source_url, strip_root=True)
+        get(self, "https://github.com/eBay/nuraft/archive/62d73b52b6897d4ec1c02d77fe5f7909705399be.tar.gz", strip_root=True)
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -65,7 +64,7 @@ class NuRaftConan(ConanFile):
         deps.generate()
 
     def build(self):
-        patch(self, patch_file="patches/patch.diff", strip=1)
+        patch(self, patch_file="patches/patch.diff")
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
