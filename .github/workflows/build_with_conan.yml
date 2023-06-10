@@ -93,7 +93,7 @@ jobs:
     - name: Build
       run: |
         conan export deps/sisl oss/master
-        conan export deps/nuraft_mesg/3rd_party/nuraft
+        conan export 3rd_party/nuraft
         conan create \
             -o sisl:prerelease=${{ matrix.prerelease }} \
             -o sisl:malloc_impl=${{ matrix.malloc-impl }} \
