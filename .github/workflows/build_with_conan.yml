@@ -60,6 +60,16 @@ jobs:
         # Set std::string to non-CoW C++11 version
         sed -i 's,compiler.libcxx=libstdc++$,compiler.libcxx=libstdc++11,g' ~/.conan/profiles/default
 
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Retrieve Dependencies
+      uses: actions/checkout@v3
+      with:
+        repository: eBay/sisl
+        path: deps/sisl
+        ref: master
+
     - name: Restore Sisl 3rdParty Cache
       id: restore-cache-sisl
       uses: actions/cache/restore@v3
@@ -79,16 +89,6 @@ jobs:
         path: |
           ~/.conan/data/sisl
         key: NuMesgDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}-${{ matrix.prerelease }}
-
-    - name: Retrieve Dependencies
-      uses: actions/checkout@v3
-      with:
-        repository: eBay/sisl
-        path: deps/sisl
-        ref: master
-
-    - name: Checkout Code
-      uses: actions/checkout@v3
 
     - name: Build
       run: |
