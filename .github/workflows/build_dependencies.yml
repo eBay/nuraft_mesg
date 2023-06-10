@@ -12,9 +12,6 @@ on:
       malloc-impl:
         required: true
         type: string
-      prerelease:
-        required: true
-        type: string
 
 jobs:
   BuildNuraftMesgDeps:
@@ -33,13 +30,6 @@ jobs:
         conan profile new --detect default
         # Set std::string to non-CoW C++11 version
         sed -i 's,compiler.libcxx=libstdc++$,compiler.libcxx=libstdc++11,g' ~/.conan/profiles/default
-
-    - name: Retrieve Dependencies
-      uses: actions/checkout@v3
-      with:
-        repository: eBay/sisl
-        path: deps/sisl
-        ref: master
 
     - name: Retrieve Dependencies
       uses: actions/checkout@v3
@@ -66,15 +56,13 @@ jobs:
       with:
         path: |
           ~/.conan/data/nuraft
-          ~/.conan/data/sisl
-        key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
+        key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}
 
     - name: Install Dependencies
       run: |
-        conan export deps/sisl oss/master
         conan export deps/nuraft_mesg/3rd_party/nuraft
         conan install \
-            -o sisl:prerelease=${{ inputs.prerelease }} \
+            -o sisl:prerelease=False \
             -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
             -o testing=False \
             -s build_type=${{ inputs.build-type }} \
@@ -90,5 +78,4 @@ jobs:
       with:
         path: |
           ~/.conan/data/nuraft
-          ~/.conan/data/sisl
         key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}

@@ -27,13 +27,11 @@ jobs:
       matrix:
         build-type: ["Debug", "Release"]
         malloc-impl: ["libc"]
-        prerelease: ["False"]
     uses: ./.github/workflows/build_dependencies.yml
     with:
       branch: main
       build-type: ${{ matrix.build-type }}
       malloc-impl: ${{ matrix.malloc-impl }}
-      prerelease: ${{ matrix.prerelease }}
 
   BuildPR:
     needs: CacheDependencies
@@ -43,7 +41,6 @@ jobs:
       matrix:
         build-type: ["Debug", "Release"]
         malloc-impl: ["libc"]
-        prerelease: ["False"]
 
     steps:
     - name: Setup Python
@@ -88,14 +85,14 @@ jobs:
       with:
         path: |
           ~/.conan/data/sisl
-        key: NuMesgDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}-${{ matrix.prerelease }}
+        key: NuMesgDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}
 
     - name: Build
       run: |
         conan export deps/sisl oss/master
         conan export 3rd_party/nuraft
         conan create \
-            -o sisl:prerelease=${{ matrix.prerelease }} \
+            -o sisl:prerelease=False \
             -o sisl:malloc_impl=${{ matrix.malloc-impl }} \
             -s build_type=${{ matrix.build-type }} \
             --build missing \
