@@ -65,6 +65,7 @@ jobs:
       uses: actions/cache/restore@v3
       with:
         path: |
+          ~/.conan/data/nuraft
           ~/.conan/data/sisl
         key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
 
@@ -88,5 +89,6 @@ jobs:
       uses: actions/cache/save@v3
       with:
         path: |
+          ~/.conan/data/nuraft
           ~/.conan/data/sisl
         key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
