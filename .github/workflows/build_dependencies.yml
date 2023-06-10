@@ -73,6 +73,7 @@ jobs:
         conan install \
             -o sisl:prerelease=False \
             -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
+            -o sisl:testing=False \
             -o testing=False \
             -s build_type=${{ inputs.build-type }} \
             --build missing deps/nuraft_mesg
