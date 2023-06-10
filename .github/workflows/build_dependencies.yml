@@ -34,6 +34,13 @@ jobs:
     - name: Retrieve Dependencies
       uses: actions/checkout@v3
       with:
+        repository: eBay/sisl
+        path: deps/sisl
+        ref: master
+
+    - name: Retrieve Dependencies
+      uses: actions/checkout@v3
+      with:
         repository: eBay/nuraft_mesg
         path: deps/nuraft_mesg
         ref: ${{ inputs.branch }}
@@ -55,11 +62,13 @@ jobs:
       uses: actions/cache/restore@v3
       with:
         path: |
+          ~/.conan/data/sisl
           ~/.conan/data/nuraft
         key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}
 
     - name: Install Dependencies
       run: |
+        conan export deps/sisl oss/master
         conan export deps/nuraft_mesg/3rd_party/nuraft
         conan install \
             -o sisl:prerelease=False \
@@ -77,5 +86,6 @@ jobs:
       uses: actions/cache/save@v3
       with:
         path: |
+          ~/.conan/data/sisl
           ~/.conan/data/nuraft
-        key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
+        key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}
