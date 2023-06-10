@@ -60,13 +60,6 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v3
 
-    - name: Retrieve Dependencies
-      uses: actions/checkout@v3
-      with:
-        repository: eBay/sisl
-        path: deps/sisl
-        ref: master
-
     - name: Restore Sisl 3rdParty Cache
       id: restore-cache-sisl
       uses: actions/cache/restore@v3
@@ -84,13 +77,10 @@ jobs:
       uses: actions/cache/restore@v3
       with:
         path: |
-          ~/.conan/data/sisl
+          ~/.conan/data/nuraft
         key: NuMesgDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}
 
-    - name: Build
-      run: |
-        conan export deps/sisl oss/master
-        conan export 3rd_party/nuraft
+    - name: Build run: |
         conan create \
             -o sisl:prerelease=False \
             -o sisl:malloc_impl=${{ matrix.malloc-impl }} \
