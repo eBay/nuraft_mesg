@@ -80,11 +80,20 @@ jobs:
           ~/.conan/data/sisl
         key: NuMesgDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}-${{ matrix.prerelease }}
 
+    - name: Retrieve Dependencies
+      uses: actions/checkout@v3
+      with:
+        repository: eBay/sisl
+        path: deps/sisl
+        ref: master
+
     - name: Checkout Code
       uses: actions/checkout@v3
 
     - name: Build
       run: |
+        conan export deps/sisl oss/master
+        conan export deps/nuraft_mesg/3rd_party/nuraft
         conan create \
             -o sisl:prerelease=${{ matrix.prerelease }} \
             -o sisl:malloc_impl=${{ matrix.malloc-impl }} \
