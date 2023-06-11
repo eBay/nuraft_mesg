@@ -86,6 +86,7 @@ jobs:
         conan create \
             -o sisl:prerelease=False \
             -o sisl:malloc_impl=${{ matrix.malloc-impl }} \
+            -o sisl:testing=False \
             -s build_type=${{ matrix.build-type }} \
             --build missing \
             . \
