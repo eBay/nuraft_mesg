@@ -1,37 +1,38 @@
-name: Conan Build
+name: Nuraft Mesg Main Build
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
     branches:
       - main
 
 jobs:
   BuildSISL:
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         build-type: ["Debug", "Release"]
         malloc-impl: ["libc"]
+        prerelease: ["False"]
     uses: ./.github/workflows/build_sisl.yml
     with:
       build-type: ${{ matrix.build-type }}
       malloc-impl: ${{ matrix.malloc-impl }}
+      prerelease: ${{ matrix.prerelease }}
 
   CacheDependencies:
     needs: BuildSISL
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         build-type: ["Debug", "Release"]
         malloc-impl: ["libc"]
+        prerelease: ["False"]
     uses: ./.github/workflows/build_dependencies.yml
     with:
       branch: main
       build-type: ${{ matrix.build-type }}
       malloc-impl: ${{ matrix.malloc-impl }}
+      prerelease: ${{ matrix.prerelease }}
 
   BuildPR:
     needs: CacheDependencies
@@ -41,6 +42,7 @@ jobs:
       matrix:
         build-type: ["Debug", "Release"]
         malloc-impl: ["libc"]
+        prerelease: ["False"]
 
     steps:
     - name: Setup Python
@@ -70,7 +72,7 @@ jobs:
           ~/.conan/data/jemalloc
           ~/.conan/data/prerelease_dummy
           ~/.conan/data/spdlog
-        key: SislDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}
+        key: SislDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}-${{ matrix.prerelease }}
 
     - name: Restore NuraftMesg 3rdParty Cache
       id: restore-3rd-party
@@ -84,7 +86,7 @@ jobs:
     - name: Build
       run: |
         conan create \
-            -o sisl:prerelease=False \
+            -o sisl:prerelease=${{ matrix.prerelease }} \
             -o sisl:malloc_impl=${{ matrix.malloc-impl }} \
             -o sisl:testing=False \
             -s build_type=${{ matrix.build-type }} \
