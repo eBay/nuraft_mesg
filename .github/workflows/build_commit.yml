@@ -32,12 +32,6 @@ jobs:
   BuildCommit:
     needs: NuraftMesgDeps
     runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        build-type: ["Debug", "Release"]
-        malloc-impl: ["libc"]
-        prerelease: ["False"]
 
     steps:
     - name: Setup Python
@@ -63,7 +57,7 @@ jobs:
       with:
         path: |
           ~/.conan/data
-        key: SislDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}-${{ matrix.prerelease }}
+        key: SislDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
 
     - name: Restore NuraftMesg 3rdParty Cache
       id: restore-3rd-party
@@ -71,15 +65,15 @@ jobs:
       with:
         path: |
           ~/.conan/data
-        key: NuMesgDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}
+        key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}
 
     - name: Build
       run: |
         conan create \
-            -o sisl:prerelease=${{ matrix.prerelease }} \
-            -o sisl:malloc_impl=${{ matrix.malloc-impl }} \
+            -o sisl:prerelease=${{ inputs.prerelease }} \
+            -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
             -o sisl:testing=False \
-            -s build_type=${{ matrix.build-type }} \
+            -s build_type=${{ inputs.build-type }} \
             --build missing \
             . \
             oss/main
