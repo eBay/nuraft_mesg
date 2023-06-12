@@ -62,7 +62,7 @@ jobs:
       with:
         path: |
           ~/.conan/data
-        key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}
+        key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
 
     - name: Install Dependencies
       run: |
@@ -89,5 +89,5 @@ jobs:
       with:
         path: |
           ~/.conan/data
-        key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}
+        key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
       if: ${{ github.event_name != 'pull_request' && steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
