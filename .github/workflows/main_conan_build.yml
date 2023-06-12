@@ -6,14 +6,14 @@ on:
       - main
 
 jobs:
-  BuildSISL:
+  CacheDependencies:
     strategy:
       fail-fast: true
       matrix:
         build-type: ["Debug", "Release"]
         malloc-impl: ["libc"]
         prerelease: ["False"]
-    uses: ./.github/workflows/build_sisl.yml
+    uses: ./.github/workflows/cache_dependencies.yml
     with:
       build-type: ${{ matrix.build-type }}
       malloc-impl: ${{ matrix.malloc-impl }}
