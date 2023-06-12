@@ -1,4 +1,4 @@
-name: NuraftMesg PR Build
+name: Nuraft Mesg PR Build
 
 on:
   pull_request:
@@ -6,70 +6,15 @@ on:
       - main
 
 jobs:
-  CacheDependencies:
+  BuildCommit:
     strategy:
       fail-fast: true
       matrix:
         build-type: ["Debug", "Release"]
         malloc-impl: ["libc"]
         prerelease: ["False"]
-    uses: ./.github/workflows/cache_dependencies.yml
+    uses: ./.github/workflows/build_commit.yml
     with:
       build-type: ${{ matrix.build-type }}
       malloc-impl: ${{ matrix.malloc-impl }}
       prerelease: ${{ matrix.prerelease }}
-
-  BuildPR:
-    needs: CacheDependencies
-    runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        build-type: ["Debug", "Release"]
-        malloc-impl: ["libc"]
-        prerelease: ["False"]
-
-    steps:
-    - name: Setup Python
-      uses: actions/setup-python@v3
-      with:
-        python-version: "3.8"
-
-    - name: Setup Conan
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install conan~=1.0
-        conan user
-        conan profile new --detect default
-        # Set std::string to non-CoW C++11 version
-        sed -i 's,compiler.libcxx=libstdc++$,compiler.libcxx=libstdc++11,g' ~/.conan/profiles/default
-
-    - name: Checkout Code
-      uses: actions/checkout@v3
-
-    - name: Restore Sisl 3rdParty Cache
-      id: restore-cache-sisl
-      uses: actions/cache/restore@v3
-      with:
-        path: |
-          ~/.conan/data
-        key: SislDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}-${{ matrix.prerelease }}
-
-    - name: Restore NuraftMesg 3rdParty Cache
-      id: restore-3rd-party
-      uses: actions/cache/restore@v3
-      with:
-        path: |
-          ~/.conan/data
-        key: NuMesgDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}
-
-    - name: Build
-      run: |
-        conan create \
-            -o sisl:prerelease=${{ matrix.prerelease }} \
-            -o sisl:malloc_impl=${{ matrix.malloc-impl }} \
-            -o sisl:testing=False \
-            -s build_type=${{ matrix.build-type }} \
-            --build missing \
-            . \
-            oss/main
