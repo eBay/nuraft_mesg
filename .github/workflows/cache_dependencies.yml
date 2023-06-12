@@ -22,6 +22,7 @@ jobs:
       malloc-impl: ${{ inputs.malloc-impl }}
       prerelease: ${{ inputs.prerelease }}
   NuraftMesgDeps:
+    needs: SislDeps
     uses: ./.github/workflows/build_dependencies.yml
     with:
       branch: main
