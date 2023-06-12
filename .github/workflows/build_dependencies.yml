@@ -65,7 +65,6 @@ jobs:
         path: |
           ~/.conan/data
         key: SislDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
-      if: ${{ inputs.native == 'false' }}
 
     - name: Restore NuraftMesg 3rdParty Cache
       id: restore-cache-nuraftmesg
