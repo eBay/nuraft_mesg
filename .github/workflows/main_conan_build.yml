@@ -67,11 +67,7 @@ jobs:
       uses: actions/cache/restore@v3
       with:
         path: |
-          ~/.conan/data/folly
-          ~/.conan/data/gperftools
-          ~/.conan/data/jemalloc
-          ~/.conan/data/prerelease_dummy
-          ~/.conan/data/spdlog
+          ~/.conan/data
         key: SislDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}-${{ matrix.prerelease }}
 
     - name: Restore NuraftMesg 3rdParty Cache
@@ -79,8 +75,7 @@ jobs:
       uses: actions/cache/restore@v3
       with:
         path: |
-          ~/.conan/data/sisl
-          ~/.conan/data/nuraft
+          ~/.conan/data
         key: NuMesgDeps-${{ matrix.build-type }}-${{ matrix.malloc-impl }}
 
     - name: Build

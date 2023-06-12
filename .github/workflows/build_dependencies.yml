@@ -1,4 +1,4 @@
-name: Conan Build
+name: NuraftMsg Dependencies
 
 on:
   workflow_call:
@@ -53,11 +53,7 @@ jobs:
       uses: actions/cache/restore@v3
       with:
         path: |
-          ~/.conan/data/folly
-          ~/.conan/data/gperftools
-          ~/.conan/data/jemalloc
-          ~/.conan/data/prerelease_dummy
-          ~/.conan/data/spdlog
+          ~/.conan/data
         key: SislDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
 
     - name: Restore NuraftMesg 3rdParty Cache
@@ -65,8 +61,7 @@ jobs:
       uses: actions/cache/restore@v3
       with:
         path: |
-          ~/.conan/data/sisl
-          ~/.conan/data/nuraft
+          ~/.conan/data
         key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}
 
     - name: Install Dependencies
@@ -80,16 +75,19 @@ jobs:
             -o testing=False \
             -s build_type=${{ inputs.build-type }} \
             --build missing deps/nuraft_mesg
+      if: ${{ steps.restore-cache-nurraftmesg.outputs.cache-hit != 'true' }}
 
     - name: Cleanup dep builds
       run: |
+        ls -1d ~/.conan/data/* | grep -Ev '(nuraft|sisl)' | xargs rm -rf
         rm -rf ~/.conan/data/*/*/*/*/build
+      if: ${{ steps.restore-cache-nurraftmesg.outputs.cache-hit != 'true' }}
 
     - name: Save NuraftMesg 3rdParty Cache
       id: save-cache-nurmesg
       uses: actions/cache/save@v3
       with:
         path: |
-          ~/.conan/data/sisl
-          ~/.conan/data/nuraft
+          ~/.conan/data
         key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}
+      if: ${{ github.event_name != 'pull_request' && steps.restore-cache-nurraftmesg.outputs.cache-hit != 'true' }}
