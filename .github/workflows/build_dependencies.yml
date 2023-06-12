@@ -75,13 +75,13 @@ jobs:
             -o testing=False \
             -s build_type=${{ inputs.build-type }} \
             --build missing deps/nuraft_mesg
-      if: ${{ steps.restore-cache-nurraftmesg.outputs.cache-hit != 'true' }}
+      if: ${{ steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
 
     - name: Cleanup dep builds
       run: |
         ls -1d ~/.conan/data/* | grep -Ev '(nuraft|sisl)' | xargs rm -rf
         rm -rf ~/.conan/data/*/*/*/*/build
-      if: ${{ steps.restore-cache-nurraftmesg.outputs.cache-hit != 'true' }}
+      if: ${{ steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
 
     - name: Save NuraftMesg 3rdParty Cache
       id: save-cache-nurmesg
@@ -90,4 +90,4 @@ jobs:
         path: |
           ~/.conan/data
         key: NuMesgDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}
-      if: ${{ github.event_name != 'pull_request' && steps.restore-cache-nurraftmesg.outputs.cache-hit != 'true' }}
+      if: ${{ github.event_name != 'pull_request' && steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
