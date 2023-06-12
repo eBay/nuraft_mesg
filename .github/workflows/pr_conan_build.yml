@@ -19,21 +19,6 @@ jobs:
       malloc-impl: ${{ matrix.malloc-impl }}
       prerelease: ${{ matrix.prerelease }}
 
-  CacheDependencies:
-    needs: BuildSISL
-    strategy:
-      fail-fast: true
-      matrix:
-        build-type: ["Debug", "Release"]
-        malloc-impl: ["libc"]
-        prerelease: ["False"]
-    uses: ./.github/workflows/build_dependencies.yml
-    with:
-      branch: main
-      build-type: ${{ matrix.build-type }}
-      malloc-impl: ${{ matrix.malloc-impl }}
-      prerelease: ${{ matrix.prerelease }}
-
   BuildPR:
     needs: CacheDependencies
     runs-on: ubuntu-22.04

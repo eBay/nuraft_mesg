@@ -21,3 +21,10 @@ jobs:
       build-type: ${{ inputs.build-type }}
       malloc-impl: ${{ inputs.malloc-impl }}
       prerelease: ${{ inputs.prerelease }}
+  NuraftMesgDeps:
+    uses: ./.github/workflows/build_dependencies.yml
+    with:
+      branch: main
+      build-type: ${{ matrix.build-type }}
+      malloc-impl: ${{ matrix.malloc-impl }}
+      prerelease: ${{ matrix.prerelease }}
