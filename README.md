@@ -1,5 +1,5 @@
 # nuRAFT-Messaging
-![main_conan_build](https://github.com/ebay/nuraft_mesg/actions/workflows/main_conan_build.yml/badge.svg)
+![merge_conan_build](https://github.com/ebay/nuraft_mesg/actions/workflows/merge_conan_build.yml/badge.svg)
 
 ## Brief
 

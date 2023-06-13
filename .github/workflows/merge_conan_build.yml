@@ -1,4 +1,4 @@
-name: Nuraft Mesg Main Build
+name: NuraftMesg Merge Build
 
 on:
   push:
@@ -6,9 +6,9 @@ on:
       - main
 
 jobs:
-  BuildCommit:
+  Build:
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         build-type: ["Debug", "Release"]
         malloc-impl: ["libc"]

@@ -1,4 +1,4 @@
-name: NuraftMsg Dependencies
+name: Conan Build
 
 on:
   workflow_call:
@@ -15,30 +15,52 @@ on:
       prerelease:
         required: true
         type: string
-      native:
+      testing:
         required: false
-        default: 'false'
         type: string
+        default: 'False'
+  workflow_dispatch:
+    inputs:
+      branch:
+        required: true
+        type: string
+      build-type:
+        required: true
+        type: choice
+        options:
+          - Debug
+          - Release
+          - RelWithDebInfo
+      malloc-impl:
+        description: 'Allocation Library'
+        required: true
+        type: choice
+        options:
+          - libc
+          - tcmalloc
+          - jemalloc
+      prerelease:
+        description: 'Fault Instrumentation'
+        required: false
+        type: choice
+        options:
+          - 'True'
+          - 'False'
+        default: 'False'
+      testing:
+        description: 'Run Tests'
+        required: true
+        type: choice
+        options:
+          - 'True'
+          - 'False'
+        default: 'False'
 
 jobs:
   BuildNuraftMesgDeps:
     runs-on: ubuntu-22.04
     steps:
-    - name: Setup Python
-      uses: actions/setup-python@v3
-      with:
-        python-version: "3.8"
-
-    - name: Setup Conan
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install conan~=1.0
-        conan user
-        conan profile new --detect default
-        # Set std::string to non-CoW C++11 version
-        sed -i 's,compiler.libcxx=libstdc++$,compiler.libcxx=libstdc++11,g' ~/.conan/profiles/default
-
-    - name: Restore Sisl 3rdParty Cache
+    - name: Restore Sisl Cache
       id: restore-cache-sisl
       uses: actions/cache/restore@v3
       with:
@@ -46,7 +68,7 @@ jobs:
           ~/.conan/data
         key: SislDeps-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
 
-    - name: Restore NuraftMesg 3rdParty Cache
+    - name: Restore NuraftMesg Cache
       id: restore-cache-nuraftmesg
       uses: actions/cache/restore@v3
       with:
@@ -56,7 +78,10 @@ jobs:
 
     - name: Retrieve Code
       uses: actions/checkout@v3
-      if: ${{ inputs.native == 'true' }}
+      with:
+        path: deps/nuraft_mesg
+        ref: ${{ inputs.branch }}
+      if: ${{ inputs.testing == 'True' }}
 
     - name: Retrieve Dependencies
       uses: actions/checkout@v3
@@ -64,30 +89,45 @@ jobs:
         repository: eBay/sisl
         path: deps/sisl
         ref: master
-      if: ${{ steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
 
-    - name: Retrieve Dependencies
+    - name: Retrieve Recipe
       uses: actions/checkout@v3
       with:
-        repository: eBay/nuraft_mesg
         path: deps/nuraft_mesg
         ref: ${{ inputs.branch }}
-      if: ${{ steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
+      if: ${{ inputs.testing == 'False' && steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
 
-    - name: Install Dependencies
+    - name: Setup Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.8"
+      if: ${{ inputs.testing == 'True' || steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
+
+    - name: Setup Conan and Export Recipes
       run: |
+        python -m pip install --upgrade pip
+        python -m pip install conan~=1.0
+        conan user
+        conan profile new --detect default
+        # Set std::string to non-CoW C++11 version
+        sed -i 's,compiler.libcxx=libstdc++$,compiler.libcxx=libstdc++11,g' ~/.conan/profiles/default
         conan export deps/sisl oss/master
         conan export deps/nuraft_mesg/3rd_party/nuraft
+      if: ${{ inputs.testing == 'True' || steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
+
+    - name: Build Cache
+      run: |
         conan install \
             -o sisl:prerelease=${{ inputs.prerelease }} \
             -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
             -o sisl:testing=False \
             -o testing=False \
             -s build_type=${{ inputs.build-type }} \
-            --build missing deps/nuraft_mesg
-      if: ${{ steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
+            --build missing \
+            deps/nuraft_mesg
+      if: ${{ inputs.testing != 'True' && steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
 
-    - name: Build
+    - name: Test Package
       run: |
         conan create \
             -o sisl:prerelease=${{ inputs.prerelease }} \
@@ -95,18 +135,17 @@ jobs:
             -o sisl:testing=False \
             -s build_type=${{ inputs.build-type }} \
             --build missing \
-            . \
-            oss/main
-      if: ${{ inputs.native == 'true' }}
+            deps/nuraft_mesg
+      if: ${{ inputs.testing == 'True' }}
 
-    - name: Cleanup dep builds
+    - name: Cleanup
       run: |
         ls -1d ~/.conan/data/* | grep -Ev '(nuraft|sisl)' | xargs rm -rf
         rm -rf ~/.conan/data/*/*/*/*/build
       if: ${{ steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
 
-    - name: Save NuraftMesg 3rdParty Cache
-      id: save-cache-nurmesg
+    - name: Save NuraftMesg Cache
+      id: save-cache-nuraftmesg
       uses: actions/cache/save@v3
       with:
         path: |
