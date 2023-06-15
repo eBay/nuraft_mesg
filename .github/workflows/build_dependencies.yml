@@ -105,8 +105,7 @@ jobs:
           ~/.conan/data
         key: NuMesgDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}-${{ hashFiles('**/conanfile.py') }}
         restore-keys: |
-          NuMesgDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-
-          NuMesgDeps-${{ inputs.platform }}-
+          NuMesgDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease == 'True' && 'True-' || '' }}
 
     - name: Restore Sisl Cache
       id: restore-cache-sisl
@@ -116,8 +115,7 @@ jobs:
           ~/.conan/data
         key: SislDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}-${{ hashFiles('**/conanfile.py') }}
         restore-keys: |
-          SislDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-
-          SislDeps-${{ inputs.platform }}-
+          SislDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease == 'True' && 'True-' || '' }}
         fail-on-cache-miss: true
       if: ${{ inputs.testing == 'True' || steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
 
