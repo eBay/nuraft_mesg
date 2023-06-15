@@ -10,11 +10,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        platform: ["ubuntu-22.04", "ubuntu-20.04"]
         build-type: ["Debug", "Release"]
         malloc-impl: ["libc"]
         prerelease: ["False"]
     uses: ./.github/workflows/build_commit.yml
     with:
+      platform: ${{ matrix.platform }}
       build-type: ${{ matrix.build-type }}
       malloc-impl: ${{ matrix.malloc-impl }}
       prerelease: ${{ matrix.prerelease }}
