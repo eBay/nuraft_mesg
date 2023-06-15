@@ -118,6 +118,7 @@ jobs:
         restore-keys: |
           SislDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-
           SislDeps-${{ inputs.platform }}-
+        fail-on-cache-miss: true
       if: ${{ inputs.testing == 'True' || steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
 
     - name: Setup Python
