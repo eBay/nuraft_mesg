@@ -86,7 +86,7 @@ jobs:
       with:
         repository: ebay/sisl
         path: deps/sisl
-        ref: platform_support
+        ref: master
       if: ${{ inputs.testing == 'True' || steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
 
     - name: Retrieve Recipe
