@@ -1,6 +1,7 @@
 name: NuraftMesg Merge Build
 
 on:
+  workflow_call:
   push:
     branches:
       - main
