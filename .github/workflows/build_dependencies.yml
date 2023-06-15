@@ -141,7 +141,7 @@ jobs:
       run: |
         # Set std::string to non-CoW C++11 version
         sed -i 's,compiler.libcxx=libstdc++$,compiler.libcxx=libstdc++11,g' ~/.conan/profiles/default
-      if: ${{ inputs.platform == 'ubuntu-22.04' && ( inputs.testing == 'True' || steps.restore-cache-sisl.outputs.cache-hit != 'true' ) }}
+      if: ${{ inputs.platform == 'ubuntu-22.04' && ( inputs.testing == 'True' || steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' ) }}
 
     - name: Build Cache
       run: |
@@ -185,4 +185,4 @@ jobs:
         path: |
           ~/.conan/data
         key: NuMesgDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}-${{ hashFiles('**/conanfile.py') }}
-      if: ${{ github.event_name != 'pull_request' && steps.restore-cache-sisl.outputs.cache-hit != 'true' }}
+      if: ${{ github.event_name != 'pull_request' && steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
