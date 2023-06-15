@@ -74,23 +74,6 @@ jobs:
   BuildNuraftMesgDeps:
     runs-on: ${{ inputs.platform }}
     steps:
-    - name: Restore NuraftMesg Cache
-      id: restore-cache-nuraftmesg
-      uses: actions/cache/restore@v3
-      with:
-        path: |
-          ~/.conan/data
-        key: NuMesgDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
-
-    - name: Restore Sisl Cache
-      id: restore-cache-sisl
-      uses: actions/cache/restore@v3
-      with:
-        path: |
-          ~/.conan/data
-        key: SislDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
-      if: ${{ inputs.testing == 'True' || steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
-
     - name: Retrieve Code
       uses: actions/checkout@v3
       with:
@@ -113,6 +96,29 @@ jobs:
         path: deps/nuraft_mesg
         ref: ${{ inputs.branch }}
       if: ${{ inputs.testing == 'False' && steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
+
+    - name: Restore NuraftMesg Cache
+      id: restore-cache-nuraftmesg
+      uses: actions/cache/restore@v3
+      with:
+        path: |
+          ~/.conan/data
+        key: NuMesgDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}-${{ hashFiles('**/conanfile.py') }}
+        restore-keys: |
+          NuMesgDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-
+          NuMesgDeps-${{ inputs.platform }}-
+
+    - name: Restore Sisl Cache
+      id: restore-cache-sisl
+      uses: actions/cache/restore@v3
+      with:
+        path: |
+          ~/.conan/data
+        key: SislDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}-${{ hashFiles('**/conanfile.py') }}
+        restore-keys: |
+          SislDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-
+          SislDeps-${{ inputs.platform }}-
+      if: ${{ inputs.testing == 'True' || steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
 
     - name: Setup Python
       uses: actions/setup-python@v3
@@ -179,5 +185,5 @@ jobs:
       with:
         path: |
           ~/.conan/data
-        key: NuMesgDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
-      if: ${{ steps.restore-cache-nuraftmesg.outputs.cache-hit != 'true' }}
+        key: NuMesgDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}-${{ hashFiles('**/conanfile.py') }}
+      if: ${{ github.event_name != 'pull_request' && steps.restore-cache-sisl.outputs.cache-hit != 'true' }}
