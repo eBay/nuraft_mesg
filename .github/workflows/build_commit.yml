@@ -1,4 +1,4 @@
-name: Cache Dependencies
+name: Build Commit
 
 on:
   workflow_call:
@@ -18,7 +18,7 @@ on:
 
 jobs:
   SislDeps:
-    uses: ebay/sisl/.github/workflows/build_dependencies.yml@master
+    uses: eBay/sisl/.github/workflows/build_dependencies.yml@master
     with:
       branch: master
       platform: ${{ inputs.platform }}
