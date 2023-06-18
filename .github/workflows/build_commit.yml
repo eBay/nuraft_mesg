@@ -37,3 +37,15 @@ jobs:
       malloc-impl: ${{ inputs.malloc-impl }}
       prerelease: ${{ inputs.prerelease }}
       testing: 'True'
+    if: ${{ github.event_name != 'pull_request' }}
+
+  NuraftPRBuild:
+    uses: ./.github/workflows/build_dependencies.yml
+    with:
+      branch: ${{ github.ref }}
+      platform: ${{ inputs.platform }}
+      build-type: ${{ inputs.build-type }}
+      malloc-impl: ${{ inputs.malloc-impl }}
+      prerelease: ${{ inputs.prerelease }}
+      testing: 'True'
+    if: ${{ github.event_name == 'pull_request' }}
