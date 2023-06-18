@@ -59,8 +59,8 @@ set (REALLY_NO_OPTIMIZATION_FLAGS "${REALLY_NO_OPTIMIZATION_FLAGS} -fno-web"    
 set (REALLY_NO_OPTIMIZATION_FLAGS "${REALLY_NO_OPTIMIZATION_FLAGS} -fno-tree-slp-vectorize"             )# E&C.
 set (REALLY_NO_OPTIMIZATION_FLAGS "${REALLY_NO_OPTIMIZATION_FLAGS} -fthreadsafe-statics"                )# Slightly smaller in code that doesn't need to be TS.
 
-if (DEFINED BUILD_COVERAGE)
-  if (${BUILD_COVERAGE})
+if (DEFINED CONAN_BUILD_COVERAGE)
+  if (${CONAN_BUILD_COVERAGE})
     include (cmake/CodeCoverage.cmake)
     APPEND_COVERAGE_COMPILER_FLAGS()
     SETUP_TARGET_FOR_COVERAGE_GCOVR_XML(NAME coverage EXECUTABLE ctest DEPENDENCIES )

@@ -1,0 +1,15 @@
+codecov:
+  notify:
+    require_ci_to_pass: no
+
+fixes:
+  - "deps/nuraft_mesg/::"
+
+ignore:
+  - "**/*_test.c*"
+  - "**/*_test.h*"
+  - "**/*_generated.h"
+  - "**/*_pb.cc"
+  - "**/*_pb.h"
+  - "**/test*/*.c*"
+  - "**/test*/*.h*"
