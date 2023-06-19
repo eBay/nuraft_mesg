@@ -6,10 +6,11 @@ fixes:
   - "deps/nuraft_mesg/::"
 
 ignore:
+  - "deps/sisl/**"
   - "**/*_test.c*"
   - "**/*_test.h*"
   - "**/*_generated.h"
-  - "**/*_pb.cc"
-  - "**/*_pb.h"
-  - "**/test*/*.c*"
-  - "**/test*/*.h*"
+  - "**/*.pb.cc"
+  - "**/*.pb.h"
+  - "**/tests/*"
+  - "**/tests/jungle_logstore/*"
