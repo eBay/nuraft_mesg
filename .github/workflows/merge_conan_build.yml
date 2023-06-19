@@ -19,7 +19,7 @@ jobs:
           - build-type: Debug
             platform: ubuntu-20.04
           - build-type: Release
-            prerelease: True
+            prerelease: "True"
     uses: ./.github/workflows/build_commit.yml
     with:
       platform: ${{ matrix.platform }}
