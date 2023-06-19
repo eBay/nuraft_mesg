@@ -15,8 +15,10 @@ jobs:
         malloc-impl: ["libc"]
         prerelease: ["False", "True"]
         exclude:
-          - build-type: Debug
-            platform: ubuntu-20.04
+          - platform: ubuntu-20.04
+            build-type: Debug
+          - platform: ubuntu-20.04
+            prerelease: True
     uses: ./.github/workflows/build_commit.yml
     with:
       platform: ${{ matrix.platform }}
