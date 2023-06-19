@@ -21,12 +21,14 @@ class NuRaftMesgConan(ConanFile):
     options = {
                 "shared": ['True', 'False'],
                 "fPIC": ['True', 'False'],
+                "coverage": ['True', 'False'],
                 "sanitize": ['True', 'False'],
                 "testing": ['True', 'False'],
                 }
     default_options = {
                 'shared': False,
                 'fPIC': True,
+                'coverage': False,
                 'sanitize': False,
                 'testing': True,
                 'sisl:prerelease': False,
@@ -40,15 +42,16 @@ class NuRaftMesgConan(ConanFile):
                         "src/*",
                         )
 
-    def config_options(self):
-        if self.settings.build_type != "Debug":
-            del self.options.sanitize
-
     def configure(self):
         if self.options.shared:
             del self.options.fPIC
-        if self.settings.build_type == "Debug" and self.options.sanitize:
-            self.options['sisl'].malloc_impl = 'libc'
+        if self.settings.build_type == "Debug":
+            if self.options.coverage and self.options.sanitize:
+                raise ConanInvalidConfiguration("Sanitizer does not work with Code Coverage!")
+            if self.options.sanitize:
+                self.options['sisl'].malloc_impl = 'libc'
+            elif self.options.coverage:
+                self.options.testing = True
 
     def build_requirements(self):
         self.build_requires("gtest/1.13.0")
@@ -70,13 +73,16 @@ class NuRaftMesgConan(ConanFile):
     def build(self):
         cmake = CMake(self)
 
-        definitions = {'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON',
+        definitions = {'CONAN_BUILD_COVERAGE': 'OFF',
+                       'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON',
                        'CONAN_CMAKE_SILENT_OUTPUT': 'ON',
                        'MEMORY_SANITIZER_ON': 'OFF'}
 
         if self.settings.build_type == "Debug":
             if self.options.sanitize:
                 definitions['MEMORY_SANITIZER_ON'] = 'ON'
+            elif self.options.coverage:
+                definitions['CONAN_BUILD_COVERAGE'] = 'ON'
 
         cmake.configure(defs=definitions)
         cmake.build()
