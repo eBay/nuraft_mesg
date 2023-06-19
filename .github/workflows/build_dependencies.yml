@@ -226,7 +226,7 @@ jobs:
           conan create \
               -o sisl:prerelease=${{ inputs.prerelease }} \
               -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
-              -o sisl:sanitize=${sanitize} \
+              -o nuraft_mesg:sanitize=${sanitize} \
               -s build_type=${{ inputs.build-type }} \
               --build missing \
               deps/nuraft_mesg
