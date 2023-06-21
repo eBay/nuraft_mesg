@@ -215,7 +215,6 @@ jobs:
               -o sisl:prerelease=${{ inputs.prerelease }} \
               -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
               -o sisl:testing=False \
-              -o testing=False \
               -o coverage=True \
               -s build_type=${{ inputs.build-type }} \
               --build missing \
