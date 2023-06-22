@@ -98,7 +98,7 @@ jobs:
       with:
         repository: eBay/sisl
         path: import/sisl
-        ref: stable/v8.x
+        ref: master
       if: ${{ inputs.testing == 'True' || steps.restore-cache.outputs.cache-hit != 'true' }}
 
     - name: Load Sisl Cache
@@ -158,36 +158,38 @@ jobs:
         fail_on_cache_miss: true
       if: ${{ inputs.testing == 'True' && github.event_name != 'pull_request' && steps.restore-cache.outputs.cache-hit != 'true' }}
 
-    - name: Create and test Package
+    - name: Code Coverage Run
       run: |
-        if [[ "${{ inputs.platform }}" == "ubuntu-22.04" && \
-              "${{ inputs.build-type }}" == "Debug" && \
-              "${{ inputs.malloc-impl }}" == "libc" && \
-              "${{ inputs.prerelease }}" == "False" ]]; then
-          conan install \
-              -o sisl:prerelease=${{ inputs.prerelease }} \
-              -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
-              -o sisl:testing=False \
-              -o coverage=True \
-              -s build_type=${{ inputs.build-type }} \
-              --build missing \
-              deps/nuraft_mesg
-          conan build deps/nuraft_mesg
-        else
-          sanitize=$([[ "${{ inputs.build-type }}" == "Debug" && "${{ inputs.malloc-impl }}" == "libc" && "${{ inputs.prerelease }}" == "True" ]] && echo "True" || echo "False")
-          conan create \
-              -o sisl:prerelease=${{ inputs.prerelease }} \
-              -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
-              -o sisl:testing=False \
-              -o nuraft_mesg:sanitize=${sanitize} \
-              -s build_type=${{ inputs.build-type }} \
-              --build missing \
-              deps/nuraft_mesg
-        fi
-      if: ${{ inputs.testing == 'True' }}
+        conan install \
+            -o sisl:prerelease=${{ inputs.prerelease }} \
+            -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
+            -o sisl:testing=False \
+            -o coverage=True \
+            -s build_type=${{ inputs.build-type }} \
+            --build missing \
+            .
+        conan build .
+      if: ${{ inputs.testing == 'True' && inputs.platform == 'ubuntu-22.04' && inputs.build-type == 'Debug' && inputs.malloc-impl == 'libc' && inputs.prerelease == 'False' }}
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         gcov: true
+      if: ${{ inputs.testing == 'True' && inputs.platform == 'ubuntu-22.04' && inputs.build-type == 'Debug' && inputs.malloc-impl == 'libc' && inputs.prerelease == 'False' }}
+
+    - name: Create and Test Package
+      run: |
+        sanitize=$([[ "${{ inputs.build-type }}" == "Debug" && \
+                      "${{ inputs.malloc-impl }}" == "libc" && \
+                      "${{ inputs.prerelease }}" == "True" ]] && \
+                          echo "True" || echo "False")
+        conan create \
+            -o sisl:prerelease=${{ inputs.prerelease }} \
+            -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
+            -o sisl:testing=False \
+            -o nuraft_mesg:sanitize=${sanitize} \
+            -s build_type=${{ inputs.build-type }} \
+            --build missing \
+            .
+      if: ${{ inputs.testing == 'True' && ( inputs.platform != 'ubuntu-22.04' || inputs.build-type != 'Debug' || inputs.malloc-impl != 'libc' || inputs.prerelease != 'False' ) }}
