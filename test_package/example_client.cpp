@@ -20,7 +20,7 @@ SISL_OPTION_GROUP(client, (add, "a", "add", "Add a server to the cluster", cxxop
 SISL_OPTIONS_ENABLE(logging, client)
 SISL_LOGGING_INIT(nuraft, nuraft_mesg, httpserver_lmod, grpc_server)
 
-void cleanup(const std::string& prefix) { auto r = system(format(FMT_STRING("rm -rf {}"), prefix).data()); }
+void cleanup(const std::string& prefix) { auto r = system(fmt::format(FMT_STRING("rm -rf {}"), prefix).data()); }
 
 using nuraft_mesg::mesg_factory;
 using namespace nuraft;
@@ -31,7 +31,7 @@ struct example_factory : public nuraft_mesg::group_factory {
 
     std::string lookupEndpoint(std::string const& client) override {
         for (auto i = 0u; i < 5; ++i) {
-            if (uuids[i] == client) { return format(FMT_STRING("127.0.0.1:{}"), 9000 + i); }
+            if (uuids[i] == client) { return fmt::format(FMT_STRING("127.0.0.1:{}"), 9000 + i); }
         }
         return client;
     }
