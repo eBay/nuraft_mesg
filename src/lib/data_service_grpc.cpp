@@ -1,4 +1,3 @@
-#include <sisl/auth_manager/auth_manager.hpp>
 #include <sisl/grpc/generic_service.hpp>
 #include "data_service_grpc.hpp"
 #include "utils.hpp"

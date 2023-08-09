@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sisl/settings/settings.hpp>
 #include "generated/nuraft_mesg_config_generated.h"
 
 SETTINGS_INIT(nuraftmesgcfg::NuraftMesgConfig, nuraft_mesg_config);

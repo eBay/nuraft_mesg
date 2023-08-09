@@ -59,10 +59,10 @@ template < typename TSERVICE >
 class grpc_client : public grpc_base_client, public sisl::GrpcAsyncClient {
 public:
     grpc_client(std::string const& worker_name, std::string const& addr,
-                const std::shared_ptr< sisl::TrfClient > trf_client, std::string const& target_domain = "",
+                const std::shared_ptr< sisl::GrpcTokenClient > token_client, std::string const& target_domain = "",
                 std::string const& ssl_cert = "") :
             grpc_base_client(),
-            sisl::GrpcAsyncClient(addr, trf_client, target_domain, ssl_cert),
+            sisl::GrpcAsyncClient(addr, token_client, target_domain, ssl_cert),
             _addr(addr),
             _worker_name(worker_name.data()) {
         init();

@@ -36,12 +36,12 @@ using group_type_t = std::string;
 class mesg_client;
 
 class group_factory : public grpc_factory {
-    std::shared_ptr< sisl::TrfClient > m_trf_client;
+    std::shared_ptr< sisl::GrpcTokenClient > m_token_client;
     static std::string m_ssl_cert;
 
 public:
-    group_factory(int const cli_thread_count, std::string const& name, std::shared_ptr< sisl::TrfClient > const trf_client,
-                  std::string const& ssl_cert = "");
+    group_factory(int const cli_thread_count, std::string const& name,
+                  std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert = "");
 
     using grpc_factory::create_client;
 
