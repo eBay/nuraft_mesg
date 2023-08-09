@@ -30,9 +30,10 @@ std::string group_factory::m_ssl_cert;
 class messaging_client : public grpc_client< Messaging >, public std::enable_shared_from_this< messaging_client > {
 public:
     messaging_client(std::string const& worker_name, std::string const& addr,
-                     const std::shared_ptr< sisl::TrfClient > trf_client, std::string const& target_domain = "",
+                     const std::shared_ptr< sisl::GrpcTokenClient > token_client, std::string const& target_domain = "",
                      std::string const& ssl_cert = "") :
-            nuraft_mesg::grpc_client< Messaging >::grpc_client(worker_name, addr, trf_client, target_domain, ssl_cert) {
+            nuraft_mesg::grpc_client< Messaging >::grpc_client(worker_name, addr, token_client, target_domain,
+                                                               ssl_cert) {
         _generic_stub = sisl::GrpcAsyncClient::make_generic_stub(_worker_name);
     }
     ~messaging_client() override = default;
@@ -163,8 +164,8 @@ std::error_condition mesg_factory::data_service_request(std::string const& reque
 }
 
 group_factory::group_factory(int const cli_thread_count, std::string const& name,
-                             std::shared_ptr< sisl::TrfClient > const trf_client, std::string const& ssl_cert) :
-        grpc_factory(cli_thread_count, name), m_trf_client(trf_client) {
+                             std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert) :
+        grpc_factory(cli_thread_count, name), m_token_client(token_client) {
     m_ssl_cert = ssl_cert;
 }
 
@@ -175,7 +176,8 @@ std::error_condition group_factory::create_client(const std::string& client,
     if (endpoint.empty()) { return std::make_error_condition(std::errc::invalid_argument); }
 
     LOGDEBUGMOD(nuraft_mesg, "Creating client for [{}] @ [{}]", client, endpoint);
-    raft_client = sisl::GrpcAsyncClient::make< messaging_client >(workerName(), endpoint, m_trf_client, "", m_ssl_cert);
+    raft_client =
+        sisl::GrpcAsyncClient::make< messaging_client >(workerName(), endpoint, m_token_client, "", m_ssl_cert);
     return (!raft_client) ? std::make_error_condition(std::errc::connection_aborted) : std::error_condition();
 }
 

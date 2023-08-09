@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
     auto const server_uuid = uuids[offset_id];
 
     // Can start using LOG from this point onward.
-    sisl::logging::SetLogger(format(FMT_STRING("server_{}"), offset_id));
+    sisl::logging::SetLogger(fmt::format(FMT_STRING("server_{}"), offset_id));
     spdlog::set_pattern("[%D %T] [%^%l%$] [%n] [%t] %v");
 
     signal(SIGINT, handle);
@@ -71,7 +71,8 @@ int main(int argc, char** argv) {
                                                     [](std::string const& client) -> std::string {
                                                         for (auto i = 0u; i < 5; ++i) {
                                                             if (uuids[i] == client) {
-                                                                return format(FMT_STRING("127.0.0.1:{}"), 9000 + i);
+                                                                return fmt::format(FMT_STRING("127.0.0.1:{}"),
+                                                                                   9000 + i);
                                                             }
                                                         }
                                                         return client;

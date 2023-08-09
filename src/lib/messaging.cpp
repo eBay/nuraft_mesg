@@ -39,7 +39,7 @@ class engine_factory : public group_factory {
 
 public:
     engine_factory(int const threads, consensus_component::params& start_params) :
-            group_factory::group_factory(threads, start_params.server_uuid, start_params.trf_client,
+            group_factory::group_factory(threads, start_params.server_uuid, start_params.token_client,
                                          start_params.ssl_cert),
             _lookup_endpoint_func(start_params.lookup_peer) {
         DEBUG_ASSERT(!!_lookup_endpoint_func, "Lookup endpoint function NULL!");
@@ -104,8 +104,9 @@ void service::restart_server() {
 
     std::lock_guard< std::mutex > lg(_manager_lock);
     _grpc_server.reset();
-    _grpc_server = std::unique_ptr< sisl::GrpcServer >(sisl::GrpcServer::make(
-        listen_address, _start_params.auth_mgr, grpc_server_threads, _start_params.ssl_key, _start_params.ssl_cert));
+    _grpc_server = std::unique_ptr< sisl::GrpcServer >(
+        sisl::GrpcServer::make(listen_address, _start_params.token_verifier, grpc_server_threads, _start_params.ssl_key,
+                               _start_params.ssl_cert));
     _mesg_service->associate(_grpc_server.get());
 
     _grpc_server->run();

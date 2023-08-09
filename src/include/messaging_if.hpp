@@ -29,8 +29,8 @@ class Status;
 } // namespace grpc
 
 namespace sisl {
-class AuthManager;
-class TrfClient;
+class GrpcTokenVerifier;
+class GrpcTokenClient;
 class GenericRpcData;
 using generic_unary_callback_t = std::function< void(grpc::ByteBuffer&, ::grpc::Status& status) >;
 } // namespace sisl
@@ -104,8 +104,8 @@ public:
         uint32_t mesg_port;
         lookup_peer_cb lookup_peer;
         std::string default_group_type;
-        std::shared_ptr< sisl::AuthManager > auth_mgr{nullptr};
-        std::shared_ptr< sisl::TrfClient > trf_client{nullptr};
+        std::shared_ptr< sisl::GrpcTokenVerifier > token_verifier{nullptr};
+        std::shared_ptr< sisl::GrpcTokenClient > token_client{nullptr};
         std::string ssl_key{};
         std::string ssl_cert{};
         bool enable_data_service{false};
