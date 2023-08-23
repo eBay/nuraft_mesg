@@ -31,7 +31,6 @@ class NuRaftMesgConan(ConanFile):
                 'coverage': False,
                 'sanitize': False,
                 'testing': True,
-                'sisl:prerelease': False,
             }
 
     generators = "cmake", "cmake_find_package"
