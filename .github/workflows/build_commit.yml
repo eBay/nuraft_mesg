@@ -15,6 +15,9 @@ on:
       prerelease:
         required: true
         type: string
+      tooling:
+        required: true
+        type: string
 
 jobs:
   SislDeps:
@@ -25,6 +28,7 @@ jobs:
       build-type: ${{ inputs.build-type }}
       malloc-impl: ${{ inputs.malloc-impl }}
       prerelease: ${{ inputs.prerelease }}
+      tooling: None
     if: ${{ github.event_name != 'pull_request' }}
 
   NuraftMesgDeps:
@@ -36,6 +40,7 @@ jobs:
       build-type: ${{ inputs.build-type }}
       malloc-impl: ${{ inputs.malloc-impl }}
       prerelease: ${{ inputs.prerelease }}
+      tooling: ${{ inputs.tooling }}
       testing: 'True'
     if: ${{ github.event_name != 'pull_request' }}
 
@@ -47,5 +52,6 @@ jobs:
       build-type: ${{ inputs.build-type }}
       malloc-impl: ${{ inputs.malloc-impl }}
       prerelease: ${{ inputs.prerelease }}
+      tooling: ${{ inputs.tooling }}
       testing: 'True'
     if: ${{ github.event_name == 'pull_request' }}
