@@ -48,10 +48,9 @@ class NuRaftMesgConan(ConanFile):
         if self.settings.build_type == "Debug":
             if self.options.coverage and self.options.sanitize:
                 raise ConanInvalidConfiguration("Sanitizer does not work with Code Coverage!")
-            if self.options.sanitize:
-                self.options['sisl'].malloc_impl = 'libc'
-            elif self.options.coverage:
-                self.options.testing = True
+            if not self.options.testing:
+                if self.options.coverage or self.options.sanitize:
+                    raise ConanInvalidConfiguration("Coverage/Sanitizer requires Testing!")
 
     def build_requirements(self):
         self.build_requires("gtest/1.13.0")
