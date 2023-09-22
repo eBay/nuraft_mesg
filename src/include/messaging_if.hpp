@@ -18,7 +18,10 @@
 #include <memory>
 #include <string>
 #include <system_error>
+#include <folly/Expected.h>
 #include <folly/small_vector.h>
+#include <folly/Unit.h>
+#include <folly/futures/Future.h>
 
 #include <libnuraft/nuraft.hxx>
 #include <sisl/fds/buffer.hpp>
@@ -48,13 +51,18 @@ using io_blob_list_t = folly::small_vector< sisl::io_blob, 4 >;
 using data_service_request_handler_t =
     std::function< void(sisl::io_blob const& incoming_buf, boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) >;
 
-// called by the client after it receives response to its request
-using data_service_response_handler_t = std::function< void(sisl::io_blob const& incoming_buf) >;
-
 // This object can be stored by the caller and can be used to directly call raft/data operatons without taking
 // _raft_servers_lock
 class mesg_factory;
 class grpc_server;
+
+template < typename T >
+using Result = folly::Expected< T, std::error_condition >;
+template < typename T >
+using AsyncResult = folly::SemiFuture< Result< T > >;
+
+using NullResult = Result< folly::Unit >;
+using NullAsyncResult = AsyncResult< folly::Unit >;
 
 class repl_service_ctx {
 public:
@@ -66,8 +74,8 @@ public:
     bool is_raft_leader() const;
 
     // data service api client call
-    virtual std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
-                                                      data_service_response_handler_t const& response_cb) = 0;
+    virtual AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name,
+                                                              io_blob_list_t const& cli_buf);
 
     // Send response to a data service request and finish the async call.
     virtual void send_data_service_response(io_blob_list_t const& outgoing_buf,
@@ -92,57 +100,53 @@ protected:
 
 extern int32_t to_server_id(std::string const& server_addr);
 
-class consensus_component {
+class MessagingApplication {
 public:
-    using lookup_peer_cb = std::function< std::string(std::string const&) >;
-    using create_state_mgr_cb =
-        std::function< std::shared_ptr< mesg_state_mgr >(int32_t const srv_id, std::string const& group_id) >;
-    using process_req_cb = std::function< void(std::function< void() >) >;
+    virtual ~MessagingApplication() = default;
+    virtual std::string lookup_peer(std::string const&) = 0;
+    virtual std::shared_ptr< mesg_state_mgr > create_state_mgr(int32_t const srv_id, std::string const& group_id) = 0;
+};
 
-    struct params {
-        std::string server_uuid;
-        uint32_t mesg_port;
-        lookup_peer_cb lookup_peer;
-        std::string default_group_type;
-        std::shared_ptr< sisl::GrpcTokenVerifier > token_verifier{nullptr};
-        std::shared_ptr< sisl::GrpcTokenClient > token_client{nullptr};
-        std::string ssl_key{};
-        std::string ssl_cert{};
-        bool enable_data_service{false};
+class Manager {
+public:
+    struct Params {
+        std::string server_uuid_;
+        uint32_t mesg_port_;
+        std::string default_group_type_;
+        std::string ssl_key_;
+        std::string ssl_cert_;
+        std::shared_ptr< sisl::GrpcTokenVerifier > token_verifier_{nullptr};
+        std::shared_ptr< sisl::GrpcTokenClient > token_client_{nullptr};
     };
-    virtual ~consensus_component() = default;
-    virtual void start(consensus_component::params& start_params) = 0;
+    using group_params = nuraft::raft_params;
+    virtual ~Manager() = default;
 
-    // Register a new state_mgr type
-    struct register_params {
-        nuraft::raft_params raft_params;
-        create_state_mgr_cb create_state_mgr;
-        process_req_cb process_req{nullptr};
-    };
-    virtual void register_mgr_type(std::string const& group_type, register_params& params) = 0;
+    // Register a new group type
+    virtual void register_mgr_type(std::string const& group_type, group_params const&);
 
     virtual std::shared_ptr< mesg_state_mgr > lookup_state_manager(std::string const& group_id) const = 0;
-    virtual std::error_condition create_group(std::string const& group_id, std::string const& group_type) = 0;
-    virtual std::error_condition join_group(std::string const& group_id, std::string const& group_type,
-                                            std::shared_ptr< mesg_state_mgr > smgr) = 0;
+    virtual NullAsyncResult create_group(std::string const& group_id, std::string const& group_type) = 0;
+    virtual NullResult join_group(std::string const& group_id, std::string const& group_type,
+                                  std::shared_ptr< mesg_state_mgr >) = 0;
 
     // Send a client request to the cluster
-    virtual bool add_member(std::string const& group_id, std::string const& server_id) = 0;
-    virtual bool add_member(std::string const& group_id, std::string const& server_id,
-                            bool const wait_for_completion) = 0;
-    virtual bool rem_member(std::string const& group_id, std::string const& server_id) = 0;
+    virtual NullAsyncResult add_member(std::string const& group_id, std::string const& server_id) = 0;
+    virtual NullAsyncResult rem_member(std::string const& group_id, std::string const& server_id) = 0;
+    virtual NullAsyncResult become_leader(std::string const& group_id) = 0;
+    virtual NullAsyncResult client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >&) = 0;
+
     virtual void leave_group(std::string const& group_id) = 0;
-    virtual bool request_leadership(std::string const& group_id) = 0;
-    virtual std::error_condition client_request(std::string const& group_id,
-                                                std::shared_ptr< nuraft::buffer >& buf) = 0;
-    virtual void get_peers(std::string const& group_id, std::list< std::string >&) const = 0;
+    virtual void append_peers(std::string const& group_id, std::list< std::string >&) const = 0;
     virtual uint32_t logstore_id(std::string const& group_id) const = 0;
     virtual int32_t server_id() const = 0;
     virtual void restart_server() = 0;
 
     // data channel APIs
     virtual bool bind_data_service_request(std::string const& request_name, std::string const& group_id,
-                                           data_service_request_handler_t const& request_handler) = 0;
+                                           data_service_request_handler_t const&) = 0;
 };
+
+extern std::shared_ptr< Manager > init_messaging(Manager::Params const&, std::weak_ptr< MessagingApplication >,
+                                                 bool with_data_svc = false);
 
 } // namespace nuraft_mesg

@@ -47,7 +47,8 @@ public:
 
     std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >&) override;
 
-    std::error_condition reinit_client(std::string const& client, std::shared_ptr< nuraft::rpc_client >& raft_client) override;
+    std::error_condition reinit_client(std::string const& client,
+                                       std::shared_ptr< nuraft::rpc_client >& raft_client) override;
 
     virtual std::string lookupEndpoint(std::string const& client) = 0;
 };
@@ -71,10 +72,10 @@ public:
 
     std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >& rpc_ptr) override;
 
-    std::error_condition reinit_client(const std::string& client, std::shared_ptr< nuraft::rpc_client >& raft_client) override;
+    std::error_condition reinit_client(const std::string& client,
+                                       std::shared_ptr< nuraft::rpc_client >& raft_client) override;
 
-    std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
-                                              data_service_response_handler_t const& response_cb);
+    AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf);
 };
 
 } // namespace nuraft_mesg

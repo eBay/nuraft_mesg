@@ -35,10 +35,10 @@ int32_t to_server_id(std::string const& server_addr) {
 }
 
 class engine_factory : public group_factory {
-    consensus_component::lookup_peer_cb _lookup_endpoint_func;
+    Manager::lookup_peer_cb _lookup_endpoint_func;
 
 public:
-    engine_factory(int const threads, consensus_component::params& start_params) :
+    engine_factory(int const threads, Manager::params& start_params) :
             group_factory::group_factory(threads, start_params.server_uuid, start_params.token_client,
                                          start_params.ssl_cert),
             _lookup_endpoint_func(start_params.lookup_peer) {
@@ -57,7 +57,7 @@ service::~service() {
     }
 }
 
-void service::start(consensus_component::params& start_params) {
+void service::start(Manager::params& start_params) {
     _start_params = start_params;
     _srv_id = to_server_id(_start_params.server_uuid);
 

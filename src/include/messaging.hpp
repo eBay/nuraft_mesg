@@ -35,15 +35,15 @@ class group_factory;
 class msg_service;
 class group_metrics;
 
-class service : public consensus_component {
-    consensus_component::params _start_params;
+class service : public Manager {
+    Manager::Params _start_params;
     int32_t _srv_id;
 
-    std::map< std::string, consensus_component::register_params > _state_mgr_types;
+    std::map< std::string, Manager::group_params > _state_mgr_types;
 
     std::shared_ptr< group_factory > _g_factory;
     std::shared_ptr< msg_service > _mesg_service;
-    std::unique_ptr< ::sisl::GrpcServer > _grpc_server;
+    std::unique_ptr<::sisl::GrpcServer > _grpc_server;
 
     std::mutex mutable _manager_lock;
     std::map< std::string, std::shared_ptr< mesg_state_mgr > > _state_managers;
@@ -66,23 +66,25 @@ public:
 
     int32_t server_id() const override { return _srv_id; }
 
-    void register_mgr_type(std::string const& group_type, register_params& params) override;
+    void register_mgr_type(std::string const& group_type, group_params const&) override;
 
     std::shared_ptr< mesg_state_mgr > lookup_state_manager(std::string const& group_id) const override;
 
-    std::error_condition create_group(std::string const& group_id, std::string const& group_type) override;
-    std::error_condition join_group(std::string const& group_id, std::string const& group_type,
-                                    std::shared_ptr< mesg_state_mgr > smgr) override;
+    NullAsyncResult create_group(std::string const& group_id, std::string const& group_type) override;
+    NullResult join_group(std::string const& group_id, std::string const& group_type,
+                          std::shared_ptr< mesg_state_mgr > smgr) override;
 
-    void start(consensus_component::params& start_params) override;
-    bool add_member(std::string const& group_id, std::string const& server_id) override;
-    bool add_member(std::string const& group_id, std::string const& server_id, bool const wait_for_completion) override;
-    bool rem_member(std::string const& group_id, std::string const& server_id) override;
+    void start(Manager::Params& start_params);
+
+    virtual NullAsyncResult add_member(std::string const& group_id, std::string const& server_id) override;
+    virtual NullAsyncResult rem_member(std::string const& group_id, std::string const& server_id) override;
+    virtual NullAsyncResult become_leader(std::string const& group_id) override;
+    virtual NullAsyncResult client_request(std::string const& group_id,
+                                           std::shared_ptr< nuraft::buffer >&) override;
+
     void leave_group(std::string const& group_id) override;
-    bool request_leadership(std::string const& group_id) override;
-    std::error_condition client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >& buf) override;
     uint32_t logstore_id(std::string const& group_id) const override;
-    void get_peers(std::string const& group_id, std::list< std::string >&) const override;
+    void append_peers(std::string const& group_id, std::list< std::string >&) const override;
     void restart_server() override;
 
     // data service APIs
@@ -100,8 +102,8 @@ public:
     ~repl_service_ctx_grpc() override = default;
     std::shared_ptr< mesg_factory > m_mesg_factory;
 
-    std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
-                                              data_service_response_handler_t const& response_cb) override;
+    AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name,
+                                                      io_blob_list_t const& cli_buf) override;
     void send_data_service_response(io_blob_list_t const& outgoing_buf,
                                     boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) override;
 };

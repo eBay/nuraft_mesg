@@ -15,6 +15,8 @@
 #include "grpc_client.hpp"
 #include <string>
 
+#include <folly/futures/Future.h>
+
 #include "mesg_factory.hpp"
 #include "service.hpp"
 #include "proto/messaging_service.grpc.pb.h"
@@ -65,24 +67,26 @@ public:
             NURAFT_MESG_CONFIG(mesg_factory_config->raft_request_deadline_secs));
     }
 
-    void data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
-                              data_service_response_handler_t const& response_cb) {
+    AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf) {
         grpc::ByteBuffer cli_byte_buf;
         serialize_to_byte_buffer(cli_byte_buf, cli_buf);
+        auto [p, sf] = folly::makePromiseContract< Result< sisl::io_blob > >();
+        /// FIXME we shouldn't need a copy-constructible here should we?
+        auto copyable_promise = std::make_shared< decltype(p) >(std::move(p));
         _generic_stub->call_unary(
             cli_byte_buf, request_name,
-            [response_cb](grpc::ByteBuffer& resp, ::grpc::Status& status) {
+            [c = copyable_promise](grpc::ByteBuffer& resp, ::grpc::Status& status) mutable {
                 if (!status.ok()) {
                     LOGERRORMOD(nuraft_mesg, "Failed to send data_service_request, error: {}", status.error_message());
-                    return;
-                }
-                if (response_cb) {
+                    c->setValue(folly::makeUnexpected(std::make_error_condition(std::errc::connection_aborted)));
+                } else {
                     sisl::io_blob svr_buf;
                     deserialize_from_byte_buffer(resp, svr_buf);
-                    response_cb(svr_buf);
+                    c->setValue(std::move(svr_buf));
                 }
             },
             NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs));
+        return std::move(sf);
     }
 
 protected:
@@ -127,9 +131,8 @@ public:
         _client->send(group_msg, complete);
     }
 
-    void data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
-                              data_service_response_handler_t const& response_cb) {
-        _client->data_service_request(request_name, cli_buf, response_cb);
+    AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf) {
+        return _client->data_service_request(request_name, cli_buf);
     }
 };
 
@@ -153,14 +156,15 @@ std::error_condition mesg_factory::reinit_client(const std::string& client,
     return std::error_condition();
 }
 
-std::error_condition mesg_factory::data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
-                                                        data_service_response_handler_t const& response_cb) {
+AsyncResult< sisl::io_blob > mesg_factory::data_service_request(std::string const& request_name,
+                                                                io_blob_list_t const& cli_buf) {
     std::shared_lock< client_factory_lock_type > rl(_client_lock);
+    auto calls = std::list< AsyncResult< sisl::io_blob > >();
     for (auto& nuraft_client : _clients) {
         auto g_client = std::dynamic_pointer_cast< nuraft_mesg::group_client >(nuraft_client.second);
-        g_client->data_service_request(get_generic_method_name(request_name, _group_name), cli_buf, response_cb);
+        calls.push_back(g_client->data_service_request(get_generic_method_name(request_name, _group_name), cli_buf));
     }
-    return std::error_condition();
+    return folly::collectAnyWithoutException(calls).deferValue([](auto&& p) { return p.second; });
 }
 
 group_factory::group_factory(int const cli_thread_count, std::string const& name,
