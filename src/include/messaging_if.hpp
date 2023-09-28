@@ -75,7 +75,7 @@ public:
 
     // data service api client call
     virtual AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name,
-                                                              io_blob_list_t const& cli_buf);
+                                                              io_blob_list_t const& cli_buf) = 0;
 
     // Send response to a data service request and finish the async call.
     virtual void send_data_service_response(io_blob_list_t const& outgoing_buf,
@@ -122,7 +122,7 @@ public:
     virtual ~Manager() = default;
 
     // Register a new group type
-    virtual void register_mgr_type(std::string const& group_type, group_params const&);
+    virtual void register_mgr_type(std::string const& group_type, group_params const&) = 0;
 
     virtual std::shared_ptr< mesg_state_mgr > lookup_state_manager(std::string const& group_id) const = 0;
     virtual NullAsyncResult create_group(std::string const& group_id, std::string const& group_type) = 0;

@@ -5,7 +5,7 @@
 namespace sisl {
 struct io_blob;
 class GenericRpcData;
-}
+} // namespace sisl
 namespace nuraft_mesg {
 
 using data_service_request_handler_t =

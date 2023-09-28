@@ -43,11 +43,10 @@ public:
     void leave() override;
 
     ///// data service helper apis
-    std::error_condition data_service_request(std::string const& request_name,
-                                              nuraft_mesg::io_blob_list_t const& cli_buf,
-                                              nuraft_mesg::data_service_response_handler_t const& response_cb);
+    nuraft_mesg::AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name,
+                                                                   nuraft_mesg::io_blob_list_t const& cli_buf);
 
-    bool register_data_service_apis(nuraft_mesg::service* messaging);
+    bool register_data_service_apis(nuraft_mesg::Manager* messaging);
     static void fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf);
     static uint32_t get_random_num();
     static uint32_t get_server_counter();

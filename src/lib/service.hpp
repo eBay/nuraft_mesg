@@ -49,9 +49,6 @@ using get_server_ctx_cb =
 // pluggable type for data service
 using data_service_t = data_service_grpc;
 
-// A calback that returns the registered callback for for offloading RAFT request processing
-using process_offload_cb = std::function< std::function< void(std::function< void() >) >(group_type_t const&) >;
-
 struct grpc_server_wrapper {
     explicit grpc_server_wrapper(group_name_t const& group_name);
 
@@ -61,7 +58,6 @@ struct grpc_server_wrapper {
 
 class msg_service : public std::enable_shared_from_this< msg_service > {
     get_server_ctx_cb _get_server_ctx;
-    process_offload_cb _get_process_offload;
     std::mutex _raft_sync_lock;
     std::condition_variable_any _raft_servers_sync;
     lock_type _raft_servers_lock;
@@ -71,13 +67,12 @@ class msg_service : public std::enable_shared_from_this< msg_service > {
     data_service_t _data_service;
     bool _data_service_enabled;
 
-    msg_service(get_server_ctx_cb get_server_ctx, process_offload_cb process_offload,
-                std::string const& service_address, bool const enable_data_service);
+    msg_service(get_server_ctx_cb get_server_ctx, std::string const& service_address, bool const enable_data_service);
     ~msg_service();
 
 public:
-    static std::shared_ptr< msg_service > create(get_server_ctx_cb get_server_ctx, process_offload_cb poc,
-                                                 std::string const& service_address, bool const enable_data_service);
+    static std::shared_ptr< msg_service > create(get_server_ctx_cb get_server_ctx, std::string const& service_address,
+                                                 bool const enable_data_service);
 
     msg_service(msg_service const&) = delete;
     msg_service& operator=(msg_service const&) = delete;

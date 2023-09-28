@@ -45,8 +45,8 @@ static std::shared_ptr< nuraft::req_msg > toRequest(RaftMessage const& raft_msg)
     for (auto const& log : req.log_entries()) {
         auto log_buffer = nuraft::buffer::alloc(log.buffer().size());
         memcpy(log_buffer->data(), log.buffer().data(), log.buffer().size());
-        log_entries.push_back(
-            std::make_shared< nuraft::log_entry >(log.term(), log_buffer, (nuraft::log_val_type)log.type(), log.timestamp()));
+        log_entries.push_back(std::make_shared< nuraft::log_entry >(log.term(), log_buffer,
+                                                                    (nuraft::log_val_type)log.type(), log.timestamp()));
     }
     return message;
 }

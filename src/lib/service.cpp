@@ -30,16 +30,15 @@ grpc_server_wrapper::grpc_server_wrapper(group_name_t const& group_name) {
     if (0 < SISL_OPTIONS.count("msg_metrics")) m_metrics = std::make_shared< group_metrics >(group_name);
 }
 
-msg_service::msg_service(get_server_ctx_cb get_server_ctx, process_offload_cb process_offload,
-                         std::string const& service_address, bool const enable_data_service) :
+msg_service::msg_service(get_server_ctx_cb get_server_ctx, std::string const& service_address,
+                         bool const enable_data_service) :
         _get_server_ctx(get_server_ctx),
-        _get_process_offload(process_offload),
         _service_address(service_address),
         _data_service_enabled(enable_data_service) {}
 
-std::shared_ptr< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, process_offload_cb poc,
-                                                   std::string const& service_address, bool const enable_data_service) {
-    return std::shared_ptr< msg_service >(new msg_service(get_server_ctx, poc, service_address, enable_data_service),
+std::shared_ptr< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, std::string const& service_address,
+                                                   bool const enable_data_service) {
+    return std::shared_ptr< msg_service >(new msg_service(get_server_ctx, service_address, enable_data_service),
                                           [](msg_service* p) { delete p; });
 }
 
@@ -208,15 +207,16 @@ bool msg_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg,
     // to offload the Raft append operations onto a seperate thread group.
     response.set_group_name(group_name);
     if (server) {
-        if (auto offload = _get_process_offload(request.group_type()); nullptr != offload) {
-            offload([rpc_data, server]() {
-                auto& request = rpc_data->request();
-                auto& response = rpc_data->response();
-                rpc_data->set_status(server->step(request.msg(), *response.mutable_msg()));
-                rpc_data->send_response();
-            });
-            return false;
-        }
+        /// TODO replace this ugly hack
+        //if (auto offload = _get_process_offload(request.group_type()); nullptr != offload) {
+        //    offload([rpc_data, server]() {
+        //        auto& request = rpc_data->request();
+        //        auto& response = rpc_data->response();
+        //        rpc_data->set_status(server->step(request.msg(), *response.mutable_msg()));
+        //        rpc_data->send_response();
+        //    });
+        //    return false;
+        //}
         try {
             rpc_data->set_status(server->step(request.msg(), *response.mutable_msg()));
             return true;

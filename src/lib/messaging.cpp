@@ -14,6 +14,7 @@
 #include <sisl/options/options.h>
 #include <sisl/grpc/rpc_server.hpp>
 #include <sisl/grpc/generic_service.hpp>
+#include <system_error>
 
 #include "service.hpp"
 #include "mesg_factory.hpp"
@@ -35,20 +36,20 @@ int32_t to_server_id(std::string const& server_addr) {
 }
 
 class engine_factory : public group_factory {
-    Manager::lookup_peer_cb _lookup_endpoint_func;
-
 public:
-    engine_factory(int const threads, Manager::params& start_params) :
-            group_factory::group_factory(threads, start_params.server_uuid, start_params.token_client,
-                                         start_params.ssl_cert),
-            _lookup_endpoint_func(start_params.lookup_peer) {
-        DEBUG_ASSERT(!!_lookup_endpoint_func, "Lookup endpoint function NULL!");
+    std::weak_ptr< MessagingApplication > application_;
+
+    engine_factory(int const threads, Manager::Params const& start_params, std::weak_ptr< MessagingApplication > app) :
+            group_factory::group_factory(threads, start_params.server_uuid_, start_params.token_client_,
+                                         start_params.ssl_cert_),
+            application_(app) {}
+
+    std::string lookupEndpoint(std::string const& client) override {
+        LOGTRACEMOD(nuraft_mesg, "[peer={}]", client);
+        if (auto a = application_.lock(); a) return a->lookup_peer(client);
+        return std::string();
     }
-
-    std::string lookupEndpoint(std::string const& client) override { return _lookup_endpoint_func(client); }
 };
-
-service::service() = default;
 
 service::~service() {
     if (_mesg_service) {
@@ -57,12 +58,10 @@ service::~service() {
     }
 }
 
-void service::start(Manager::params& start_params) {
-    _start_params = start_params;
-    _srv_id = to_server_id(_start_params.server_uuid);
-
-    _g_factory = std::make_shared< engine_factory >(grpc_client_threads, _start_params);
-    auto logger_name = fmt::format("nuraft_{}", _start_params.server_uuid);
+service::service(Manager::Params const& start_params, std::weak_ptr< MessagingApplication > app, bool and_data_svc) :
+        start_params_(start_params), _srv_id(to_server_id(start_params_.server_uuid_)), application_(app) {
+    _g_factory = std::make_shared< engine_factory >(grpc_client_threads, start_params_, app);
+    auto logger_name = fmt::format("nuraft_{}", start_params_.server_uuid_);
     //
     // NOTE: The Unit tests require this instance to be recreated with the same parameters.
     // This exception is only expected in this case where we "restart" the server by just recreating the instance.
@@ -86,34 +85,29 @@ void service::start(Manager::params& start_params) {
                nuraft::context*& ctx, std::shared_ptr< group_metrics > metrics) mutable -> std::error_condition {
             return this->group_init(srv_id, group_id, group_type, ctx, metrics);
         },
-        [this](group_type_t const& group_type) -> process_req_cb {
-            std::lock_guard< std::mutex > lg(_manager_lock);
-            auto const& type_params = _state_mgr_types[group_type];
-            return type_params.process_req;
-        },
-        _start_params.server_uuid, _start_params.enable_data_service);
-    _mesg_service->setDefaultGroupType(_start_params.default_group_type);
+        start_params_.server_uuid_, and_data_svc);
+    _mesg_service->setDefaultGroupType(start_params_.default_group_type_);
 
     // Start a gRPC server and create and associate nuraft_mesg services.
     restart_server();
 }
 
 void service::restart_server() {
-    auto listen_address = fmt::format(FMT_STRING("0.0.0.0:{}"), _start_params.mesg_port);
+    auto listen_address = fmt::format(FMT_STRING("0.0.0.0:{}"), start_params_.mesg_port_);
     LOGINFO("Starting Messaging Service on http://{}", listen_address);
 
     std::lock_guard< std::mutex > lg(_manager_lock);
     _grpc_server.reset();
     _grpc_server = std::unique_ptr< sisl::GrpcServer >(
-        sisl::GrpcServer::make(listen_address, _start_params.token_verifier, grpc_server_threads, _start_params.ssl_key,
-                               _start_params.ssl_cert));
+        sisl::GrpcServer::make(listen_address, start_params_.token_verifier_, grpc_server_threads,
+                               start_params_.ssl_key_, start_params_.ssl_cert_));
     _mesg_service->associate(_grpc_server.get());
 
     _grpc_server->run();
     _mesg_service->bind(_grpc_server.get());
 }
 
-void service::register_mgr_type(std::string const& group_type, register_params& params) {
+void service::register_mgr_type(std::string const& group_type, group_params const& params) {
     std::lock_guard< std::mutex > lg(_manager_lock);
     auto [it, happened] = _state_mgr_types.emplace(std::make_pair(group_type, params));
     DEBUG_ASSERT(_state_mgr_types.end() != it, "Out of memory?");
@@ -186,15 +180,14 @@ std::error_condition service::group_init(int32_t const srv_id, std::string const
         if (def_group = _state_mgr_types.find(group_type); _state_mgr_types.end() == def_group) {
             return std::make_error_condition(std::errc::invalid_argument);
         }
-        auto const& type_params = def_group->second;
-        params = type_params.raft_params;
+        params = def_group->second;
 
         auto [it, happened] = _state_managers.emplace(group_id, nullptr);
         if (it != _state_managers.end()) {
             if (happened) {
                 // A new logstore!
                 LOGDEBUGMOD(nuraft_mesg, "Creating new State Manager for: {}, type: {}", group_id, group_type);
-                it->second = type_params.create_state_mgr(srv_id, group_id);
+                it->second = application_.lock()->create_state_mgr(srv_id, group_id);
             }
             it->second->become_ready();
             sm = it->second->get_state_machine();
@@ -220,57 +213,59 @@ std::error_condition service::group_init(int32_t const srv_id, std::string const
     return std::error_condition();
 }
 
-bool service::add_member(std::string const& group_id, std::string const& server_id) {
-    return add_member(group_id, server_id, false);
+NullAsyncResult service::add_member(std::string const& group_id, std::string const& new_id) {
+    auto rc = _mesg_service->add_srv(group_id, nuraft::srv_config(to_server_id(new_id), new_id));
+    return folly::makeSemiFuture< folly::Unit >(folly::Unit())
+        .deferValue([this, rc, n_id = new_id, g_id = group_id](auto) mutable -> NullResult {
+            while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
+                rc = _mesg_service->add_srv(g_id, nuraft::srv_config(to_server_id(n_id), n_id));
+                if (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
+                    LOGDEBUGMOD(nuraft_mesg, "Server is busy, retrying...");
+                    std::this_thread::sleep_for(cfg_change_timeout);
+                }
+            }
+            if (nuraft::OK != rc) {
+                if (nuraft::SERVER_NOT_FOUND == rc) {
+                    LOGWARN("Messaging service does not know of group: [{}]", g_id);
+                } else
+                    LOGERROR("Unknown failure to add member: [{}]", static_cast< uint32_t >(rc));
+                return folly::makeUnexpected(std::make_error_condition(std::errc::connection_aborted));
+            }
+
+            auto lk = std::unique_lock< std::mutex >(_manager_lock);
+            if (!_config_change.wait_for(
+                    lk, cfg_change_timeout * 20, [this, g_id = std::move(g_id), n_id = std::move(n_id)]() {
+                        std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
+                        _mesg_service->get_srv_config_all(g_id, srv_list);
+                        return std::find_if(srv_list.begin(), srv_list.end(),
+                                            [n_id = std::move(n_id)](const std::shared_ptr< nuraft::srv_config >& cfg) {
+                                                return n_id == cfg->get_endpoint();
+                                            }) != srv_list.end();
+                    }))
+                return folly::makeUnexpected(std::make_error_condition(std::errc::connection_aborted));
+            ;
+            return folly::Unit();
+        });
 }
 
-bool service::add_member(std::string const& group_id, std::string const& new_id, bool const wait_for_completion) {
-    int32_t const srv_id = to_server_id(new_id);
-    auto cfg = nuraft::srv_config(srv_id, new_id);
-    nuraft::cmd_result_code rc = nuraft::SERVER_IS_JOINING;
-    while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-        rc = _mesg_service->add_srv(group_id, cfg);
-        if (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-            LOGDEBUGMOD(nuraft_mesg, "Server is busy, retrying...");
-            std::this_thread::sleep_for(cfg_change_timeout);
-        }
-    }
-    if (nuraft::SERVER_NOT_FOUND == rc) {
-        LOGWARN("Messaging service does not know of group: [{}]", group_id);
-    } else if (nuraft::OK != rc) {
-        LOGERROR("Unknown failure to add member: [{}]", static_cast< uint32_t >(rc));
-    }
-
-    if (!wait_for_completion) { return nuraft::OK == rc; }
-
-    auto lk = std::unique_lock< std::mutex >(_manager_lock);
-    return (nuraft::OK == rc) && _config_change.wait_for(lk, cfg_change_timeout * 20, [this, &group_id, &new_id]() {
-        std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
-        _mesg_service->get_srv_config_all(group_id, srv_list);
-        return std::find_if(srv_list.begin(), srv_list.end(),
-                            [&new_id](const std::shared_ptr< nuraft::srv_config >& cfg) {
-                                return new_id == cfg->get_endpoint();
-                            }) != srv_list.end();
-    });
-}
-
-bool service::rem_member(std::string const& group_id, std::string const& old_id) {
-    int32_t const srv_id = to_server_id(old_id);
-
-    nuraft::cmd_result_code rc = nuraft::SERVER_IS_JOINING;
-    while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-        rc = _mesg_service->rm_srv(group_id, srv_id);
-        if (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-            LOGDEBUGMOD(nuraft_mesg, "Server is busy, retrying...");
-            std::this_thread::sleep_for(cfg_change_timeout);
-        }
-    }
-    if (nuraft::SERVER_NOT_FOUND == rc) {
-        LOGWARN("Messaging service does not know of group: [{}]", group_id);
-    } else if (nuraft::OK != rc) {
-        LOGERROR("Unknown failure to add member: [{}]", static_cast< uint32_t >(rc));
-    }
-    return nuraft::OK == rc;
+NullAsyncResult service::rem_member(std::string const& group_id, std::string const& old_id) {
+    auto rc = _mesg_service->rm_srv(group_id, to_server_id(old_id));
+    return folly::makeSemiFuture< folly::Unit >(folly::Unit())
+        .deferValue([this, rc, o_id = old_id, g_id = group_id](auto) mutable -> NullResult {
+            while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
+                rc = _mesg_service->rm_srv(g_id, to_server_id(o_id));
+                if (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
+                    LOGDEBUGMOD(nuraft_mesg, "Server is busy, retrying...");
+                    std::this_thread::sleep_for(cfg_change_timeout);
+                }
+            }
+            if (nuraft::OK != rc) {
+                if (nuraft::SERVER_NOT_FOUND == rc) { LOGWARN("Messaging service does not know of group: [{}]", g_id); }
+                LOGERROR("Unknown failure to add member: [{}]", static_cast< uint32_t >(rc));
+                return folly::makeUnexpected(std::make_error_condition(std::errc::connection_aborted));
+            }
+            return folly::Unit();
+        });
 }
 
 std::shared_ptr< mesg_state_mgr > service::lookup_state_manager(std::string const& group_id) const {
@@ -279,40 +274,45 @@ std::shared_ptr< mesg_state_mgr > service::lookup_state_manager(std::string cons
     return nullptr;
 }
 
-std::error_condition service::create_group(std::string const& group_id, std::string const& group_type_name) {
+NullAsyncResult service::create_group(std::string const& group_id, std::string const& group_type_name) {
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         _is_leader.insert(std::make_pair(group_id, false));
     }
-
-    if (auto const err = _mesg_service->createRaftGroup(_srv_id, group_id, group_type_name); err) { return err; }
+    if (auto const err = _mesg_service->createRaftGroup(_srv_id, group_id, group_type_name); err) {
+        return folly::makeUnexpected(err);
+    }
 
     // Wait for the leader election timeout to make us the leader
-    auto lk = std::unique_lock< std::mutex >(_manager_lock);
-    if (!_config_change.wait_for(lk, leader_change_timeout, [this, &group_id]() { return _is_leader[group_id]; })) {
-        return std::make_error_condition(std::errc::timed_out);
-    }
-    return std::error_condition();
+    return folly::makeSemiFuture< folly::Unit >(folly::Unit())
+        .deferValue([this, g_id = group_id](auto) mutable -> NullResult {
+            auto lk = std::unique_lock< std::mutex >(_manager_lock);
+            if (!_config_change.wait_for(lk, leader_change_timeout,
+                                         [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; })) {
+                return folly::makeUnexpected(std::make_error_condition(std::errc::timed_out));
+            }
+            return folly::Unit();
+        });
 }
 
-std::error_condition service::join_group(std::string const& group_id, std::string const& group_type,
-                                         std::shared_ptr< mesg_state_mgr > smgr) {
+NullResult service::join_group(std::string const& group_id, std::string const& group_type,
+                               std::shared_ptr< mesg_state_mgr > smgr) {
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         auto [it, happened] = _state_managers.emplace(group_id, smgr);
-        if (_state_managers.end() == it) return std::make_error_condition(std::errc::not_enough_memory);
+        if (_state_managers.end() == it)
+            return folly::makeUnexpected(std::make_error_condition(std::errc::not_enough_memory));
     }
     if (auto const err = _mesg_service->joinRaftGroup(_srv_id, group_id, group_type); err) {
         std::lock_guard< std::mutex > lg(_manager_lock);
         _state_managers.erase(group_id);
-        return err;
+        return folly::makeUnexpected(err);
     }
     std::this_thread::sleep_for(cfg_change_timeout);
-    return std::error_condition();
+    return folly::Unit();
 }
 
-void service::get_peers(std::string const& group_id, std::list< std::string >& servers) const {
-    auto res = std::list< std::string >();
+void service::append_peers(std::string const& group_id, std::list< std::string >& servers) const {
     std::lock_guard< std::mutex > lg(_manager_lock);
     if (auto it = _state_managers.find(group_id); _state_managers.end() != it) {
         if (auto config = it->second->load_config(); config) {
@@ -323,24 +323,30 @@ void service::get_peers(std::string const& group_id, std::list< std::string >& s
     }
 }
 
-bool service::request_leadership(std::string const& group_id) {
+NullAsyncResult service::become_leader(std::string const& group_id) {
     {
         auto lk = std::unique_lock< std::mutex >(_manager_lock);
-        if (_is_leader[group_id]) { return true; }
+        if (_is_leader[group_id]) { return folly::Unit(); }
     }
 
-    bool request_success{false};
-    for (auto max_retries = 5ul; max_retries > 0; --max_retries) {
-        if (_mesg_service->request_leadership(group_id)) {
-            request_success = true;
-            break;
-        }
-        // Do not sleep on the last try
-        if (max_retries != 1) { std::this_thread::sleep_for(std::chrono::milliseconds(leader_change_timeout)); }
-    }
-    auto lk = std::unique_lock< std::mutex >(_manager_lock);
-    return request_success &&
-        _config_change.wait_for(lk, leader_change_timeout, [this, &group_id]() { return _is_leader[group_id]; });
+    return folly::makeSemiFuture< folly::Unit >(folly::Unit())
+        .deferValue([this, g_id = group_id](auto) mutable -> NullResult {
+            bool request_success{false};
+            for (auto max_retries = 5ul; max_retries > 0; --max_retries) {
+                if (_mesg_service->request_leadership(g_id)) {
+                    request_success = true;
+                    break;
+                }
+                // Do not sleep on the last try
+                if (max_retries != 1) { std::this_thread::sleep_for(std::chrono::milliseconds(leader_change_timeout)); }
+            }
+            if (!request_success) return folly::makeUnexpected(std::make_error_condition(std::errc::timed_out));
+            auto lk = std::unique_lock< std::mutex >(_manager_lock);
+            if (!_config_change.wait_for(lk, leader_change_timeout,
+                                         [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; }))
+                return folly::makeUnexpected(std::make_error_condition(std::errc::timed_out));
+            return folly::Unit();
+        });
 }
 
 void service::leave_group(std::string const& group_id) {
@@ -396,17 +402,22 @@ static std::error_condition convertToError(nuraft::cmd_result_code const& rc) {
     }
 }
 
-std::error_condition service::client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >& buf) {
-    auto rc = nuraft::SERVER_IS_JOINING;
-    while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-        LOGDEBUGMOD(nuraft_mesg, "Sending Client Request to {}", group_id);
-        rc = _mesg_service->append_entries(group_id, {buf});
-        if (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-            LOGDEBUGMOD(nuraft_mesg, "Server is busy, retrying...");
-            std::this_thread::sleep_for(cfg_change_timeout);
-        }
-    }
-    return convertToError(rc);
+NullAsyncResult service::client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >& buf) {
+    auto rc = _mesg_service->append_entries(group_id, {buf});
+    if (nuraft::OK == rc) return folly::Unit();
+    return folly::makeSemiFuture< folly::Unit >(folly::Unit())
+        .deferValue([this, rc, g_id = group_id, buf = std::move(buf)](auto) mutable -> NullResult {
+            while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
+                LOGDEBUGMOD(nuraft_mesg, "Sending Client Request to {}", g_id);
+                rc = _mesg_service->append_entries(g_id, {buf});
+                if (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
+                    LOGDEBUGMOD(nuraft_mesg, "Server is busy, retrying...");
+                    std::this_thread::sleep_for(cfg_change_timeout);
+                }
+            }
+            if (nuraft::OK != rc) return folly::makeUnexpected(convertToError(rc));
+            return folly::Unit();
+        });
 }
 uint32_t service::logstore_id(std::string const& group_id) const {
     std::lock_guard< std::mutex > lg(_manager_lock);
@@ -424,13 +435,11 @@ bool service::bind_data_service_request(std::string const& request_name, std::st
     return _mesg_service->bind_data_service_request(request_name, group_id, request_handler);
 }
 
-std::error_condition repl_service_ctx_grpc::data_service_request(std::string const& request_name,
-                                                                 io_blob_list_t const& cli_buf,
-                                                                 data_service_response_handler_t const& response_cb) {
+AsyncResult< sisl::io_blob > repl_service_ctx_grpc::data_service_request(std::string const& request_name,
+                                                                         io_blob_list_t const& cli_buf) {
 
-    return (m_mesg_factory) ? m_mesg_factory->data_service_request(request_name, cli_buf, response_cb)
-                            : std::make_error_condition(std::errc::no_such_device);
-    ;
+    return (m_mesg_factory) ? m_mesg_factory->data_service_request(request_name, cli_buf)
+                            : folly::makeUnexpected(std::make_error_condition(std::errc::no_such_device));
 }
 
 repl_service_ctx::repl_service_ctx(grpc_server* server) : m_server(server) {}
@@ -448,6 +457,12 @@ void repl_service_ctx_grpc::send_data_service_response(io_blob_list_t const& out
 
 void mesg_state_mgr::make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory >& cli_factory) {
     m_repl_svc_ctx = std::make_unique< repl_service_ctx_grpc >(server, cli_factory);
+}
+
+std::shared_ptr< Manager > init_messaging(Manager::Params const& p, std::weak_ptr< MessagingApplication > w,
+                                          bool with_data_svc) {
+    RELEASE_ASSERT(w.lock(), "Could not acquire application!");
+    return std::make_shared< service >(p, w, with_data_svc);
 }
 
 } // namespace nuraft_mesg

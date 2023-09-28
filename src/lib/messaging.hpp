@@ -36,14 +36,15 @@ class msg_service;
 class group_metrics;
 
 class service : public Manager {
-    Manager::Params _start_params;
+    Manager::Params start_params_;
     int32_t _srv_id;
 
     std::map< std::string, Manager::group_params > _state_mgr_types;
 
+    std::weak_ptr< MessagingApplication > application_;
     std::shared_ptr< group_factory > _g_factory;
     std::shared_ptr< msg_service > _mesg_service;
-    std::unique_ptr<::sisl::GrpcServer > _grpc_server;
+    std::unique_ptr< ::sisl::GrpcServer > _grpc_server;
 
     std::mutex mutable _manager_lock;
     std::map< std::string, std::shared_ptr< mesg_state_mgr > > _state_managers;
@@ -61,7 +62,7 @@ class service : public Manager {
     void exit_group(std::string const& group_id);
 
 public:
-    service();
+    service(Manager::Params const&, std::weak_ptr< MessagingApplication >, bool and_data_svc = false);
     ~service() override;
 
     int32_t server_id() const override { return _srv_id; }
@@ -74,13 +75,10 @@ public:
     NullResult join_group(std::string const& group_id, std::string const& group_type,
                           std::shared_ptr< mesg_state_mgr > smgr) override;
 
-    void start(Manager::Params& start_params);
-
     virtual NullAsyncResult add_member(std::string const& group_id, std::string const& server_id) override;
     virtual NullAsyncResult rem_member(std::string const& group_id, std::string const& server_id) override;
     virtual NullAsyncResult become_leader(std::string const& group_id) override;
-    virtual NullAsyncResult client_request(std::string const& group_id,
-                                           std::shared_ptr< nuraft::buffer >&) override;
+    virtual NullAsyncResult client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >&) override;
 
     void leave_group(std::string const& group_id) override;
     uint32_t logstore_id(std::string const& group_id) const override;

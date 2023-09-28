@@ -22,7 +22,6 @@
 #include <libnuraft/state_machine.hxx>
 
 #include "test_state_machine.h"
-#include "messaging.hpp"
 #include <gtest/gtest.h>
 #include <random>
 #include <sisl/grpc/generic_service.hpp>
@@ -164,13 +163,12 @@ void test_state_mgr::leave() {}
 
 ///// data service api helpers
 
-std::error_condition
-test_state_mgr::data_service_request(std::string const& request_name, nuraft_mesg::io_blob_list_t const& cli_buf,
-                                     nuraft_mesg::data_service_response_handler_t const& response_cb) {
-    return m_repl_svc_ctx->data_service_request(request_name, cli_buf, response_cb);
+nuraft_mesg::AsyncResult< sisl::io_blob >
+test_state_mgr::data_service_request(std::string const& request_name, nuraft_mesg::io_blob_list_t const& cli_buf) {
+    return m_repl_svc_ctx->data_service_request(request_name, cli_buf);
 }
 
-bool test_state_mgr::register_data_service_apis(nuraft_mesg::service* messaging) {
+bool test_state_mgr::register_data_service_apis(nuraft_mesg::Manager* messaging) {
     return messaging->bind_data_service_request(
                SEND_DATA, _group_id,
                [this](sisl::io_blob const& incoming_buf, boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
