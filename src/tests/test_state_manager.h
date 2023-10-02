@@ -15,7 +15,6 @@
 #pragma once
 
 #include "mesg_service.hpp"
-#include "mesg_state_mgr.hpp"
 #include <sisl/logging/logging.h>
 
 class test_state_machine;

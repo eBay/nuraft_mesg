@@ -57,22 +57,4 @@ static std::string get_generic_method_name(std::string const& request_name, std:
     return fmt::format("{}|{}", request_name, group_id);
 }
 
-class group_factory : public grpc_factory {
-    std::shared_ptr< sisl::GrpcTokenClient > m_token_client;
-    static std::string m_ssl_cert;
-
-public:
-    group_factory(int const cli_thread_count, std::string const& name,
-                  std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert = "");
-
-    using grpc_factory::create_client;
-
-    std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >&) override;
-
-    std::error_condition reinit_client(std::string const& client,
-                                       std::shared_ptr< nuraft::rpc_client >& raft_client) override;
-
-    virtual std::string lookupEndpoint(std::string const& client) = 0;
-};
-
 } // namespace nuraft_mesg

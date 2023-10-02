@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nuraft_mesg/mesg_service.hpp>
+#include <nuraft_mesg/mesg_state_mgr.hpp>
 #include <sisl/logging/logging.h>
 
 class simple_state_mgr : public nuraft_mesg::mesg_state_mgr {

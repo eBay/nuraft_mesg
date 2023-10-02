@@ -13,6 +13,8 @@
  *
  *********************************************************************************/
 
+#include <sisl/fds/buffer.hpp>
+
 // Brief:
 //   grpc_client does the protobuf transformations on nuraft req's
 //

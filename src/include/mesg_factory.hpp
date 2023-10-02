@@ -33,7 +33,21 @@ namespace nuraft_mesg {
 using group_name_t = std::string;
 using group_type_t = std::string;
 
-class group_factory;
+class group_factory : public grpc_factory {
+    std::shared_ptr< sisl::GrpcTokenClient > m_token_client;
+    static std::string m_ssl_cert;
+
+public:
+    group_factory(int const cli_thread_count, std::string const& name,
+                  std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert = "");
+
+    using grpc_factory::create_client;
+    std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >&) override;
+    std::error_condition reinit_client(std::string const& client,
+                                       std::shared_ptr< nuraft::rpc_client >& raft_client) override;
+
+    virtual std::string lookupEndpoint(std::string const& client) = 0;
+};
 
 class mesg_factory final : public grpc_factory {
     std::shared_ptr< group_factory > _group_factory;

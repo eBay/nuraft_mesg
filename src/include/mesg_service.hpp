@@ -18,14 +18,11 @@
 #include <memory>
 #include <string>
 #include <system_error>
-#include <folly/Expected.h>
-#include <folly/small_vector.h>
-#include <folly/Unit.h>
-#include <folly/futures/Future.h>
 
 #include <libnuraft/nuraft.hxx>
-#include <sisl/fds/buffer.hpp>
 #include <sisl/logging/logging.h>
+
+#include "mesg_state_mgr.hpp"
 
 SISL_LOGGING_DECL(nuraft)
 
@@ -37,56 +34,17 @@ class Status;
 namespace sisl {
 class GrpcTokenVerifier;
 class GrpcTokenClient;
-class GenericRpcData;
 using generic_unary_callback_t = std::function< void(grpc::ByteBuffer&, ::grpc::Status& status) >;
 } // namespace sisl
 
-namespace boost {
-template < class T >
-class intrusive_ptr;
-} // namespace boost
-
 namespace nuraft_mesg {
-
-using io_blob_list_t = folly::small_vector< sisl::io_blob, 4 >;
 
 // called by the server after it receives the request
 using data_service_request_handler_t =
     std::function< void(sisl::io_blob const& incoming_buf, boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) >;
 
-// This object can be stored by the caller and can be used to directly call raft/data operatons without taking
-// _raft_servers_lock
-class grpc_server;
-
-template < typename T >
-using Result = folly::Expected< T, std::error_condition >;
-template < typename T >
-using AsyncResult = folly::SemiFuture< Result< T > >;
-
 using NullResult = Result< folly::Unit >;
 using NullAsyncResult = AsyncResult< folly::Unit >;
-
-class repl_service_ctx {
-public:
-    repl_service_ctx(grpc_server* server);
-    virtual ~repl_service_ctx() = default;
-
-    // we do not own this pointer. Use this only if the lyfe cycle of the pointer is well known
-    grpc_server* m_server;
-    bool is_raft_leader() const;
-
-    // data service api client call
-    virtual AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name,
-                                                              io_blob_list_t const& cli_buf) = 0;
-
-    // Send response to a data service request and finish the async call.
-    virtual void send_data_service_response(io_blob_list_t const& outgoing_buf,
-                                            boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) = 0;
-};
-
-extern int32_t to_server_id(std::string const& server_addr);
-
-class mesg_state_mgr;
 
 class MessagingApplication {
 public:
@@ -133,6 +91,8 @@ public:
     virtual bool bind_data_service_request(std::string const& request_name, std::string const& group_id,
                                            data_service_request_handler_t const&) = 0;
 };
+
+extern int32_t to_server_id(std::string const& server_addr);
 
 extern std::shared_ptr< Manager > init_messaging(Manager::Params const&, std::weak_ptr< MessagingApplication >,
                                                  bool with_data_svc = false);

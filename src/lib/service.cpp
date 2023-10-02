@@ -15,7 +15,7 @@
 #include "libnuraft/rpc_listener.hxx"
 #include "service.hpp"
 #include "mesg_factory.hpp"
-#include "mesg_state_mgr.hpp"
+#include "mesg_service.hpp"
 
 SISL_LOGGING_DECL(nuraft_mesg)
 
