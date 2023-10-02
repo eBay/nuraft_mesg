@@ -24,7 +24,7 @@
 
 #include <sisl/logging/logging.h>
 
-#include "messaging_if.hpp"
+#include "mesg_factory.hpp"
 
 namespace sisl {
 class GrpcServer;

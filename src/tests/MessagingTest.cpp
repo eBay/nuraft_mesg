@@ -31,7 +31,6 @@
 
 #include "libnuraft/cluster_config.hxx"
 #include "libnuraft/state_machine.hxx"
-#include "messaging_if.hpp"
 #include "mesg_factory.hpp"
 
 #include "test_state_manager.h"

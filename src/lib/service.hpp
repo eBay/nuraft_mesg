@@ -12,7 +12,6 @@
 #include <sisl/metrics/metrics.hpp>
 
 #include "proto/messaging_service.grpc.pb.h"
-#include "messaging_if.hpp"
 #include "messaging.hpp"
 #include "data_service_grpc.hpp"
 

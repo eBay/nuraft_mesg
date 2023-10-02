@@ -24,8 +24,6 @@
 #include <folly/SharedMutex.h>
 #include <libnuraft/nuraft.hxx>
 
-SISL_LOGGING_DECL(nuraft)
-
 namespace nuraft_mesg {
 
 using client_factory_lock_type = folly::SharedMutex;

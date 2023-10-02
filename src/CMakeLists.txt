@@ -12,7 +12,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     lib/grpc_client.cpp
     lib/grpc_factory.cpp
     lib/grpc_server.cpp
-    lib/mesg_factory.cpp
+    lib/mesg_client.cpp
     lib/service.cpp
     lib/data_service_grpc.cpp
     lib/messaging.cpp
