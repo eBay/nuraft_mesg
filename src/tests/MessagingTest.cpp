@@ -90,6 +90,7 @@ public:
                             .with_rpc_failure_backoff(rpc_backoff)
                             .with_auto_forwarding(true)
                             .with_snapshot_enabled(0);
+        r_params.return_method_ = nuraft::raft_params::async_handler;
         instance_->register_mgr_type("test_type", r_params);
     }
 
