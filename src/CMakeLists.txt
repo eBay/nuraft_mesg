@@ -15,7 +15,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     lib/mesg_client.cpp
     lib/service.cpp
     lib/data_service_grpc.cpp
-    lib/messaging.cpp
+    lib/manager_impl.cpp
     $<TARGET_OBJECTS:${PROJECT_NAME}-proto>
   )
 settings_gen_cpp($<TARGET_FILE:flatbuffers::flatc> ${CMAKE_CURRENT_BINARY_DIR}/generated/ ${PROJECT_NAME} lib/nuraft_mesg_config.fbs)

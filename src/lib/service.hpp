@@ -12,7 +12,7 @@
 #include <sisl/metrics/metrics.hpp>
 
 #include "proto/messaging_service.grpc.pb.h"
-#include "messaging.hpp"
+#include "manager_impl.hpp"
 #include "data_service_grpc.hpp"
 
 namespace nuraft_mesg {

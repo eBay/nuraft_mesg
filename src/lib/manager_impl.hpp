@@ -35,7 +35,7 @@ class group_factory;
 class msg_service;
 class group_metrics;
 
-class service : public Manager {
+class ManagerImpl : public Manager {
     Manager::Params start_params_;
     int32_t _srv_id;
 
@@ -62,8 +62,8 @@ class service : public Manager {
     void exit_group(std::string const& group_id);
 
 public:
-    service(Manager::Params const&, std::weak_ptr< MessagingApplication >, bool and_data_svc = false);
-    ~service() override;
+    ManagerImpl(Manager::Params const&, std::weak_ptr< MessagingApplication >, bool and_data_svc = false);
+    ~ManagerImpl() override;
 
     int32_t server_id() const override { return _srv_id; }
 
