@@ -80,7 +80,8 @@ bool msg_service::bind_data_service_request(std::string const& request_name, std
     return _data_service.bind(request_name, group_id, request_handler);
 }
 
-nuraft::cmd_result_code msg_service::add_srv(group_name_t const& group_name, nuraft::srv_config const& cfg) {
+AsyncResult< nuraft::cmd_result_code > msg_service::add_srv(group_name_t const& group_name,
+                                                            nuraft::srv_config const& cfg) {
     std::shared_ptr< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
@@ -88,7 +89,14 @@ nuraft::cmd_result_code msg_service::add_srv(group_name_t const& group_name, nur
     }
     if (server) {
         try {
-            return server->add_srv(cfg)->get_result_code();
+            auto res_p = server->add_srv(cfg);
+            if (auto r = res_p->get_result_code(); r != nuraft::RESULT_NOT_EXIST_YET) return r;
+            auto [p, sf] = folly::makePromiseContract< Result< nuraft::cmd_result_code > >();
+            res_p->when_ready(
+                [p = std::make_shared< decltype(p) >(std::move(p))](
+                    nuraft::cmd_result< nuraft::ptr< nuraft::buffer >, nuraft::ptr< std::exception > >& result,
+                    auto& e) mutable { p->setValue(result.get_result_code()); });
+            return std::move(sf);
         } catch (std::runtime_error& rte) {
             LOGERRORMOD(nuraft_mesg, "Caught exception during add_srv(): {}", rte.what());
         }
@@ -96,7 +104,7 @@ nuraft::cmd_result_code msg_service::add_srv(group_name_t const& group_name, nur
     return nuraft::SERVER_NOT_FOUND;
 }
 
-nuraft::cmd_result_code msg_service::rm_srv(group_name_t const& group_name, int const member_id) {
+AsyncResult< nuraft::cmd_result_code > msg_service::rm_srv(group_name_t const& group_name, int const member_id) {
     std::shared_ptr< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
@@ -104,7 +112,14 @@ nuraft::cmd_result_code msg_service::rm_srv(group_name_t const& group_name, int 
     }
     if (server) {
         try {
-            return server->rem_srv(member_id)->get_result_code();
+            auto res_p = server->rem_srv(member_id);
+            if (auto r = res_p->get_result_code(); r != nuraft::RESULT_NOT_EXIST_YET) return r;
+            auto [p, sf] = folly::makePromiseContract< Result< nuraft::cmd_result_code > >();
+            res_p->when_ready(
+                [p = std::make_shared< decltype(p) >(std::move(p))](
+                    nuraft::cmd_result< nuraft::ptr< nuraft::buffer >, nuraft::ptr< std::exception > >& result,
+                    auto& e) mutable { p->setValue(result.get_result_code()); });
+            return std::move(sf);
         } catch (std::runtime_error& rte) {
             LOGERRORMOD(nuraft_mesg, "Caught exception during rm_srv(): {}", rte.what());
         }
@@ -146,8 +161,8 @@ void msg_service::get_srv_config_all(group_name_t const& group_name,
     }
 }
 
-nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_name,
-                                                    std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
+AsyncResult< nuraft::cmd_result_code >
+msg_service::append_entries(group_name_t const& group_name, std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
     std::shared_ptr< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
@@ -155,7 +170,14 @@ nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_na
     }
     if (server) {
         try {
-            return server->append_entries(logs)->get_result_code();
+            auto res_p = server->append_entries(logs);
+            if (auto r = res_p->get_result_code(); r != nuraft::RESULT_NOT_EXIST_YET) return r;
+            auto [p, sf] = folly::makePromiseContract< Result< nuraft::cmd_result_code > >();
+            auto sp = std::make_shared< decltype(p) >(std::move(p));
+            res_p->when_ready(
+                [sp](nuraft::cmd_result< nuraft::ptr< nuraft::buffer >, nuraft::ptr< std::exception > >& result,
+                     auto& e) mutable { sp->setValue(result.get_result_code()); });
+            return std::move(sf);
         } catch (std::runtime_error& rte) {
             LOGERRORMOD(nuraft_mesg, "Caught exception during step(): {}", rte.what());
         }

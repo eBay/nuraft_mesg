@@ -78,14 +78,14 @@ public:
 
     void shutdown();
 
-    nuraft::cmd_result_code add_srv(group_name_t const& group_name, nuraft::srv_config const& cfg);
-    nuraft::cmd_result_code rm_srv(group_name_t const& group_name, int const member_id);
+    AsyncResult< nuraft::cmd_result_code > add_srv(group_name_t const& group_name, nuraft::srv_config const& cfg);
+    AsyncResult< nuraft::cmd_result_code > append_entries(group_name_t const& group_name,
+                                                          std::vector< nuraft::ptr< nuraft::buffer > > const& logs);
+    AsyncResult< nuraft::cmd_result_code > rm_srv(group_name_t const& group_name, int const member_id);
+
     bool request_leadership(group_name_t const& group_name);
     void get_srv_config_all(group_name_t const& group_name,
                             std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out);
-
-    nuraft::cmd_result_code append_entries(group_name_t const& group_name,
-                                           std::vector< nuraft::ptr< nuraft::buffer > > const& logs);
 
     void associate(sisl::GrpcServer* server);
     void bind(sisl::GrpcServer* server);

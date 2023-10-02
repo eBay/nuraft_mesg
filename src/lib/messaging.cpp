@@ -31,6 +31,37 @@ constexpr auto grpc_server_threads = 1u;
 
 namespace nuraft_mesg {
 
+static std::error_condition convertToError(nuraft::cmd_result_code rc) {
+    switch (rc) {
+    case nuraft::OK:
+        return std::error_condition();
+    case nuraft::CANCELLED:
+        return std::make_error_condition(std::errc::operation_canceled);
+    case nuraft::TIMEOUT:
+        return std::make_error_condition(std::errc::timed_out);
+    case nuraft::NOT_LEADER:
+        return std::make_error_condition(std::errc::permission_denied);
+    case nuraft::BAD_REQUEST:
+        return std::make_error_condition(std::errc::invalid_argument);
+    case nuraft::SERVER_ALREADY_EXISTS:
+        return std::make_error_condition(std::errc::file_exists);
+    case nuraft::CONFIG_CHANGING:
+        return std::make_error_condition(std::errc::interrupted);
+    case nuraft::SERVER_IS_JOINING:
+        return std::make_error_condition(std::errc::device_or_resource_busy);
+    case nuraft::SERVER_NOT_FOUND:
+        return std::make_error_condition(std::errc::no_such_device);
+    case nuraft::CANNOT_REMOVE_LEADER:
+        return std::make_error_condition(std::errc::not_supported);
+    case nuraft::SERVER_IS_LEAVING:
+        return std::make_error_condition(std::errc::owner_dead);
+    case nuraft::FAILED:
+        [[fallthrough]];
+    default:
+        return std::make_error_condition(std::errc::io_error);
+    }
+}
+
 int32_t to_server_id(std::string const& server_addr) {
     boost::hash< boost::uuids::uuid > uuid_hasher;
     return uuid_hasher(boost::uuids::string_generator()(server_addr)) >> 33;
@@ -215,24 +246,11 @@ std::error_condition service::group_init(int32_t const srv_id, std::string const
 }
 
 NullAsyncResult service::add_member(std::string const& group_id, std::string const& new_id) {
-    auto rc = _mesg_service->add_srv(group_id, nuraft::srv_config(to_server_id(new_id), new_id));
-    return folly::makeSemiFuture< folly::Unit >(folly::Unit())
-        .deferValue([this, rc, n_id = new_id, g_id = group_id](auto) mutable -> NullResult {
-            while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-                rc = _mesg_service->add_srv(g_id, nuraft::srv_config(to_server_id(n_id), n_id));
-                if (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-                    LOGDEBUGMOD(nuraft_mesg, "Server is busy, retrying...");
-                    std::this_thread::sleep_for(cfg_change_timeout);
-                }
-            }
-            if (nuraft::OK != rc) {
-                if (nuraft::SERVER_NOT_FOUND == rc) {
-                    LOGWARN("Messaging service does not know of group: [{}]", g_id);
-                } else
-                    LOGERROR("Unknown failure to add member: [{}]", static_cast< uint32_t >(rc));
-                return folly::makeUnexpected(std::make_error_condition(std::errc::connection_aborted));
-            }
-
+    return _mesg_service->add_srv(group_id, nuraft::srv_config(to_server_id(new_id), new_id))
+        .deferValue([this, g_id = group_id, n_id = new_id](auto cmd_result) mutable -> NullResult {
+            auto result = cmd_result.value();
+            if (nuraft::OK != result) return folly::makeUnexpected(convertToError(result));
+            // TODO This should not block, but attach a new promise!
             auto lk = std::unique_lock< std::mutex >(_manager_lock);
             if (!_config_change.wait_for(
                     lk, cfg_change_timeout * 20, [this, g_id = std::move(g_id), n_id = std::move(n_id)]() {
@@ -250,19 +268,14 @@ NullAsyncResult service::add_member(std::string const& group_id, std::string con
 }
 
 NullAsyncResult service::rem_member(std::string const& group_id, std::string const& old_id) {
-    auto rc = _mesg_service->rm_srv(group_id, to_server_id(old_id));
-    return folly::makeSemiFuture< folly::Unit >(folly::Unit())
-        .deferValue([this, rc, o_id = old_id, g_id = group_id](auto) mutable -> NullResult {
-            while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-                rc = _mesg_service->rm_srv(g_id, to_server_id(o_id));
-                if (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-                    LOGDEBUGMOD(nuraft_mesg, "Server is busy, retrying...");
-                    std::this_thread::sleep_for(cfg_change_timeout);
+    return _mesg_service->rm_srv(group_id, to_server_id(old_id))
+        .deferValue([this, group_id](auto cmd_result) mutable -> NullResult {
+            auto result = cmd_result.value();
+            if (nuraft::OK != result) {
+                if (nuraft::SERVER_NOT_FOUND == result) {
+                    LOGWARN("Messaging service does not know of group: [{}]", group_id);
                 }
-            }
-            if (nuraft::OK != rc) {
-                if (nuraft::SERVER_NOT_FOUND == rc) { LOGWARN("Messaging service does not know of group: [{}]", g_id); }
-                LOGERROR("Unknown failure to add member: [{}]", static_cast< uint32_t >(rc));
+                LOGERROR("Unknown failure to add member: [{}]", static_cast< uint32_t >(result));
                 return folly::makeUnexpected(std::make_error_condition(std::errc::connection_aborted));
             }
             return folly::Unit();
@@ -372,53 +385,12 @@ void service::leave_group(std::string const& group_id) {
     LOGINFO("Finished leaving: [vol={}]", group_id);
 }
 
-static std::error_condition convertToError(nuraft::cmd_result_code const& rc) {
-    switch (rc) {
-    case nuraft::OK:
-        return std::error_condition();
-    case nuraft::CANCELLED:
-        return std::make_error_condition(std::errc::operation_canceled);
-    case nuraft::TIMEOUT:
-        return std::make_error_condition(std::errc::timed_out);
-    case nuraft::NOT_LEADER:
-        return std::make_error_condition(std::errc::permission_denied);
-    case nuraft::BAD_REQUEST:
-        return std::make_error_condition(std::errc::invalid_argument);
-    case nuraft::SERVER_ALREADY_EXISTS:
-        return std::make_error_condition(std::errc::file_exists);
-    case nuraft::CONFIG_CHANGING:
-        return std::make_error_condition(std::errc::interrupted);
-    case nuraft::SERVER_IS_JOINING:
-        return std::make_error_condition(std::errc::device_or_resource_busy);
-    case nuraft::SERVER_NOT_FOUND:
-        return std::make_error_condition(std::errc::no_such_device);
-    case nuraft::CANNOT_REMOVE_LEADER:
-        return std::make_error_condition(std::errc::not_supported);
-    case nuraft::SERVER_IS_LEAVING:
-        return std::make_error_condition(std::errc::owner_dead);
-    case nuraft::FAILED:
-        [[fallthrough]];
-    default:
-        return std::make_error_condition(std::errc::io_error);
-    }
-}
-
 NullAsyncResult service::client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >& buf) {
-    auto rc = _mesg_service->append_entries(group_id, {buf});
-    if (nuraft::OK == rc) return folly::Unit();
-    return folly::makeSemiFuture< folly::Unit >(folly::Unit())
-        .deferValue([this, rc, g_id = group_id, buf = std::move(buf)](auto) mutable -> NullResult {
-            while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-                LOGDEBUGMOD(nuraft_mesg, "Sending Client Request to {}", g_id);
-                rc = _mesg_service->append_entries(g_id, {buf});
-                if (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
-                    LOGDEBUGMOD(nuraft_mesg, "Server is busy, retrying...");
-                    std::this_thread::sleep_for(cfg_change_timeout);
-                }
-            }
-            if (nuraft::OK != rc) return folly::makeUnexpected(convertToError(rc));
-            return folly::Unit();
-        });
+    return _mesg_service->append_entries(group_id, {buf}).deferValue([](auto cmd_result) -> NullResult {
+        auto result = cmd_result.value();
+        if (nuraft::OK != result) return folly::makeUnexpected(convertToError(result));
+        return folly::Unit();
+    });
 }
 uint32_t service::logstore_id(std::string const& group_id) const {
     std::lock_guard< std::mutex > lg(_manager_lock);
