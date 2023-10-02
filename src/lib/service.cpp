@@ -208,15 +208,15 @@ bool msg_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg,
     response.set_group_name(group_name);
     if (server) {
         /// TODO replace this ugly hack
-        //if (auto offload = _get_process_offload(request.group_type()); nullptr != offload) {
-        //    offload([rpc_data, server]() {
-        //        auto& request = rpc_data->request();
-        //        auto& response = rpc_data->response();
-        //        rpc_data->set_status(server->step(request.msg(), *response.mutable_msg()));
-        //        rpc_data->send_response();
-        //    });
-        //    return false;
-        //}
+        // if (auto offload = _get_process_offload(request.group_type()); nullptr != offload) {
+        //     offload([rpc_data, server]() {
+        //         auto& request = rpc_data->request();
+        //         auto& response = rpc_data->response();
+        //         rpc_data->set_status(server->step(request.msg(), *response.mutable_msg()));
+        //         rpc_data->send_response();
+        //     });
+        //     return false;
+        // }
         try {
             rpc_data->set_status(server->step(request.msg(), *response.mutable_msg()));
             return true;

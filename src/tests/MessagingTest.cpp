@@ -48,7 +48,7 @@ constexpr auto elect_to_high = elect_to_low * 2;
 
 namespace nuraft_mesg {
 
-class TestApplication : public MessagingApplication, std::enable_shared_from_this< TestApplication > {
+class TestApplication : public MessagingApplication, public std::enable_shared_from_this< TestApplication > {
 public:
     std::string name_;
     uint32_t port_;
@@ -81,7 +81,7 @@ public:
         params.server_uuid_ = id_;
         params.mesg_port_ = port_;
         params.default_group_type_ = "test_type";
-        instance_ = init_messaging(params, shared_from_this(), false);
+        instance_ = init_messaging(params, weak_from_this(), false);
         auto r_params = nuraft::raft_params()
                             .with_election_timeout_lower(elect_to_low)
                             .with_election_timeout_upper(elect_to_high)
