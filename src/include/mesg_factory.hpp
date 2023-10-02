@@ -30,9 +30,6 @@ struct io_blob;
 
 namespace nuraft_mesg {
 
-using group_name_t = std::string;
-using group_type_t = std::string;
-
 class group_factory : public grpc_factory {
     std::shared_ptr< sisl::GrpcTokenClient > m_token_client;
     static std::string m_ssl_cert;

@@ -89,9 +89,8 @@ public:
     bool bind_data_service_request(std::string const& request_name, std::string const& group_id,
                                    data_service_request_handler_t const& request_handler) override;
 
-    // for testing
     void get_srv_config_all(std::string const& group_name,
-                            std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out);
+                            std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) override;
 };
 
 class repl_service_ctx_grpc : public repl_service_ctx {
