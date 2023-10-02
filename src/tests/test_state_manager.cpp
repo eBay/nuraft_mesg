@@ -203,10 +203,10 @@ void test_state_mgr::fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf) {
     }
 }
 
-uint32_t test_state_mgr::get_random_num() {
+uint16_t test_state_mgr::get_random_num() {
     static std::random_device dev;
     static std::mt19937 rng(dev());
-    std::uniform_int_distribution< std::mt19937::result_type > dist(1001u, 99999u);
+    std::uniform_int_distribution< std::mt19937::result_type > dist(1001u, 65535u);
     return dist(rng);
 }
 

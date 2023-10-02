@@ -49,7 +49,7 @@ public:
 
     bool register_data_service_apis(nuraft_mesg::service* messaging);
     static void fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf);
-    static uint32_t get_random_num();
+    static uint16_t get_random_num();
     static uint32_t get_server_counter();
     static void verify_data(sisl::io_blob const& buf);
 
