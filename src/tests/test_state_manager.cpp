@@ -21,6 +21,7 @@
 #include <nlohmann/json.hpp>
 #include <libnuraft/state_machine.hxx>
 
+#include "nuraft_mesg/common.hpp"
 #include "test_state_machine.h"
 #include <gtest/gtest.h>
 #include <random>
@@ -46,12 +47,12 @@ std::error_condition jsonObjectFromFile(std::string const& filename, json& json_
     return std::error_condition();
 }
 
-std::error_condition loadConfigFile(json& config_map, std::string const& _group_id, int32_t const _srv_id) {
+std::error_condition loadConfigFile(json& config_map, nuraft_mesg::group_id_t const& _group_id, int32_t const _srv_id) {
     auto const config_file = fmt::format(FMT_STRING("{}_s{}/config.json"), _group_id, _srv_id);
     return jsonObjectFromFile(config_file, config_map);
 }
 
-std::error_condition loadStateFile(json& state_map, std::string const& _group_id, int32_t const _srv_id) {
+std::error_condition loadStateFile(json& state_map, nuraft_mesg::group_id_t const& _group_id, int32_t const _srv_id) {
     auto const state_file = fmt::format(FMT_STRING("{}_s{}/state.json"), _group_id, _srv_id);
     return jsonObjectFromFile(state_file, state_map);
 }
@@ -95,11 +96,12 @@ nuraft::ptr< nuraft::cluster_config > fromClusterConfig(json const& cluster_conf
     return raft_config;
 }
 
-test_state_mgr::test_state_mgr(int32_t srv_id, std::string const& srv_addr, std::string const& group_id) :
+test_state_mgr::test_state_mgr(int32_t srv_id, nuraft_mesg::peer_id_t const& srv_addr,
+                               nuraft_mesg::group_id_t const& group_id) :
         nuraft_mesg::mesg_state_mgr(),
         _srv_id(srv_id),
         _srv_addr(srv_addr),
-        _group_id(group_id.c_str()),
+        _group_id(group_id),
         _state_machine(std::make_shared< test_state_machine >()) {}
 
 nuraft::ptr< nuraft::cluster_config > test_state_mgr::load_config() {
@@ -107,7 +109,7 @@ nuraft::ptr< nuraft::cluster_config > test_state_mgr::load_config() {
     json config_map;
     if (auto err = loadConfigFile(config_map, _group_id, _srv_id); !err) { return fromClusterConfig(config_map); }
     auto conf = nuraft::cs_new< nuraft::cluster_config >();
-    conf->get_servers().push_back(nuraft::cs_new< nuraft::srv_config >(_srv_id, _srv_addr));
+    conf->get_servers().push_back(nuraft::cs_new< nuraft::srv_config >(_srv_id, to_string(_srv_addr)));
     return conf;
 }
 

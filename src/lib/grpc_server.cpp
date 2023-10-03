@@ -16,11 +16,9 @@
 // Brief:
 //   grpc_server step function and response transformations
 //
-#include "grpc_server.hpp"
+#include "nuraft_mesg/grpc_server.hpp"
 #include "utils.hpp"
 #include "proto/raft_types.pb.h"
-
-SISL_LOGGING_DECL(nuraft_mesg)
 
 namespace nuraft_mesg {
 

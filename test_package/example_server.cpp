@@ -1,7 +1,7 @@
 #include <cassert>
 #include <csignal>
 
-#include <nuraft_mesg/mesg_service.hpp>
+#include <nuraft_mesg/nuraft_mesg.hpp>
 #include <sisl/grpc/rpc_client.hpp>
 #include <sisl/grpc/rpc_server.hpp>
 #include <sisl/logging/logging.h>

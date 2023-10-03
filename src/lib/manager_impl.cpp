@@ -5,7 +5,6 @@
 #include <chrono>
 
 #include <boost/uuid/string_generator.hpp>
-#include <boost/uuid/uuid_io.hpp>
 #include <ios>
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/details/registry.h>
@@ -17,12 +16,10 @@
 #include <system_error>
 
 #include "service.hpp"
-#include "mesg_factory.hpp"
-#include "mesg_service.hpp"
+#include "nuraft_mesg/mesg_factory.hpp"
+#include "nuraft_mesg/nuraft_mesg.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
-
-SISL_LOGGING_DECL(nuraft_mesg)
 
 constexpr auto cfg_change_timeout = std::chrono::milliseconds(200);
 constexpr auto leader_change_timeout = std::chrono::milliseconds(3200);
@@ -62,9 +59,9 @@ static std::error_condition convertToError(nuraft::cmd_result_code rc) {
     }
 }
 
-int32_t to_server_id(std::string const& server_addr) {
+int32_t to_server_id(peer_id_t const& server_addr) {
     boost::hash< boost::uuids::uuid > uuid_hasher;
-    return uuid_hasher(boost::uuids::string_generator()(server_addr)) >> 33;
+    return uuid_hasher(server_addr) >> 33;
 }
 
 class engine_factory : public group_factory {
@@ -76,7 +73,7 @@ public:
                                          start_params.ssl_cert_),
             application_(app) {}
 
-    std::string lookupEndpoint(std::string const& client) override {
+    std::string lookupEndpoint(peer_id_t const& client) override {
         LOGTRACEMOD(nuraft_mesg, "[peer={}]", client);
         if (auto a = application_.lock(); a) return a->lookup_peer(client);
         return std::string();
@@ -103,7 +100,8 @@ ManagerImpl::ManagerImpl(Manager::Params const& start_params, std::weak_ptr< Mes
     } catch (spdlog::spdlog_ex const& e) { _custom_logger = spdlog::details::registry::instance().get(logger_name); }
 
     sisl::logging::SetLogPattern("[%D %T.%f] [%^%L%$] [%t] %v", _custom_logger);
-    nuraft::ptr< nuraft::logger > logger = std::make_shared< nuraft_mesg_logger >("scheduler", _custom_logger);
+    nuraft::ptr< nuraft::logger > logger =
+        std::make_shared< nuraft_mesg_logger >(start_params_.server_uuid_, _custom_logger);
 
     // RAFT request scheduler
     nuraft::asio_service::options service_options;
@@ -114,8 +112,8 @@ ManagerImpl::ManagerImpl(Manager::Params const& start_params, std::weak_ptr< Mes
     // allowing sharing of the Server and client amongst raft instances.
 
     _mesg_service = msg_service::create(
-        [this](int32_t const srv_id, group_name_t const& group_id, group_type_t const& group_type,
-               nuraft::context*& ctx, std::shared_ptr< group_metrics > metrics) mutable -> std::error_condition {
+        [this](int32_t const srv_id, group_id_t const& group_id, group_type_t const& group_type, nuraft::context*& ctx,
+               std::shared_ptr< group_metrics > metrics) mutable -> nuraft::cmd_result_code {
             return this->group_init(srv_id, group_id, group_type, ctx, metrics);
         },
         start_params_.server_uuid_, and_data_svc);
@@ -140,7 +138,7 @@ void ManagerImpl::restart_server() {
     _mesg_service->bind(_grpc_server.get());
 }
 
-void ManagerImpl::register_mgr_type(std::string const& group_type, group_params const& params) {
+void ManagerImpl::register_mgr_type(group_type_t const& group_type, group_params const& params) {
     std::lock_guard< std::mutex > lg(_manager_lock);
     auto [it, happened] = _state_mgr_types.emplace(std::make_pair(group_type, params));
     DEBUG_ASSERT(_state_mgr_types.end() != it, "Out of memory?");
@@ -148,7 +146,7 @@ void ManagerImpl::register_mgr_type(std::string const& group_type, group_params 
     if (_state_mgr_types.end() == it) { LOGERROR("Could not register group type: {}", group_type); }
 }
 
-nuraft::cb_func::ReturnCode ManagerImpl::callback_handler(std::string const& group_id, nuraft::cb_func::Type type,
+nuraft::cb_func::ReturnCode ManagerImpl::callback_handler(group_id_t const& group_id, nuraft::cb_func::Type type,
                                                           nuraft::cb_func::Param* param) {
     switch (type) {
     case nuraft::cb_func::RemovedFromCluster: {
@@ -189,7 +187,7 @@ nuraft::cb_func::ReturnCode ManagerImpl::callback_handler(std::string const& gro
     return nuraft::cb_func::Ok;
 }
 
-void ManagerImpl::exit_group(std::string const& group_id) {
+void ManagerImpl::exit_group(group_id_t const& group_id) {
     std::shared_ptr< mesg_state_mgr > mgr;
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
@@ -198,9 +196,9 @@ void ManagerImpl::exit_group(std::string const& group_id) {
     if (mgr) mgr->leave();
 }
 
-std::error_condition ManagerImpl::group_init(int32_t const srv_id, std::string const& group_id,
-                                             std::string const& group_type, nuraft::context*& ctx,
-                                             std::shared_ptr< nuraft_mesg::group_metrics > metrics) {
+nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t const& group_id,
+                                                group_type_t const& group_type, nuraft::context*& ctx,
+                                                std::shared_ptr< nuraft_mesg::group_metrics > metrics) {
     LOGDEBUGMOD(nuraft_mesg, "Creating context for Group: {} as Member: {}", group_id, srv_id);
 
     // State manager (RAFT log store, config)
@@ -211,7 +209,7 @@ std::error_condition ManagerImpl::group_init(int32_t const srv_id, std::string c
         std::lock_guard< std::mutex > lg(_manager_lock);
         auto def_group = _state_mgr_types.end();
         if (def_group = _state_mgr_types.find(group_type); _state_mgr_types.end() == def_group) {
-            return std::make_error_condition(std::errc::invalid_argument);
+            return nuraft::cmd_result_code::SERVER_NOT_FOUND;
         }
         params = def_group->second;
 
@@ -226,7 +224,7 @@ std::error_condition ManagerImpl::group_init(int32_t const srv_id, std::string c
             sm = it->second->get_state_machine();
             smgr = it->second;
         } else {
-            return std::make_error_condition(std::errc::not_enough_memory);
+            return nuraft::cmd_result_code::CANCELLED;
         }
     }
 
@@ -243,14 +241,14 @@ std::error_condition ManagerImpl::group_init(int32_t const srv_id, std::string c
         return this->callback_handler(group_id, type, param);
     });
 
-    return std::error_condition();
+    return nuraft::cmd_result_code::OK;
 }
 
-NullAsyncResult ManagerImpl::add_member(std::string const& group_id, std::string const& new_id) {
-    return _mesg_service->add_srv(group_id, nuraft::srv_config(to_server_id(new_id), new_id))
-        .deferValue([this, g_id = group_id, n_id = new_id](auto cmd_result) mutable -> NullResult {
-            auto result = cmd_result.value();
-            if (nuraft::OK != result) return folly::makeUnexpected(convertToError(result));
+NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, peer_id_t const& new_id) {
+    auto str_id = to_string(new_id);
+    return _mesg_service->add_srv(group_id, nuraft::srv_config(to_server_id(new_id), str_id))
+        .deferValue([this, g_id = group_id, n_id = std::move(str_id)](auto cmd_result) mutable -> NullResult {
+            if (!cmd_result) return folly::makeUnexpected(cmd_result.error());
             // TODO This should not block, but attach a new promise!
             auto lk = std::unique_lock< std::mutex >(_manager_lock);
             if (!_config_change.wait_for(
@@ -261,35 +259,29 @@ NullAsyncResult ManagerImpl::add_member(std::string const& group_id, std::string
                                             [n_id = std::move(n_id)](const std::shared_ptr< nuraft::srv_config >& cfg) {
                                                 return n_id == cfg->get_endpoint();
                                             }) != srv_list.end();
-                    }))
-                return folly::makeUnexpected(std::make_error_condition(std::errc::connection_aborted));
-            ;
-            return folly::Unit();
-        });
-}
-
-NullAsyncResult ManagerImpl::rem_member(std::string const& group_id, std::string const& old_id) {
-    return _mesg_service->rm_srv(group_id, to_server_id(old_id))
-        .deferValue([this, group_id](auto cmd_result) mutable -> NullResult {
-            auto result = cmd_result.value();
-            if (nuraft::OK != result) {
-                if (nuraft::SERVER_NOT_FOUND == result) {
-                    LOGWARN("Messaging service does not know of group: [{}]", group_id);
-                }
-                LOGERROR("Unknown failure to add member: [{}]", static_cast< uint32_t >(result));
-                return folly::makeUnexpected(std::make_error_condition(std::errc::connection_aborted));
+                    })) {
+                return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
             }
             return folly::Unit();
         });
 }
 
-std::shared_ptr< mesg_state_mgr > ManagerImpl::lookup_state_manager(std::string const& group_id) const {
+NullAsyncResult ManagerImpl::append_entries(group_id_t const& group_id,
+                                            std::vector< std::shared_ptr< nuraft::buffer > > const& buf) {
+    return _mesg_service->append_entries(group_id, buf);
+}
+
+NullAsyncResult ManagerImpl::rem_member(group_id_t const& group_id, peer_id_t const& old_id) {
+    return _mesg_service->rm_srv(group_id, to_server_id(old_id));
+}
+
+std::shared_ptr< mesg_state_mgr > ManagerImpl::lookup_state_manager(group_id_t const& group_id) const {
     std::lock_guard< std::mutex > lg(_manager_lock);
     if (auto it = _state_managers.find(group_id); _state_managers.end() != it) return it->second;
     return nullptr;
 }
 
-NullAsyncResult ManagerImpl::create_group(std::string const& group_id, std::string const& group_type_name) {
+NullAsyncResult ManagerImpl::create_group(group_id_t const& group_id, std::string const& group_type_name) {
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         _is_leader.insert(std::make_pair(group_id, false));
@@ -304,19 +296,18 @@ NullAsyncResult ManagerImpl::create_group(std::string const& group_id, std::stri
             auto lk = std::unique_lock< std::mutex >(_manager_lock);
             if (!_config_change.wait_for(lk, leader_change_timeout,
                                          [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; })) {
-                return folly::makeUnexpected(std::make_error_condition(std::errc::timed_out));
+                return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
             }
             return folly::Unit();
         });
 }
 
-NullResult ManagerImpl::join_group(std::string const& group_id, std::string const& group_type,
+NullResult ManagerImpl::join_group(group_id_t const& group_id, group_type_t const& group_type,
                                    std::shared_ptr< mesg_state_mgr > smgr) {
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         auto [it, happened] = _state_managers.emplace(group_id, smgr);
-        if (_state_managers.end() == it)
-            return folly::makeUnexpected(std::make_error_condition(std::errc::not_enough_memory));
+        if (_state_managers.end() == it) return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
     }
     if (auto const err = _mesg_service->joinRaftGroup(_srv_id, group_id, group_type); err) {
         std::lock_guard< std::mutex > lg(_manager_lock);
@@ -327,18 +318,20 @@ NullResult ManagerImpl::join_group(std::string const& group_id, std::string cons
     return folly::Unit();
 }
 
-void ManagerImpl::append_peers(std::string const& group_id, std::list< std::string >& servers) const {
-    std::lock_guard< std::mutex > lg(_manager_lock);
-    if (auto it = _state_managers.find(group_id); _state_managers.end() != it) {
-        if (auto config = it->second->load_config(); config) {
-            for (auto const& server : config->get_servers()) {
-                servers.push_back(server->get_endpoint());
-            }
+void ManagerImpl::append_peers(group_id_t const& group_id, std::list< peer_id_t >& servers) const {
+    auto it = _state_managers.end();
+    {
+        std::lock_guard< std::mutex > lg(_manager_lock);
+        if (it = _state_managers.find(group_id); _state_managers.end() == it) return;
+    }
+    if (auto config = it->second->load_config(); config) {
+        for (auto const& server : config->get_servers()) {
+            servers.push_back(boost::uuids::string_generator()(server->get_endpoint()));
         }
     }
 }
 
-NullAsyncResult ManagerImpl::become_leader(std::string const& group_id) {
+NullAsyncResult ManagerImpl::become_leader(group_id_t const& group_id) {
     {
         auto lk = std::unique_lock< std::mutex >(_manager_lock);
         if (_is_leader[group_id]) { return folly::Unit(); }
@@ -355,16 +348,17 @@ NullAsyncResult ManagerImpl::become_leader(std::string const& group_id) {
                 // Do not sleep on the last try
                 if (max_retries != 1) { std::this_thread::sleep_for(std::chrono::milliseconds(leader_change_timeout)); }
             }
-            if (!request_success) return folly::makeUnexpected(std::make_error_condition(std::errc::timed_out));
+            if (!request_success) return folly::makeUnexpected(nuraft::cmd_result_code::TIMEOUT);
+
             auto lk = std::unique_lock< std::mutex >(_manager_lock);
             if (!_config_change.wait_for(lk, leader_change_timeout,
                                          [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; }))
-                return folly::makeUnexpected(std::make_error_condition(std::errc::timed_out));
+                return folly::makeUnexpected(nuraft::cmd_result_code::TIMEOUT);
             return folly::Unit();
         });
 }
 
-void ManagerImpl::leave_group(std::string const& group_id) {
+void ManagerImpl::leave_group(group_id_t const& group_id) {
     LOGINFO("Leaving group [vol={}]", group_id);
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
@@ -386,25 +380,18 @@ void ManagerImpl::leave_group(std::string const& group_id) {
     LOGINFO("Finished leaving: [vol={}]", group_id);
 }
 
-NullAsyncResult ManagerImpl::client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >& buf) {
-    return _mesg_service->append_entries(group_id, {buf}).deferValue([](auto cmd_result) -> NullResult {
-        auto result = cmd_result.value();
-        if (nuraft::OK != result) return folly::makeUnexpected(convertToError(result));
-        return folly::Unit();
-    });
-}
-uint32_t ManagerImpl::logstore_id(std::string const& group_id) const {
+uint32_t ManagerImpl::logstore_id(group_id_t const& group_id) const {
     std::lock_guard< std::mutex > lg(_manager_lock);
     if (auto it = _state_managers.find(group_id); _state_managers.end() != it) { return it->second->get_logstore_id(); }
     return UINT32_MAX;
 }
 
-void ManagerImpl::get_srv_config_all(std::string const& group_name,
+void ManagerImpl::get_srv_config_all(group_id_t const& group_name,
                                      std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) {
     _mesg_service->get_srv_config_all(group_name, configs_out);
 }
 
-bool ManagerImpl::bind_data_service_request(std::string const& request_name, std::string const& group_id,
+bool ManagerImpl::bind_data_service_request(std::string const& request_name, group_id_t const& group_id,
                                             data_service_request_handler_t const& request_handler) {
     return _mesg_service->bind_data_service_request(request_name, group_id, request_handler);
 }
@@ -413,7 +400,7 @@ AsyncResult< sisl::io_blob > repl_service_ctx_grpc::data_service_request(std::st
                                                                          io_blob_list_t const& cli_buf) {
 
     return (m_mesg_factory) ? m_mesg_factory->data_service_request(request_name, cli_buf)
-                            : folly::makeUnexpected(std::make_error_condition(std::errc::no_such_device));
+                            : folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
 }
 
 repl_service_ctx::repl_service_ctx(grpc_server* server) : m_server(server) {}

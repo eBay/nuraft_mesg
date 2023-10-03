@@ -1,43 +1,52 @@
-///
-// Copyright 2018 (c) eBay Corporation
-//
-// Authors:
-//      Brian Szmyd <bszmyd@ebay.com>
-//
-// Brief:
-//   Messaging service routines
-//
-
+#include <boost/uuid/string_generator.hpp>
+#include <folly/Expected.h>
+#include <grpcpp/impl/codegen/status_code_enum.h>
+#include <libnuraft/async.hxx>
+#include <libnuraft/rpc_listener.hxx>
 #include <sisl/options/options.h>
 
-#include "grpcpp/impl/codegen/status_code_enum.h"
-#include "libnuraft/async.hxx"
-#include "libnuraft/rpc_listener.hxx"
 #include "service.hpp"
-#include "mesg_factory.hpp"
-#include "mesg_service.hpp"
-
-SISL_LOGGING_DECL(nuraft_mesg)
+#include "nuraft_mesg/mesg_factory.hpp"
+#include "nuraft_mesg/nuraft_mesg.hpp"
 
 SISL_OPTION_GROUP(nuraft_mesg,
                   (messaging_metrics, "", "msg_metrics", "Gather metrics from SD Messaging", cxxopts::value< bool >(),
                    ""))
 
+#define CONTINUE_RESP(resp)                                                                                            \
+    try {                                                                                                              \
+        if (auto r = (resp)->get_result_code(); r != nuraft::RESULT_NOT_EXIST_YET) {                                   \
+            if (nuraft::OK == r) return folly::Unit();                                                                 \
+            return folly::makeUnexpected(r);                                                                           \
+        }                                                                                                              \
+        auto [p, sf] = folly::makePromiseContract< NullResult >();                                                     \
+        (resp)->when_ready(                                                                                            \
+            [p = std::make_shared< decltype(p) >(std::move(p))](                                                       \
+                nuraft::cmd_result< nuraft::ptr< nuraft::buffer >, nuraft::ptr< std::exception > >& result,            \
+                auto& e) mutable {                                                                                     \
+                if (nuraft::cmd_result_code::OK != result.get_result_code())                                           \
+                    p->setValue(folly::makeUnexpected(result.get_result_code()));                                      \
+                else                                                                                                   \
+                    p->setValue(folly::Unit());                                                                        \
+            });                                                                                                        \
+        return std::move(sf);                                                                                          \
+    } catch (std::runtime_error & rte) { LOGERRORMOD(nuraft_mesg, "Caught exception during rm_srv(): {}", rte.what()); }
+
 namespace nuraft_mesg {
 
 using AsyncRaftSvc = Messaging::AsyncService;
 
-grpc_server_wrapper::grpc_server_wrapper(group_name_t const& group_name) {
+grpc_server_wrapper::grpc_server_wrapper(group_id_t const& group_name) {
     if (0 < SISL_OPTIONS.count("msg_metrics")) m_metrics = std::make_shared< group_metrics >(group_name);
 }
 
-msg_service::msg_service(get_server_ctx_cb get_server_ctx, std::string const& service_address,
+msg_service::msg_service(get_server_ctx_cb get_server_ctx, group_id_t const& service_address,
                          bool const enable_data_service) :
         _get_server_ctx(get_server_ctx),
         _service_address(service_address),
         _data_service_enabled(enable_data_service) {}
 
-std::shared_ptr< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, std::string const& service_address,
+std::shared_ptr< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, group_id_t const& service_address,
                                                    bool const enable_data_service) {
     return std::shared_ptr< msg_service >(new msg_service(get_server_ctx, service_address, enable_data_service),
                                           [](msg_service* p) { delete p; });
@@ -71,7 +80,7 @@ void msg_service::bind(::sisl::GrpcServer* server) {
     if (_data_service_enabled) { _data_service.bind(); }
 }
 
-bool msg_service::bind_data_service_request(std::string const& request_name, std::string const& group_id,
+bool msg_service::bind_data_service_request(std::string const& request_name, group_id_t const& group_id,
                                             data_service_request_handler_t const& request_handler) {
     if (!_data_service_enabled) {
         LOGERRORMOD(nuraft_mesg, "Could not register data service method {}; data service is null", request_name);
@@ -80,54 +89,27 @@ bool msg_service::bind_data_service_request(std::string const& request_name, std
     return _data_service.bind(request_name, group_id, request_handler);
 }
 
-AsyncResult< nuraft::cmd_result_code > msg_service::add_srv(group_name_t const& group_name,
-                                                            nuraft::srv_config const& cfg) {
+NullAsyncResult msg_service::add_srv(group_id_t const& group_name, nuraft::srv_config const& cfg) {
     std::shared_ptr< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
     }
-    if (server) {
-        try {
-            auto res_p = server->add_srv(cfg);
-            if (auto r = res_p->get_result_code(); r != nuraft::RESULT_NOT_EXIST_YET) return r;
-            auto [p, sf] = folly::makePromiseContract< Result< nuraft::cmd_result_code > >();
-            res_p->when_ready(
-                [p = std::make_shared< decltype(p) >(std::move(p))](
-                    nuraft::cmd_result< nuraft::ptr< nuraft::buffer >, nuraft::ptr< std::exception > >& result,
-                    auto& e) mutable { p->setValue(result.get_result_code()); });
-            return std::move(sf);
-        } catch (std::runtime_error& rte) {
-            LOGERRORMOD(nuraft_mesg, "Caught exception during add_srv(): {}", rte.what());
-        }
-    }
-    return nuraft::SERVER_NOT_FOUND;
+    if (server) { CONTINUE_RESP(server->add_srv(cfg)) }
+    return folly::makeUnexpected(nuraft::SERVER_NOT_FOUND);
 }
 
-AsyncResult< nuraft::cmd_result_code > msg_service::rm_srv(group_name_t const& group_name, int const member_id) {
+NullAsyncResult msg_service::rm_srv(group_id_t const& group_name, int const member_id) {
     std::shared_ptr< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
     }
-    if (server) {
-        try {
-            auto res_p = server->rem_srv(member_id);
-            if (auto r = res_p->get_result_code(); r != nuraft::RESULT_NOT_EXIST_YET) return r;
-            auto [p, sf] = folly::makePromiseContract< Result< nuraft::cmd_result_code > >();
-            res_p->when_ready(
-                [p = std::make_shared< decltype(p) >(std::move(p))](
-                    nuraft::cmd_result< nuraft::ptr< nuraft::buffer >, nuraft::ptr< std::exception > >& result,
-                    auto& e) mutable { p->setValue(result.get_result_code()); });
-            return std::move(sf);
-        } catch (std::runtime_error& rte) {
-            LOGERRORMOD(nuraft_mesg, "Caught exception during rm_srv(): {}", rte.what());
-        }
-    }
-    return nuraft::SERVER_NOT_FOUND;
+    if (server) { CONTINUE_RESP(server->rem_srv(member_id)) }
+    return folly::makeUnexpected(nuraft::SERVER_NOT_FOUND);
 }
 
-bool msg_service::request_leadership(group_name_t const& group_name) {
+bool msg_service::request_leadership(group_id_t const& group_name) {
     std::shared_ptr< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
@@ -143,7 +125,7 @@ bool msg_service::request_leadership(group_name_t const& group_name) {
     return false;
 }
 
-void msg_service::get_srv_config_all(group_name_t const& group_name,
+void msg_service::get_srv_config_all(group_id_t const& group_name,
                                      std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) {
 
     std::shared_ptr< grpc_server > server;
@@ -161,28 +143,15 @@ void msg_service::get_srv_config_all(group_name_t const& group_name,
     }
 }
 
-AsyncResult< nuraft::cmd_result_code >
-msg_service::append_entries(group_name_t const& group_name, std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
+NullAsyncResult msg_service::append_entries(group_id_t const& group_name,
+                                            std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
     std::shared_ptr< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
         if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
     }
-    if (server) {
-        try {
-            auto res_p = server->append_entries(logs);
-            if (auto r = res_p->get_result_code(); r != nuraft::RESULT_NOT_EXIST_YET) return r;
-            auto [p, sf] = folly::makePromiseContract< Result< nuraft::cmd_result_code > >();
-            auto sp = std::make_shared< decltype(p) >(std::move(p));
-            res_p->when_ready(
-                [sp](nuraft::cmd_result< nuraft::ptr< nuraft::buffer >, nuraft::ptr< std::exception > >& result,
-                     auto& e) mutable { sp->setValue(result.get_result_code()); });
-            return std::move(sf);
-        } catch (std::runtime_error& rte) {
-            LOGERRORMOD(nuraft_mesg, "Caught exception during step(): {}", rte.what());
-        }
-    }
-    return nuraft::SERVER_NOT_FOUND;
+    if (server) { CONTINUE_RESP(server->append_entries(logs)) }
+    return folly::makeUnexpected(nuraft::SERVER_NOT_FOUND);
 }
 
 void msg_service::setDefaultGroupType(std::string const& _type) {
@@ -196,9 +165,21 @@ bool msg_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg,
     auto const& group_name = request.group_name();
     auto const& intended_addr = request.intended_addr();
 
+    auto gid = boost::uuids::uuid();
+    auto sid = boost::uuids::uuid();
+    try {
+        gid = boost::uuids::string_generator()(group_name);
+        sid = boost::uuids::string_generator()(intended_addr);
+    } catch (std::runtime_error const& e) {
+        LOGWARNMOD(nuraft_mesg, "Recieved mesg for {}:{} which is not a valid UUID!", group_name, intended_addr);
+        rpc_data->set_status(
+            ::grpc::Status(::grpc::INVALID_ARGUMENT, fmt::format(FMT_STRING("Bad GroupID {}"), group_name)));
+        return true;
+    }
+
     // Verify this is for the service it was intended for
     auto const& base = request.msg().base();
-    if (intended_addr != _service_address) {
+    if (sid != _service_address) {
         LOGWARNMOD(nuraft_mesg, "Recieved mesg for {} intended for {}, we are {}",
                    nuraft::msg_type_to_string(nuraft::msg_type(base.type())), intended_addr, _service_address);
         rpc_data->set_status(::grpc::Status(
@@ -213,13 +194,13 @@ bool msg_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg,
     // JoinClusterRequests are expected to be received upon Cluster creation by the current leader. We need
     // to initialize a RaftServer context based on the corresponding type prior to servicing this request. This
     // should emplace a corresponding server in the _raft_servers member.
-    if (nuraft::join_cluster_request == base.type()) { joinRaftGroup(base.dest(), group_name, request.group_type()); }
+    if (nuraft::join_cluster_request == base.type()) { joinRaftGroup(base.dest(), gid, request.group_type()); }
 
     // Find the RaftServer context based on the name of the group.
     std::shared_ptr< grpc_server > server;
     {
         std::shared_lock< lock_type > rl(_raft_servers_lock);
-        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) {
+        if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
             if (it->second.m_metrics) COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
             server = it->second.m_server;
         }
@@ -265,10 +246,10 @@ public:
 
 class msg_group_listner : public nuraft::rpc_listener {
     std::shared_ptr< msg_service > _svc;
-    group_name_t _group;
+    group_id_t _group;
 
 public:
-    msg_group_listner(std::shared_ptr< msg_service > svc, group_name_t const& group) : _svc(svc), _group(group) {}
+    msg_group_listner(std::shared_ptr< msg_service > svc, group_id_t const& group) : _svc(svc), _group(group) {}
     ~msg_group_listner() { _svc->shutdown_for(_group); }
 
     void listen(nuraft::ptr< nuraft::msg_handler >& handler) override {
@@ -278,7 +259,7 @@ public:
     void shutdown() override { LOGINFOMOD(nuraft_mesg, "Shutdown {}", _group); }
 };
 
-void msg_service::shutdown_for(group_name_t const& group_name) {
+void msg_service::shutdown_for(group_id_t const& group_name) {
     {
         std::unique_lock< lock_type > lck(_raft_servers_lock);
         LOGDEBUGMOD(nuraft_mesg, "Shutting down RAFT group: {}", group_name);
@@ -292,8 +273,8 @@ void msg_service::shutdown_for(group_name_t const& group_name) {
     _raft_servers_sync.notify_all();
 }
 
-std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name_t const& group_name,
-                                                group_type_t const& group_type) {
+nuraft::cmd_result_code msg_service::joinRaftGroup(int32_t const srv_id, group_id_t const& group_name,
+                                                   group_type_t const& group_type) {
     LOGINFOMOD(nuraft_mesg, "Joining RAFT group: {}, type: {}", group_name, group_type);
 
     nuraft::context* ctx{nullptr};
@@ -307,8 +288,7 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
         std::tie(it, happened) = _raft_servers.emplace(std::make_pair(group_name, group_name));
         if (_raft_servers.end() != it && happened) {
             if (auto err = _get_server_ctx(srv_id, group_name, g_type, ctx, it->second.m_metrics); err) {
-                LOGERRORMOD(nuraft_mesg, "Error during RAFT server creation on group {}: {}", group_name,
-                            err.message());
+                LOGERRORMOD(nuraft_mesg, "Error during RAFT server creation on group {}: {}", group_name, err);
                 return err;
             }
             DEBUG_ASSERT(!ctx->rpc_listener_, "RPC listner should not be set!");
@@ -323,10 +303,10 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
             }
         }
     }
-    return std::error_condition();
+    return nuraft::cmd_result_code::OK;
 }
 
-void msg_service::partRaftGroup(group_name_t const& group_name) {
+void msg_service::partRaftGroup(group_id_t const& group_name) {
     std::shared_ptr< grpc_server > server;
 
     {

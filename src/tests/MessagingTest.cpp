@@ -18,7 +18,6 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/random_generator.hpp>
-#include <boost/uuid/string_generator.hpp>
 #include <sisl/grpc/rpc_client.hpp>
 #include <sisl/logging/logging.h>
 #include <sisl/options/options.h>
@@ -31,7 +30,8 @@
 
 #include "libnuraft/cluster_config.hxx"
 #include "libnuraft/state_machine.hxx"
-#include "mesg_factory.hpp"
+#include "nuraft_mesg/common.hpp"
+#include "nuraft_mesg/mesg_factory.hpp"
 
 #include "test_state_manager.h"
 #include <sisl/fds/buffer.hpp>
@@ -51,27 +51,26 @@ class TestApplication : public MessagingApplication, public std::enable_shared_f
 public:
     std::string name_;
     uint32_t port_;
-    std::string id_;
+    boost::uuids::uuid id_;
     std::shared_ptr< Manager > instance_;
 
     TestApplication(std::string const& name, uint32_t port) : name_(name), port_(port) {
-        id_ = to_string(boost::uuids::random_generator()());
+        id_ = boost::uuids::random_generator()();
     }
     ~TestApplication() override = default;
 
-    void set_id(std::string const& id) { id_ = id; }
-    std::string lookup_peer(std::string const& peer) override {
+    void set_id(boost::uuids::uuid const& id) { id_ = id; }
+
+    std::string lookup_peer(peer_id_t const& peer) override {
         auto lg = std::scoped_lock(lookup_lock_);
         return (lookup_map_.count(peer) > 0) ? lookup_map_[peer] : std::string();
     }
 
-    std::shared_ptr< mesg_state_mgr > create_state_mgr(int32_t const srv_id, std::string const& group_id) override {
-        auto [it, happened] = state_mgr_map.emplace(
-            std::make_pair(group_id + "_" + name_, std::make_shared< test_state_mgr >(srv_id, id_, group_id)));
-        return std::static_pointer_cast< mesg_state_mgr >(it->second);
+    std::shared_ptr< mesg_state_mgr > create_state_mgr(int32_t const srv_id, group_id_t const& group_id) override {
+        return std::static_pointer_cast< mesg_state_mgr >(std::make_shared< test_state_mgr >(srv_id, id_, group_id));
     }
 
-    void map_peers(std::map< std::string, std::string > const& peers) {
+    void map_peers(std::map< nuraft_mesg::peer_id_t, std::string > const& peers) {
         auto lg = std::scoped_lock(lookup_lock_);
         lookup_map_ = peers;
     }
@@ -96,9 +95,7 @@ public:
 
 private:
     std::mutex lookup_lock_;
-    std::map< std::string, std::string > lookup_map_;
-
-    std::map< std::string, std::shared_ptr< test_state_mgr > > state_mgr_map;
+    std::map< nuraft_mesg::peer_id_t, std::string > lookup_map_;
 };
 
 extern nuraft::ptr< nuraft::cluster_config > fromClusterConfig(nlohmann::json const& cluster_config);
@@ -125,10 +122,9 @@ protected:
     std::shared_ptr< TestApplication > app_3_;
 
     std::vector< uint32_t > ports;
-    std::map< std::string, std::string > lookup_map;
+    std::map< nuraft_mesg::peer_id_t, std::string > lookup_map;
 
-    // Store state mgrs for each instance and group. key is "group_id" + "_sm{instance_number}".
-    std::map< std::string, std::pair< std::shared_ptr< test_state_mgr >, Manager* > > state_mgr_map;
+    group_id_t group_id_;
 
     void get_random_ports(const uint16_t n) {
         auto cur_size = ports.size();
@@ -160,14 +156,16 @@ protected:
         app_2_->start(data_svc_enabled);
         app_3_->start(data_svc_enabled);
 
-        EXPECT_TRUE(!!app_1_->instance_->create_group("test_group", "test_type").get());
+        group_id_ = boost::uuids::random_generator()();
+
+        EXPECT_TRUE(!!app_1_->instance_->create_group(group_id_, "test_type").get());
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
-        auto add2 = app_1_->instance_->add_member("test_group", app_2_->id_);
+        auto add2 = app_1_->instance_->add_member(group_id_, app_2_->id_);
         std::this_thread::sleep_for(std::chrono::seconds(1));
         EXPECT_TRUE(std::move(add2).get());
 
-        auto add3 = app_1_->instance_->add_member("test_group", app_3_->id_);
+        auto add3 = app_1_->instance_->add_member(group_id_, app_3_->id_);
         std::this_thread::sleep_for(std::chrono::seconds(1));
         EXPECT_TRUE(std::move(add3).get());
     }
@@ -186,11 +184,11 @@ TEST_F(MessagingFixture, ClientRequest) {
     auto buf = nuraft_mesg::create_message(nlohmann::json{
         {"op_type", 2},
     });
-    EXPECT_TRUE(!!app_1_->instance_->client_request("test_group", buf).get());
+    EXPECT_TRUE(!!app_1_->instance_->append_entries(group_id_, {buf}).get());
 
-    app_3_->instance_->leave_group("test_group");
-    app_2_->instance_->leave_group("test_group");
-    app_1_->instance_->leave_group("test_group");
+    app_3_->instance_->leave_group(group_id_);
+    app_2_->instance_->leave_group(group_id_);
+    app_1_->instance_->leave_group(group_id_);
 }
 
 // Basic resiliency test (append_entries)
@@ -203,7 +201,7 @@ TEST_F(MessagingFixture, ClientReset) {
     auto buf = nuraft_mesg::create_message(nlohmann::json{
         {"op_type", 2},
     });
-    EXPECT_TRUE(!!app_1_->instance_->client_request("test_group", buf).get());
+    EXPECT_TRUE(!!app_1_->instance_->append_entries(group_id_, {buf}).get());
 
     app_3_ = std::make_shared< TestApplication >("sm3", ports[2]);
     app_3_->set_id(our_id);
@@ -211,47 +209,47 @@ TEST_F(MessagingFixture, ClientReset) {
     app_3_->start();
 
     std::this_thread::sleep_for(std::chrono::seconds(5));
-    auto err = app_3_->instance_->client_request("test_group", buf).get();
-    if (!!err) { LOGERROR("Failed to commit: {}", err.error().message()); }
+    auto err = app_3_->instance_->append_entries(group_id_, {buf}).get();
+    if (!!err) { LOGERROR("Failed to commit: {}", err.error()); }
     EXPECT_FALSE(err);
 
-    app_3_->instance_->leave_group("test_group");
-    app_2_->instance_->leave_group("test_group");
-    app_1_->instance_->leave_group("test_group");
+    app_3_->instance_->leave_group(group_id_);
+    app_2_->instance_->leave_group(group_id_);
+    app_1_->instance_->leave_group(group_id_);
 }
 
 // Test sending a message for a group the messaging service is not aware of.
 TEST_F(MessagingFixture, UnknownGroup) {
-    auto add = app_1_->instance_->add_member("unknown_group", to_string(boost::uuids::random_generator()()));
+    auto add = app_1_->instance_->add_member(boost::uuids::random_generator()(), boost::uuids::random_generator()());
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_FALSE(std::move(add).get());
 
-    app_1_->instance_->leave_group("unknown_group");
+    app_1_->instance_->leave_group(boost::uuids::random_generator()());
 
     auto buf = nuraft_mesg::create_message(nlohmann::json{
         {"op_type", 2},
     });
-    EXPECT_FALSE(app_1_->instance_->client_request("unknown_group", buf).get());
+    EXPECT_FALSE(app_1_->instance_->append_entries(boost::uuids::random_generator()(), {buf}).get());
 }
 
 TEST_F(MessagingFixture, RemoveMember) {
-    EXPECT_TRUE(app_1_->instance_->rem_member("test_group", app_3_->id_).get());
+    EXPECT_TRUE(app_1_->instance_->rem_member(group_id_, app_3_->id_).get());
 
     auto buf = nuraft_mesg::create_message(nlohmann::json{
         {"op_type", 2},
     });
-    EXPECT_TRUE(!!app_1_->instance_->client_request("test_group", buf).get());
+    EXPECT_TRUE(!!app_1_->instance_->append_entries(group_id_, {buf}).get());
 }
 
 TEST_F(MessagingFixture, SyncAddMember) {
     std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
-    app_1_->instance_->get_srv_config_all("test_group", srv_list);
+    app_1_->instance_->get_srv_config_all(group_id_, srv_list);
     EXPECT_EQ(srv_list.size(), 3u);
     srv_list.clear();
-    app_2_->instance_->get_srv_config_all("test_group", srv_list);
+    app_2_->instance_->get_srv_config_all(group_id_, srv_list);
     EXPECT_EQ(srv_list.size(), 3u);
     srv_list.clear();
-    app_3_->instance_->get_srv_config_all("test_group", srv_list);
+    app_3_->instance_->get_srv_config_all(group_id_, srv_list);
     EXPECT_EQ(srv_list.size(), 3u);
 
     get_random_ports(1u);
@@ -262,12 +260,12 @@ TEST_F(MessagingFixture, SyncAddMember) {
     app_3_->map_peers(lookup_map);
     app_4->map_peers(lookup_map);
     app_4->start();
-    auto add = app_1_->instance_->add_member("test_group", app_4->id_);
+    auto add = app_1_->instance_->add_member(group_id_, app_4->id_);
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(std::move(add).get());
 
     srv_list.clear();
-    app_1_->instance_->get_srv_config_all("test_group", srv_list);
+    app_1_->instance_->get_srv_config_all(group_id_, srv_list);
     EXPECT_EQ(srv_list.size(), 4u);
 }
 

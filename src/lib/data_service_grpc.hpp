@@ -3,7 +3,8 @@
 #include <unordered_map>
 #include <sisl/grpc/rpc_server.hpp>
 #include <folly/SharedMutex.h>
-#include "data_service.hpp"
+
+#include "nuraft_mesg/nuraft_mesg.hpp"
 
 namespace sisl {
 struct io_blob;
@@ -12,7 +13,7 @@ namespace nuraft_mesg {
 
 using data_lock_type = folly::SharedMutex;
 
-class data_service_grpc : public data_service {
+class data_service_grpc {
     // key: group_id, value: map
     // value_key: request name, value_value: handler
     // Different groups can have same request name.
@@ -28,10 +29,10 @@ public:
     data_service_grpc(data_service_grpc const&) = delete;
     data_service_grpc& operator=(data_service_grpc const&) = delete;
 
-    void associate() override;
-    void bind() override;
-    bool bind(std::string const& request_name, std::string const& group_id,
-              data_service_request_handler_t const& request_cb) override;
+    void associate();
+    void bind();
+    bool bind(std::string const& request_name, group_id_t const& group_id,
+              data_service_request_handler_t const& request_cb);
 
     void set_grpc_server(sisl::GrpcServer* server);
 };

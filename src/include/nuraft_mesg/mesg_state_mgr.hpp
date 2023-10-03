@@ -2,13 +2,9 @@
 
 #include <memory>
 
-#include <folly/Expected.h>
-#include <folly/small_vector.h>
-#include <folly/Unit.h>
-#include <folly/futures/Future.h>
-
 #include <libnuraft/nuraft.hxx>
-#include <sisl/fds/buffer.hpp>
+
+#include "common.hpp"
 
 namespace boost {
 template < class T >
@@ -23,13 +19,6 @@ namespace nuraft_mesg {
 
 class mesg_factory;
 class grpc_server;
-
-using io_blob_list_t = folly::small_vector< sisl::io_blob, 4 >;
-
-template < typename T >
-using Result = folly::Expected< T, std::error_condition >;
-template < typename T >
-using AsyncResult = folly::SemiFuture< Result< T > >;
 
 class repl_service_ctx {
 public:

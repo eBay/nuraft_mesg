@@ -13,17 +13,16 @@
  *
  *********************************************************************************/
 #include "grpc_client.hpp"
+#include <libnuraft/async.hxx>
 #include <string>
 
 #include <folly/futures/Future.h>
 
-#include "mesg_factory.hpp"
+#include "nuraft_mesg/mesg_factory.hpp"
 #include "service.hpp"
 #include "proto/messaging_service.grpc.pb.h"
 #include "utils.hpp"
 #include "nuraft_mesg_config.hpp"
-
-SISL_LOGGING_DECL(nuraft_mesg)
 
 namespace nuraft_mesg {
 
@@ -78,7 +77,7 @@ public:
             [c = copyable_promise](grpc::ByteBuffer& resp, ::grpc::Status& status) mutable {
                 if (!status.ok()) {
                     LOGERRORMOD(nuraft_mesg, "Failed to send data_service_request, error: {}", status.error_message());
-                    c->setValue(folly::makeUnexpected(std::make_error_condition(std::errc::connection_aborted)));
+                    c->setValue(folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED));
                 } else {
                     sisl::io_blob svr_buf;
                     deserialize_from_byte_buffer(resp, svr_buf);
@@ -96,21 +95,20 @@ protected:
 
 class group_client : public grpc_base_client {
     std::shared_ptr< messaging_client > _client;
-    group_name_t const _group_name;
+    group_id_t const _group_name;
     group_type_t const _group_type;
     std::shared_ptr< group_metrics > _metrics;
     std::string const _client_addr;
 
 public:
-    group_client(std::shared_ptr< messaging_client > client, std::string const& client_addr,
-                 group_name_t const& grp_name, group_type_t const& grp_type,
-                 std::shared_ptr< sisl::MetricsGroupWrapper > metrics) :
+    group_client(std::shared_ptr< messaging_client > client, peer_id_t const& client_addr, group_id_t const& grp_name,
+                 group_type_t const& grp_type, std::shared_ptr< sisl::MetricsGroupWrapper > metrics) :
             grpc_base_client(),
             _client(client),
             _group_name(grp_name),
             _group_type(grp_type),
             _metrics(std::static_pointer_cast< group_metrics >(metrics)),
-            _client_addr(client_addr) {}
+            _client_addr(to_string(client_addr)) {}
 
     ~group_client() override = default;
 
@@ -125,7 +123,7 @@ public:
                     message.base().dest(), _group_name);
         if (_metrics) { COUNTER_INCREMENT(*_metrics, group_sends, 1); }
         group_msg.set_intended_addr(_client_addr);
-        group_msg.set_group_name(_group_name);
+        group_msg.set_group_name(to_string(_group_name));
         group_msg.set_group_type(_group_type);
         group_msg.mutable_msg()->CopyFrom(message);
         _client->send(group_msg, complete);
@@ -136,17 +134,17 @@ public:
     }
 };
 
-std::error_condition mesg_factory::create_client(const std::string& client,
+std::error_condition mesg_factory::create_client(peer_id_t const& client,
                                                  nuraft::ptr< nuraft::rpc_client >& raft_client) {
     // Re-direct this call to a global factory so we can re-use clients to the same endpoints
     LOGDEBUGMOD(nuraft_mesg, "Creating client to {}", client);
-    auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_client(client));
+    auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_client(to_string(client)));
     if (!m_client) { return std::make_error_condition(std::errc::connection_aborted); }
     raft_client = std::make_shared< group_client >(m_client, client, _group_name, _group_type, _metrics);
     return (!raft_client) ? std::make_error_condition(std::errc::invalid_argument) : std::error_condition();
 }
 
-std::error_condition mesg_factory::reinit_client(const std::string& client,
+std::error_condition mesg_factory::reinit_client(peer_id_t const& client,
                                                  std::shared_ptr< nuraft::rpc_client >& raft_client) {
     LOGDEBUGMOD(nuraft_mesg, "Re-init client to {}", client);
     auto g_client = std::dynamic_pointer_cast< group_client >(raft_client);
@@ -167,13 +165,13 @@ AsyncResult< sisl::io_blob > mesg_factory::data_service_request(std::string cons
     return folly::collectAnyWithoutException(calls).deferValue([](auto&& p) { return p.second; });
 }
 
-group_factory::group_factory(int const cli_thread_count, std::string const& name,
+group_factory::group_factory(int const cli_thread_count, group_id_t const& name,
                              std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert) :
-        grpc_factory(cli_thread_count, name), m_token_client(token_client) {
+        grpc_factory(cli_thread_count, to_string(name)), m_token_client(token_client) {
     m_ssl_cert = ssl_cert;
 }
 
-std::error_condition group_factory::create_client(const std::string& client,
+std::error_condition group_factory::create_client(peer_id_t const& client,
                                                   nuraft::ptr< nuraft::rpc_client >& raft_client) {
     LOGDEBUGMOD(nuraft_mesg, "Creating client to {}", client);
     auto endpoint = lookupEndpoint(client);
@@ -185,7 +183,7 @@ std::error_condition group_factory::create_client(const std::string& client,
     return (!raft_client) ? std::make_error_condition(std::errc::connection_aborted) : std::error_condition();
 }
 
-std::error_condition group_factory::reinit_client(const std::string& client,
+std::error_condition group_factory::reinit_client(peer_id_t const& client,
                                                   std::shared_ptr< nuraft::rpc_client >& raft_client) {
     LOGDEBUGMOD(nuraft_mesg, "Re-init client to {}", client);
     assert(raft_client);

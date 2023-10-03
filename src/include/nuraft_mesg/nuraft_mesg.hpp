@@ -23,9 +23,8 @@
 #include <libnuraft/nuraft.hxx>
 #include <sisl/logging/logging.h>
 
+#include "common.hpp"
 #include "mesg_state_mgr.hpp"
-
-SISL_LOGGING_DECL(nuraft)
 
 namespace grpc {
 class ByteBuffer;
@@ -40,9 +39,6 @@ using generic_unary_callback_t = std::function< void(grpc::ByteBuffer&, ::grpc::
 
 namespace nuraft_mesg {
 
-using group_name_t = std::string;
-using group_type_t = std::string;
-
 // called by the server after it receives the request
 using data_service_request_handler_t =
     std::function< void(sisl::io_blob const& incoming_buf, boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) >;
@@ -53,14 +49,14 @@ using NullAsyncResult = AsyncResult< folly::Unit >;
 class MessagingApplication {
 public:
     virtual ~MessagingApplication() = default;
-    virtual std::string lookup_peer(std::string const&) = 0;
-    virtual std::shared_ptr< mesg_state_mgr > create_state_mgr(int32_t const srv_id, group_name_t const& group_id) = 0;
+    virtual std::string lookup_peer(peer_id_t const&) = 0;
+    virtual std::shared_ptr< mesg_state_mgr > create_state_mgr(int32_t const srv_id, group_id_t const& group_id) = 0;
 };
 
 class Manager {
 public:
     struct Params {
-        std::string server_uuid_;
+        boost::uuids::uuid server_uuid_;
         uint32_t mesg_port_;
         group_type_t default_group_type_;
         std::string ssl_key_;
@@ -74,32 +70,33 @@ public:
     // Register a new group type
     virtual void register_mgr_type(group_type_t const& group_type, group_params const&) = 0;
 
-    virtual std::shared_ptr< mesg_state_mgr > lookup_state_manager(group_name_t const& group_id) const = 0;
-    virtual NullAsyncResult create_group(group_name_t const& group_id, group_type_t const& group_type) = 0;
-    virtual NullResult join_group(group_name_t const& group_id, group_type_t const& group_type,
+    virtual std::shared_ptr< mesg_state_mgr > lookup_state_manager(group_id_t const& group_id) const = 0;
+    virtual NullAsyncResult create_group(group_id_t const& group_id, group_type_t const& group_type) = 0;
+    virtual NullResult join_group(group_id_t const& group_id, group_type_t const& group_type,
                                   std::shared_ptr< mesg_state_mgr >) = 0;
 
     // Send a client request to the cluster
-    virtual NullAsyncResult add_member(group_name_t const& group_id, std::string const& server_id) = 0;
-    virtual NullAsyncResult rem_member(group_name_t const& group_id, std::string const& server_id) = 0;
-    virtual NullAsyncResult become_leader(group_name_t const& group_id) = 0;
-    virtual NullAsyncResult client_request(group_name_t const& group_id, std::shared_ptr< nuraft::buffer >&) = 0;
+    virtual NullAsyncResult add_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
+    virtual NullAsyncResult rem_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
+    virtual NullAsyncResult become_leader(group_id_t const& group_id) = 0;
+    virtual NullAsyncResult append_entries(group_id_t const& group_id,
+                                           std::vector< std::shared_ptr< nuraft::buffer > > const&) = 0;
 
     // Misc Mgmt
-    virtual void get_srv_config_all(group_name_t const& group_id,
+    virtual void get_srv_config_all(group_id_t const& group_id,
                                     std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) = 0;
-    virtual void leave_group(group_name_t const& group_id) = 0;
-    virtual void append_peers(group_name_t const& group_id, std::list< std::string >&) const = 0;
-    virtual uint32_t logstore_id(group_name_t const& group_id) const = 0;
+    virtual void leave_group(group_id_t const& group_id) = 0;
+    virtual void append_peers(group_id_t const& group_id, std::list< peer_id_t >&) const = 0;
+    virtual uint32_t logstore_id(group_id_t const& group_id) const = 0;
     virtual int32_t server_id() const = 0;
     virtual void restart_server() = 0;
 
     // data channel APIs
-    virtual bool bind_data_service_request(std::string const& request_name, group_name_t const& group_id,
+    virtual bool bind_data_service_request(std::string const& request_name, group_id_t const& group_id,
                                            data_service_request_handler_t const&) = 0;
 };
 
-extern int32_t to_server_id(std::string const& server_addr);
+extern int32_t to_server_id(peer_id_t const& server_addr);
 
 extern std::shared_ptr< Manager > init_messaging(Manager::Params const&, std::weak_ptr< MessagingApplication >,
                                                  bool with_data_svc = false);

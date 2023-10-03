@@ -16,10 +16,11 @@
 // Brief:
 //   grpc_factory static functions that makes for easy client creation.
 //
+#include <boost/uuid/string_generator.hpp>
 #include <sisl/grpc/rpc_client.hpp>
 
 #include "grpc_client.hpp"
-#include "grpc_factory.hpp"
+#include "nuraft_mesg/grpc_factory.hpp"
 #include "proto/raft_types.pb.h"
 
 namespace nuraft_mesg {
@@ -131,13 +132,14 @@ class grpc_error_client : public grpc_base_client {
 
 nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string& client) {
     nuraft::ptr< nuraft::rpc_client > new_client;
+    auto client_uuid = boost::uuids::string_generator()(client);
 
     std::unique_lock< client_factory_lock_type > lk(_client_lock);
-    auto [it, happened] = _clients.emplace(client, nullptr);
+    auto [it, happened] = _clients.emplace(client_uuid, nullptr);
     if (_clients.end() != it) {
         if (!happened) {
             LOGDEBUGMOD(nuraft_mesg, "Re-creating client for {}", client);
-            if (auto err = reinit_client(client, it->second); err) {
+            if (auto err = reinit_client(client_uuid, it->second); err) {
                 LOGERROR("Failed to re-initialize client {}: {}", client, err.message());
                 new_client = std::make_shared< grpc_error_client >();
             } else {
@@ -145,7 +147,7 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string&
             }
         } else {
             LOGDEBUGMOD(nuraft_mesg, "Creating client for {}", client);
-            if (auto err = create_client(client, it->second); err) {
+            if (auto err = create_client(client_uuid, it->second); err) {
                 LOGERROR("Failed to create client for {}: {}", client, err.message());
                 new_client = std::make_shared< grpc_error_client >();
             } else {

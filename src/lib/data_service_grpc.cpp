@@ -1,8 +1,8 @@
+#include <boost/uuid/uuid_io.hpp>
 #include <sisl/grpc/generic_service.hpp>
+
 #include "data_service_grpc.hpp"
 #include "utils.hpp"
-
-SISL_LOGGING_DECL(nuraft_mesg)
 
 namespace nuraft_mesg {
 
@@ -23,7 +23,7 @@ void data_service_grpc::bind() {
     }
 }
 
-bool data_service_grpc::bind(std::string const& request_name, std::string const& group_id,
+bool data_service_grpc::bind(std::string const& request_name, group_id_t const& group_id,
                              data_service_request_handler_t const& request_cb) {
     RELEASE_ASSERT(_grpc_server, "NULL _grpc_server!");
     if (!request_cb) {

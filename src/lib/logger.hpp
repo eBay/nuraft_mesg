@@ -17,15 +17,15 @@
 #include <libnuraft/logger.hxx>
 #include <sisl/logging/logging.h>
 
-SISL_LOGGING_DECL(nuraft)
-SISL_LOGGING_DECL(nuraft_mesg)
+#include "nuraft_mesg/common.hpp"
 
 class nuraft_mesg_logger : public ::nuraft::logger {
-    std::string const _group_id;
+    nuraft_mesg::group_id_t const _group_id;
     std::shared_ptr< sisl::logging::logger_t > _custom_logger;
 
 public:
-    explicit nuraft_mesg_logger(std::string const& group_id, std::shared_ptr< sisl::logging::logger_t > custom_logger) :
+    explicit nuraft_mesg_logger(nuraft_mesg::group_id_t const& group_id,
+                                std::shared_ptr< sisl::logging::logger_t > custom_logger) :
             ::nuraft::logger(), _group_id(group_id), _custom_logger(custom_logger) {}
 
     void set_level(int l) override {

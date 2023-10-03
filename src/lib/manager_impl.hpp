@@ -16,6 +16,7 @@
 
 #include <condition_variable>
 #include <future>
+#include <libnuraft/async.hxx>
 #include <list>
 #include <map>
 #include <mutex>
@@ -24,7 +25,7 @@
 
 #include <sisl/logging/logging.h>
 
-#include "mesg_factory.hpp"
+#include "nuraft_mesg/mesg_factory.hpp"
 
 namespace sisl {
 class GrpcServer;
@@ -39,7 +40,7 @@ class ManagerImpl : public Manager {
     Manager::Params start_params_;
     int32_t _srv_id;
 
-    std::map< std::string, Manager::group_params > _state_mgr_types;
+    std::map< group_type_t, Manager::group_params > _state_mgr_types;
 
     std::weak_ptr< MessagingApplication > application_;
     std::shared_ptr< group_factory > _g_factory;
@@ -47,19 +48,19 @@ class ManagerImpl : public Manager {
     std::unique_ptr< ::sisl::GrpcServer > _grpc_server;
 
     std::mutex mutable _manager_lock;
-    std::map< std::string, std::shared_ptr< mesg_state_mgr > > _state_managers;
+    std::map< group_id_t, std::shared_ptr< mesg_state_mgr > > _state_managers;
 
     std::condition_variable _config_change;
-    std::map< std::string, bool > _is_leader;
+    std::map< group_id_t, bool > _is_leader;
 
     nuraft::ptr< nuraft::delayed_task_scheduler > _scheduler;
     std::shared_ptr< sisl::logging::logger_t > _custom_logger;
 
-    std::error_condition group_init(int32_t const srv_id, std::string const& group_id, std::string const& group_type,
-                                    nuraft::context*& ctx, std::shared_ptr< group_metrics > metrics);
-    nuraft::cb_func::ReturnCode callback_handler(std::string const& group_id, nuraft::cb_func::Type type,
+    nuraft::cmd_result_code group_init(int32_t const srv_id, group_id_t const& group_id, group_type_t const& group_type,
+                                       nuraft::context*& ctx, std::shared_ptr< group_metrics > metrics);
+    nuraft::cb_func::ReturnCode callback_handler(group_id_t const& group_id, nuraft::cb_func::Type type,
                                                  nuraft::cb_func::Param* param);
-    void exit_group(std::string const& group_id);
+    void exit_group(group_id_t const& group_id);
 
 public:
     ManagerImpl(Manager::Params const&, std::weak_ptr< MessagingApplication >, bool and_data_svc = false);
@@ -67,29 +68,30 @@ public:
 
     int32_t server_id() const override { return _srv_id; }
 
-    void register_mgr_type(std::string const& group_type, group_params const&) override;
+    void register_mgr_type(group_type_t const& group_type, group_params const&) override;
 
-    std::shared_ptr< mesg_state_mgr > lookup_state_manager(std::string const& group_id) const override;
+    std::shared_ptr< mesg_state_mgr > lookup_state_manager(group_id_t const& group_id) const override;
 
-    NullAsyncResult create_group(std::string const& group_id, std::string const& group_type) override;
-    NullResult join_group(std::string const& group_id, std::string const& group_type,
+    NullAsyncResult create_group(group_id_t const& group_id, group_type_t const& group_type) override;
+    NullResult join_group(group_id_t const& group_id, group_type_t const& group_type,
                           std::shared_ptr< mesg_state_mgr > smgr) override;
 
-    virtual NullAsyncResult add_member(std::string const& group_id, std::string const& server_id) override;
-    virtual NullAsyncResult rem_member(std::string const& group_id, std::string const& server_id) override;
-    virtual NullAsyncResult become_leader(std::string const& group_id) override;
-    virtual NullAsyncResult client_request(std::string const& group_id, std::shared_ptr< nuraft::buffer >&) override;
+    virtual NullAsyncResult add_member(group_id_t const& group_id, peer_id_t const& server_id) override;
+    virtual NullAsyncResult rem_member(group_id_t const& group_id, peer_id_t const& server_id) override;
+    virtual NullAsyncResult become_leader(group_id_t const& group_id) override;
+    virtual NullAsyncResult append_entries(group_id_t const& group_id,
+                                           std::vector< std::shared_ptr< nuraft::buffer > > const&) override;
 
-    void leave_group(std::string const& group_id) override;
-    uint32_t logstore_id(std::string const& group_id) const override;
-    void append_peers(std::string const& group_id, std::list< std::string >&) const override;
+    void leave_group(group_id_t const& group_id) override;
+    uint32_t logstore_id(group_id_t const& group_id) const override;
+    void append_peers(group_id_t const& group_id, std::list< peer_id_t >&) const override;
     void restart_server() override;
 
     // data service APIs
-    bool bind_data_service_request(std::string const& request_name, std::string const& group_id,
+    bool bind_data_service_request(std::string const& request_name, group_id_t const& group_id,
                                    data_service_request_handler_t const& request_handler) override;
 
-    void get_srv_config_all(std::string const& group_name,
+    void get_srv_config_all(group_id_t const& group_name,
                             std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) override;
 };
 

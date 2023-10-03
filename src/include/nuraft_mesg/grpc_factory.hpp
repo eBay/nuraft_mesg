@@ -24,6 +24,8 @@
 #include <folly/SharedMutex.h>
 #include <libnuraft/nuraft.hxx>
 
+#include "common.hpp"
+
 namespace nuraft_mesg {
 
 using client_factory_lock_type = folly::SharedMutex;
@@ -33,7 +35,7 @@ class grpc_factory : public nuraft::rpc_client_factory, public std::enable_share
 
 protected:
     client_factory_lock_type _client_lock;
-    std::map< std::string, std::shared_ptr< nuraft::rpc_client > > _clients;
+    std::map< peer_id_t, std::shared_ptr< nuraft::rpc_client > > _clients;
 
 public:
     grpc_factory(int const cli_thread_count, std::string const& name);
@@ -43,9 +45,9 @@ public:
 
     nuraft::ptr< nuraft::rpc_client > create_client(const std::string& client) override;
 
-    virtual std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
+    virtual std::error_condition create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 
-    virtual std::error_condition reinit_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
+    virtual std::error_condition reinit_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 
     // Construct and send an AddServer message to the cluster
     std::future< nuraft::cmd_result_code > add_server(uint32_t const srv_id, std::string const& srv_addr,
