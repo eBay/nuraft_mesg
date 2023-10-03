@@ -230,7 +230,7 @@ bool msg_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg,
     } else {
         LOGDEBUGMOD(nuraft_mesg, "Missing RAFT group: {}", group_name);
     }
-    rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND, "Missing RAFT group"));
+    rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_name)));
     return true;
 }
 

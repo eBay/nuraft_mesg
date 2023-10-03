@@ -1,6 +1,7 @@
 #include <cassert>
 #include <csignal>
 
+#include <boost/uuid/string_generator.hpp>
 #include <nuraft_mesg/nuraft_mesg.hpp>
 #include <sisl/grpc/rpc_client.hpp>
 #include <sisl/grpc/rpc_server.hpp>
@@ -12,7 +13,7 @@
 #include "uuids.h"
 
 SISL_OPTION_GROUP(server, (server_id, "", "server_id", "Servers ID (0-9)", cxxopts::value< uint32_t >(), ""),
-                  (start_group, "", "create", "Group Name to create initialy", cxxopts::value< std::string >(), ""))
+                  (start_group, "", "create", "Group to create", cxxopts::value< uint32_t >(), ""))
 
 SISL_OPTIONS_ENABLE(logging, server, nuraft_mesg)
 SISL_LOGGING_INIT(nuraft, nuraft_mesg, grpc_server, flip)
@@ -47,30 +48,28 @@ void handle(int signal) {
 
 class Application : public nuraft_mesg::MessagingApplication, public std::enable_shared_from_this< Application > {
 public:
-    std::string name_;
     uint32_t port_;
-    std::string id_;
+    nuraft_mesg::peer_id_t id_;
     std::shared_ptr< nuraft_mesg::Manager > manager_;
 
-    Application(std::string const& name, uint32_t port) : name_(name), port_(port) { id_ = name; }
+    Application(nuraft_mesg::peer_id_t const& name, uint32_t port) : port_(port) { id_ = name; }
     ~Application() override = default;
 
-    std::string lookup_peer(std::string const& peer) override {
+    std::string lookup_peer(nuraft_mesg::peer_id_t const& peer) override {
         // Provide a method for the service layer to lookup an IPv4:port address
         // from a uuid; however the process wants to do that.
+        auto id_str = to_string(peer);
         for (auto i = 0u; i < 5; ++i) {
-            if (uuids[i] == peer) { return fmt::format(FMT_STRING("127.0.0.1:{}"), 9000 + i); }
+            if (uuids[i] == id_str) { return fmt::format(FMT_STRING("127.0.0.1:{}"), 9000 + i); }
         }
         RELEASE_ASSERT(false, "Missing Peer: {}", peer);
+        return std::string();
     }
 
     std::shared_ptr< nuraft_mesg::mesg_state_mgr > create_state_mgr(int32_t const srv_id,
-                                                                    std::string const& group_id) override {
-        // Each group has a type so we can attach different state_machines upon Join request.
-        // This callback should provide a mechanism to return a new state_manager.
-        auto [it, _] = state_mgr_map.emplace(
-            std::make_pair(group_id + "_" + name_, std::make_shared< simple_state_mgr >(srv_id, id_, group_id)));
-        return std::static_pointer_cast< nuraft_mesg::mesg_state_mgr >(it->second);
+                                                                    nuraft_mesg::group_id_t const& group_id) override {
+        return std::static_pointer_cast< nuraft_mesg::mesg_state_mgr >(
+            std::make_shared< simple_state_mgr >(srv_id, id_, group_id));
     }
 
     void start() {
@@ -89,9 +88,6 @@ public:
                             .with_snapshot_enabled(0);
         manager_->register_mgr_type(params.default_group_type_, r_params);
     }
-
-private:
-    std::map< std::string, std::shared_ptr< simple_state_mgr > > state_mgr_map;
 };
 
 int main(int argc, char** argv) {
@@ -101,7 +97,7 @@ int main(int argc, char** argv) {
     // defined in uuids.h from the CLI without having to iterate
     // and store multiple maps in the code and test script.
     auto const offset_id = SISL_OPTIONS["server_id"].as< uint32_t >();
-    auto const server_uuid = uuids[offset_id];
+    auto const server_uuid = boost::uuids::string_generator()(uuids[offset_id]);
 
     // Can start using LOG from this point onward.
     sisl::logging::SetLogger(fmt::format(FMT_STRING("server_{}"), offset_id));
@@ -123,7 +119,8 @@ int main(int argc, char** argv) {
 
     // Create a new group with ourself as the only member
     if (0 < SISL_OPTIONS.count("create")) {
-        app->manager_->create_group(SISL_OPTIONS["create"].as< std::string >(), "test_package");
+        auto gid = boost::uuids::string_generator()(guids[SISL_OPTIONS["create"].as< uint32_t >()]);
+        app->manager_->create_group(gid, "test_package");
     }
 
     // Just prevent main() from exiting, require a SIGNAL

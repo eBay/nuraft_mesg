@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cassert>
 
+#include <boost/uuid/string_generator.hpp>
 #include <sisl/logging/logging.h>
 #include <sisl/options/options.h>
 #include <sisl/grpc/rpc_client.hpp>
@@ -11,7 +12,7 @@
 
 SISL_OPTION_GROUP(client, (add, "a", "add", "Add a server to the cluster", cxxopts::value< uint32_t >(), "id"),
                   (clean, "", "clean", "Reset all persistence", cxxopts::value< bool >(), ""),
-                  (group, "g", "group", "Group ID", cxxopts::value< std::string >(), "id"),
+                  (group, "g", "group", "Group ID", cxxopts::value< uint32_t >(), ""),
                   (server, "", "server", "Server to send message to", cxxopts::value< uint32_t >()->default_value("0"),
                    "id"),
                   (echo, "m", "echo", "Send message to echo service", cxxopts::value< std::string >(), "message"),
@@ -26,21 +27,23 @@ using nuraft_mesg::mesg_factory;
 using namespace nuraft;
 
 struct example_factory : public nuraft_mesg::group_factory {
-    example_factory(int const threads, std::string const& name) :
+    example_factory(int const threads, nuraft_mesg::group_id_t const& name) :
             nuraft_mesg::group_factory::group_factory(threads, name, nullptr) {}
 
-    std::string lookupEndpoint(std::string const& client) override {
+    std::string lookupEndpoint(nuraft_mesg::peer_id_t const& client) override {
+        auto id_str = to_string(client);
         for (auto i = 0u; i < 5; ++i) {
-            if (uuids[i] == client) { return fmt::format(FMT_STRING("127.0.0.1:{}"), 9000 + i); }
+            if (uuids[i] == id_str) { return fmt::format(FMT_STRING("127.0.0.1:{}"), 9000 + i); }
         }
-        return client;
+        RELEASE_ASSERT(false, "Missing Peer: {}", client);
+        return std::string();
     }
 };
 
-int send_message(uint32_t leader_id, std::string const& group_id, std::string const& message) {
+int send_message(uint32_t leader_id, nuraft_mesg::group_id_t const& group_id, std::string const& message) {
     auto g_factory = std::make_shared< example_factory >(2, group_id);
     auto factory = std::make_shared< mesg_factory >(g_factory, group_id, "test_package");
-    auto const dest_cfg = srv_config(leader_id, uuids[stol(group_id) + leader_id]);
+    auto const dest_cfg = srv_config(leader_id, uuids[leader_id]);
 
     auto buf = buffer::alloc(message.length() + 1);
     buf->put(message.c_str());
@@ -58,10 +61,10 @@ int send_message(uint32_t leader_id, std::string const& group_id, std::string co
     return ret;
 }
 
-int add_new_server(uint32_t leader_id, uint32_t srv_id, std::string const& group_id) {
+int add_new_server(uint32_t leader_id, uint32_t srv_id, nuraft_mesg::group_id_t const& group_id) {
     auto g_factory = std::make_shared< example_factory >(2, group_id);
     auto factory = std::make_shared< mesg_factory >(g_factory, group_id, "test_package");
-    auto const dest_cfg = srv_config(leader_id, uuids[stol(group_id) + leader_id]);
+    auto const dest_cfg = srv_config(leader_id, uuids[leader_id]);
 
     nuraft::cmd_result_code rc = nuraft::SERVER_IS_JOINING;
     while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
@@ -75,10 +78,10 @@ int add_new_server(uint32_t leader_id, uint32_t srv_id, std::string const& group
     return ret;
 }
 
-int remove_server(uint32_t leader_id, std::string const& group_id, uint32_t srv_id) {
+int remove_server(uint32_t leader_id, nuraft_mesg::group_id_t const& group_id, uint32_t srv_id) {
     auto g_factory = std::make_shared< example_factory >(2, group_id);
     auto factory = std::make_shared< mesg_factory >(g_factory, group_id, "test_package");
-    auto const dest_cfg = srv_config(leader_id, uuids[stol(group_id) + leader_id]);
+    auto const dest_cfg = srv_config(leader_id, uuids[leader_id]);
 
     nuraft::cmd_result_code rc = nuraft::SERVER_IS_JOINING;
     while (nuraft::SERVER_IS_JOINING == rc || nuraft::CONFIG_CHANGING == rc) {
@@ -107,15 +110,22 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    auto const group_id = SISL_OPTIONS["group"].as< std::string >();
+    auto guid_str = guids[SISL_OPTIONS["group"].as< uint32_t >()];
+    auto gid = boost::uuids::uuid();
+    try {
+        gid = boost::uuids::string_generator()(guid_str);
+    } catch (std::runtime_error const&) {
+        LOGCRITICAL("Invalid uuid: {}", guid_str);
+        return -1;
+    }
     auto const server_id = SISL_OPTIONS["server"].as< uint32_t >();
 
     if (SISL_OPTIONS.count("echo")) {
-        return send_message(server_id, group_id, SISL_OPTIONS["echo"].as< std::string >());
+        return send_message(server_id, gid, SISL_OPTIONS["echo"].as< std::string >());
     } else if (SISL_OPTIONS.count("add")) {
-        return add_new_server(server_id, SISL_OPTIONS["add"].as< uint32_t >(), group_id);
+        return add_new_server(server_id, SISL_OPTIONS["add"].as< uint32_t >(), gid);
     } else if (SISL_OPTIONS.count("remove")) {
-        return remove_server(server_id, group_id, SISL_OPTIONS["remove"].as< uint32_t >());
+        return remove_server(server_id, gid, SISL_OPTIONS["remove"].as< uint32_t >());
     } else {
         std::cout << SISL_PARSER.help({}) << std::endl;
     }

@@ -90,7 +90,7 @@ class NuRaftMesgConan(ConanFile):
     def package(self):
         lib_dir = join(self.package_folder, "lib")
         copy(self, "LICENSE", self.source_folder, join(self.package_folder, "licenses"), keep_path=False)
-        copy(self, "*.h*", join(self.source_folder, "src", "include"), join(self.package_folder, "include", "nuraft_mesg"), keep_path=True)
+        copy(self, "*.h*", join(self.source_folder, "src", "include"), join(self.package_folder, "include"), keep_path=True)
         copy(self, "*.lib", self.build_folder, lib_dir, keep_path=False)
         copy(self, "*.a", self.build_folder, lib_dir, keep_path=False)
         copy(self, "*.so*", self.build_folder, lib_dir, keep_path=False)
