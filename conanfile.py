@@ -58,7 +58,7 @@ class NuRaftMesgConan(ConanFile):
 
     def requirements(self):
         self.requires("sisl/[~=10, include_prerelease=True]@oss/master")
-        self.requires("nuraft/2.2.0")
+        self.requires("nuraft/2.3.0")
 
         self.requires("boost/1.82.0")
         self.requires("openssl/3.1.1")
