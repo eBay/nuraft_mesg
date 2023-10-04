@@ -53,7 +53,7 @@ int send_message(uint32_t leader_id, nuraft_mesg::group_id_t const& group_id, st
 
     auto result = nuraft_mesg::NullResult(folly::makeUnexpected(nuraft::SERVER_IS_JOINING));
     while (!result && (nuraft::SERVER_IS_JOINING == result.error() || nuraft::CONFIG_CHANGING == result.error())) {
-        auto sf = factory->client_request(buf, dest_cfg);
+        auto sf = factory->append_entry(buf, dest_cfg);
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
         result = std::move(sf).get();
     }

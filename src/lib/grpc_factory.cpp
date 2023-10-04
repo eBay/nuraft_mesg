@@ -207,8 +207,7 @@ NullAsyncResult grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_conf
     return ctx->future();
 }
 
-NullAsyncResult grpc_factory::client_request(std::shared_ptr< nuraft::buffer > buf,
-                                             nuraft::srv_config const& dest_cfg) {
+NullAsyncResult grpc_factory::append_entry(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
     if (!client) { return folly::makeUnexpected(nuraft::CANCELLED); }
 

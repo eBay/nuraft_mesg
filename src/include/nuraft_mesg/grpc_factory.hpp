@@ -54,7 +54,7 @@ public:
     NullAsyncResult add_server(uint32_t const srv_id, peer_id_t const& srv_addr, nuraft::srv_config const& dest_cfg);
 
     // Send a client request to the cluster
-    NullAsyncResult client_request(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg);
+    NullAsyncResult append_entry(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg);
 
     // Construct and send a RemoveServer message to the cluster
     NullAsyncResult rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);

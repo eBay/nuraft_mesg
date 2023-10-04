@@ -226,7 +226,9 @@ TEST_F(MessagingFixture, MemberCrash) {
     auto buf = nuraft_mesg::create_message(nlohmann::json{
         {"op_type", 2},
     });
-    EXPECT_TRUE(!!app_1_->instance_->append_entries(group_id_, {buf}).get());
+    auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
+    auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_), to_string(app_1_->id_));
+    EXPECT_TRUE(!!factory->append_entry(buf, dest_cfg).get());
 
     app_3_ = std::make_shared< TestApplication >("sm3", ports[2]);
     app_3_->set_id(our_id);
