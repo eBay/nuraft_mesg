@@ -118,24 +118,24 @@ nuraft::cb_func::ReturnCode ManagerImpl::callback_handler(group_id_t const& grou
                                                           nuraft::cb_func::Param* param) {
     switch (type) {
     case nuraft::cb_func::RemovedFromCluster: {
-        LOGINFO("Removed from cluster {}", group_id);
+        LOGINFO("Removed from cluster [group={}]", group_id);
         exit_group(group_id);
     } break;
     case nuraft::cb_func::JoinedCluster: {
         auto const my_id = param->myId;
         auto const leader_id = param->leaderId;
-        LOGINFO("Joined cluster: {}, [l_id:{},my_id:{}]", group_id, leader_id, my_id);
+        LOGINFO("Joined cluster: [group={}], [l_id:{},my_id:{}]", group_id, leader_id, my_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = (leader_id == my_id);
         }
     } break;
     case nuraft::cb_func::NewConfig: {
-        LOGDEBUGMOD(nuraft_mesg, "Cluster change for: {}", group_id);
+        LOGDEBUGMOD(nuraft_mesg, "Cluster change for: [group={}]", group_id);
         _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeLeader: {
-        LOGDEBUGMOD(nuraft_mesg, "I'm the leader of: {}!", group_id);
+        LOGDEBUGMOD(nuraft_mesg, "I'm the leader of: [group={}]!", group_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = true;
@@ -143,7 +143,7 @@ nuraft::cb_func::ReturnCode ManagerImpl::callback_handler(group_id_t const& grou
         _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeFollower: {
-        LOGDEBUGMOD(nuraft_mesg, "I'm a follower of: {}!", group_id);
+        LOGINFOMOD(nuraft_mesg, "I'm a follower of: [group={}]!", group_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = false;
@@ -167,7 +167,7 @@ void ManagerImpl::exit_group(group_id_t const& group_id) {
 nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t const& group_id,
                                                 group_type_t const& group_type, nuraft::context*& ctx,
                                                 std::shared_ptr< nuraft_mesg::group_metrics > metrics) {
-    LOGDEBUGMOD(nuraft_mesg, "Creating context for Group: {} as Member: {}", group_id, srv_id);
+    LOGDEBUGMOD(nuraft_mesg, "Creating context for: [group_id={}] as Member: {}", group_id, srv_id);
 
     // State manager (RAFT log store, config)
     std::shared_ptr< nuraft::state_mgr > smgr;
@@ -185,7 +185,7 @@ nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t
         if (it != _state_managers.end()) {
             if (happened) {
                 // A new logstore!
-                LOGDEBUGMOD(nuraft_mesg, "Creating new State Manager for: {}, type: {}", group_id, group_type);
+                LOGDEBUGMOD(nuraft_mesg, "Creating new State Manager for: [group={}], type: {}", group_id, group_type);
                 it->second = application_.lock()->create_state_mgr(srv_id, group_id);
             }
             it->second->become_ready();
@@ -327,11 +327,11 @@ NullAsyncResult ManagerImpl::become_leader(group_id_t const& group_id) {
 }
 
 void ManagerImpl::leave_group(group_id_t const& group_id) {
-    LOGINFO("Leaving group [vol={}]", group_id);
+    LOGINFO("Leaving group [group={}]", group_id);
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         if (0 == _state_managers.count(group_id)) {
-            LOGDEBUGMOD(nuraft_mesg, "Asked to leave group {} which we are not part of!", group_id);
+            LOGDEBUGMOD(nuraft_mesg, "Asked to leave [group={}] which we are not part of!", group_id);
             return;
         }
     }
@@ -345,7 +345,7 @@ void ManagerImpl::leave_group(group_id_t const& group_id) {
         _state_managers.erase(it);
     }
 
-    LOGINFO("Finished leaving: [vol={}]", group_id);
+    LOGINFO("Finished leaving: [group={}]", group_id);
 }
 
 uint32_t ManagerImpl::logstore_id(group_id_t const& group_id) const {

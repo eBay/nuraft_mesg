@@ -36,17 +36,15 @@ public:
     void put_details(int level, const char* source_file, const char* func_name, size_t line_number,
                      const std::string& log_line) override {
         auto const mesg =
-            fmt::format("[vol={}] {}:{}#{} : {}", _group_id, file_name(source_file), func_name, line_number, log_line);
+            fmt::format("[group={}] {}:{}#{} : {}", _group_id, file_name(source_file), func_name, line_number, log_line);
         switch (level) {
         case 1:
             [[fallthrough]];
         case 2: {
             LOGERRORMOD(nuraft, "{}", mesg);
-            LOGERRORMOD_USING_LOGGER(nuraft, _custom_logger, "{}", mesg);
         } break;
         case 3: {
             LOGWARNMOD(nuraft, "{}", mesg);
-            LOGWARNMOD_USING_LOGGER(nuraft, _custom_logger, "{}", mesg);
         } break;
         case 4: {
             LOGINFOMOD_USING_LOGGER(nuraft, _custom_logger, "{}", mesg);
