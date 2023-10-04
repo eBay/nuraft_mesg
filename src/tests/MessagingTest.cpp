@@ -261,6 +261,11 @@ TEST_F(MessagingFixture, UnknownGroup) {
 }
 
 TEST_F(MessagingFixture, RemoveMember) {
+    // Expect failure trying to remove unknown member
+    auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
+    auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_), to_string(app_1_->id_));
+    EXPECT_FALSE(!!factory->rem_server(1000, dest_cfg).get());
+
     EXPECT_TRUE(app_1_->instance_->rem_member(group_id_, app_3_->id_).get());
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
