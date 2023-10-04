@@ -18,6 +18,7 @@
 //   inherited rpc_client instances sharing a common worker pool.
 #pragma once
 
+#include <libnuraft/async.hxx>
 #include <memory>
 
 #include <folly/SharedMutex.h>
@@ -45,9 +46,9 @@ public:
     nuraft::ptr< nuraft::rpc_client > create_client(const std::string& client) override;
     nuraft::ptr< nuraft::rpc_client > create_client(peer_id_t const& client);
 
-    virtual std::error_condition create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
+    virtual nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 
-    virtual std::error_condition reinit_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
+    virtual nuraft::cmd_result_code reinit_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 
     // Construct and send an AddServer message to the cluster
     NullAsyncResult add_server(uint32_t const srv_id, peer_id_t const& srv_addr, nuraft::srv_config const& dest_cfg);

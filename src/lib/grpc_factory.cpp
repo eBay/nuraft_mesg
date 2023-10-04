@@ -156,16 +156,16 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(peer_id_t const& c
     if (_clients.end() != it) {
         if (!happened) {
             LOGDEBUGMOD(nuraft_mesg, "Re-creating client for {}", client);
-            if (auto err = reinit_client(client, it->second); err) {
-                LOGERROR("Failed to re-initialize client {}: {}", client, err.message());
+            if (auto err = reinit_client(client, it->second); nuraft::OK != err) {
+                LOGERROR("Failed to re-initialize client {}: {}", client, err);
                 new_client = std::make_shared< grpc_error_client >();
             } else {
                 new_client = it->second;
             }
         } else {
             LOGDEBUGMOD(nuraft_mesg, "Creating client for {}", client);
-            if (auto err = create_client(client, it->second); err) {
-                LOGERROR("Failed to create client for {}: {}", client, err.message());
+            if (auto err = create_client(client, it->second); nuraft::OK != err) {
+                LOGERROR("Failed to create client for {}: {}", client, err);
                 new_client = std::make_shared< grpc_error_client >();
             } else {
                 new_client = it->second;

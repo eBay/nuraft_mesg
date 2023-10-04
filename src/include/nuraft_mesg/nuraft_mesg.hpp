@@ -17,7 +17,6 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <system_error>
 #include <vector>
 
 #include <libnuraft/nuraft.hxx>
