@@ -2,6 +2,7 @@
 #include "example_state_machine.h"
 
 #include <fstream>
+#include <system_error>
 
 #include <nlohmann/json.hpp>
 

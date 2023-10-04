@@ -13,7 +13,6 @@
 #include <sisl/options/options.h>
 #include <sisl/grpc/rpc_server.hpp>
 #include <sisl/grpc/generic_service.hpp>
-#include <system_error>
 
 #include "service.hpp"
 #include "nuraft_mesg/mesg_factory.hpp"
@@ -27,37 +26,6 @@ constexpr auto grpc_client_threads = 1u;
 constexpr auto grpc_server_threads = 1u;
 
 namespace nuraft_mesg {
-
-static std::error_condition convertToError(nuraft::cmd_result_code rc) {
-    switch (rc) {
-    case nuraft::OK:
-        return std::error_condition();
-    case nuraft::CANCELLED:
-        return std::make_error_condition(std::errc::operation_canceled);
-    case nuraft::TIMEOUT:
-        return std::make_error_condition(std::errc::timed_out);
-    case nuraft::NOT_LEADER:
-        return std::make_error_condition(std::errc::permission_denied);
-    case nuraft::BAD_REQUEST:
-        return std::make_error_condition(std::errc::invalid_argument);
-    case nuraft::SERVER_ALREADY_EXISTS:
-        return std::make_error_condition(std::errc::file_exists);
-    case nuraft::CONFIG_CHANGING:
-        return std::make_error_condition(std::errc::interrupted);
-    case nuraft::SERVER_IS_JOINING:
-        return std::make_error_condition(std::errc::device_or_resource_busy);
-    case nuraft::SERVER_NOT_FOUND:
-        return std::make_error_condition(std::errc::no_such_device);
-    case nuraft::CANNOT_REMOVE_LEADER:
-        return std::make_error_condition(std::errc::not_supported);
-    case nuraft::SERVER_IS_LEAVING:
-        return std::make_error_condition(std::errc::owner_dead);
-    case nuraft::FAILED:
-        [[fallthrough]];
-    default:
-        return std::make_error_condition(std::errc::io_error);
-    }
-}
 
 int32_t to_server_id(peer_id_t const& server_addr) {
     boost::hash< boost::uuids::uuid > uuid_hasher;

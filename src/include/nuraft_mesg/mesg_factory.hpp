@@ -14,7 +14,7 @@
  *********************************************************************************/
 #pragma once
 
-#include <future>
+#include <libnuraft/async.hxx>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -37,13 +37,13 @@ class group_factory : public grpc_factory {
     static std::string m_ssl_cert;
 
 public:
-    group_factory(int const cli_thread_count, boost::uuids::uuid const& name,
+    group_factory(int const cli_thread_count, group_id_t const& name,
                   std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert = "");
 
     using grpc_factory::create_client;
-    std::error_condition create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) override;
-    std::error_condition reinit_client(peer_id_t const& client,
-                                       std::shared_ptr< nuraft::rpc_client >& raft_client) override;
+    nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) override;
+    nuraft::cmd_result_code reinit_client(peer_id_t const& client,
+                                          std::shared_ptr< nuraft::rpc_client >& raft_client) override;
 
     virtual std::string lookupEndpoint(peer_id_t const& client) = 0;
 };
@@ -65,10 +65,10 @@ public:
 
     group_id_t group_name() const { return _group_name; }
 
-    std::error_condition create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >& rpc_ptr) override;
+    nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >& rpc_ptr) override;
 
-    std::error_condition reinit_client(peer_id_t const& client,
-                                       std::shared_ptr< nuraft::rpc_client >& raft_client) override;
+    nuraft::cmd_result_code reinit_client(peer_id_t const& client,
+                                          std::shared_ptr< nuraft::rpc_client >& raft_client) override;
 
     AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf);
 };

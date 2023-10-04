@@ -15,6 +15,7 @@
 #include "test_state_manager.h"
 
 #include <fstream>
+#include <system_error>
 
 #include "jungle_logstore/jungle_log_store.h"
 #include <memory>

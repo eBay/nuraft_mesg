@@ -1,10 +1,11 @@
-name: NuraftMesg Build
+name: NuraftMesg PR Build
 
 on:
   workflow_dispatch:
   pull_request:
     branches:
       - main
+      - feature/*
 
 jobs:
   Build:

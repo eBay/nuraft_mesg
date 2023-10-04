@@ -28,6 +28,9 @@ using Result = folly::Expected< T, nuraft::cmd_result_code >;
 template < typename T >
 using AsyncResult = folly::SemiFuture< Result< T > >;
 
+using NullResult = Result< folly::Unit >;
+using NullAsyncResult = AsyncResult< folly::Unit >;
+
 } // namespace nuraft_mesg
 
 namespace fmt {
