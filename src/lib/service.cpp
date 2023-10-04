@@ -30,7 +30,9 @@ SISL_OPTION_GROUP(nuraft_mesg,
                     p->setValue(folly::Unit());                                                                        \
             });                                                                                                        \
         return std::move(sf);                                                                                          \
-    } catch (std::runtime_error & rte) { LOGERRORMOD(nuraft_mesg, "Caught exception during rm_srv(): {}", rte.what()); }
+    } catch (std::runtime_error & rte) {                                                                               \
+        LOGERRORMOD(nuraft_mesg, "Caught exception: [group={}] {}", group_name, rte.what());                           \
+    }
 
 namespace nuraft_mesg {
 

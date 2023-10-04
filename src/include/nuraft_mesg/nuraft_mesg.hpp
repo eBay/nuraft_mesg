@@ -42,9 +42,6 @@ namespace nuraft_mesg {
 using data_service_request_handler_t =
     std::function< void(sisl::io_blob const& incoming_buf, boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) >;
 
-using NullResult = Result< folly::Unit >;
-using NullAsyncResult = AsyncResult< folly::Unit >;
-
 class MessagingApplication {
 public:
     virtual ~MessagingApplication() = default;
