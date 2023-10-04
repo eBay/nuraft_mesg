@@ -130,16 +130,22 @@ class grpc_error_client : public grpc_base_client {
     }
 };
 
-nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string& client) {
+nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(std::string const& client) {
+    try {
+        return create_client(boost::uuids::string_generator()(client));
+    } catch (std::runtime_error const& e) { LOGCRITICAL("Client Endpoint Invalid! [{}]", client); }
+    return nullptr;
+}
+
+nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(peer_id_t const& client) {
     nuraft::ptr< nuraft::rpc_client > new_client;
-    auto client_uuid = boost::uuids::string_generator()(client);
 
     std::unique_lock< client_factory_lock_type > lk(_client_lock);
-    auto [it, happened] = _clients.emplace(client_uuid, nullptr);
+    auto [it, happened] = _clients.emplace(client, nullptr);
     if (_clients.end() != it) {
         if (!happened) {
             LOGDEBUGMOD(nuraft_mesg, "Re-creating client for {}", client);
-            if (auto err = reinit_client(client_uuid, it->second); err) {
+            if (auto err = reinit_client(client, it->second); err) {
                 LOGERROR("Failed to re-initialize client {}: {}", client, err.message());
                 new_client = std::make_shared< grpc_error_client >();
             } else {
@@ -147,7 +153,7 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(const std::string&
             }
         } else {
             LOGDEBUGMOD(nuraft_mesg, "Creating client for {}", client);
-            if (auto err = create_client(client_uuid, it->second); err) {
+            if (auto err = create_client(client, it->second); err) {
                 LOGERROR("Failed to create client for {}: {}", client, err.message());
                 new_client = std::make_shared< grpc_error_client >();
             } else {

@@ -12,7 +12,9 @@
 #include "example_state_manager.h"
 #include "uuids.h"
 
-SISL_OPTION_GROUP(server, (server_id, "", "server_id", "Servers ID (0-9)", cxxopts::value< uint32_t >(), ""),
+SISL_OPTION_GROUP(server,
+                  (server_id, "", "server_id", "Servers ID (0-9)", cxxopts::value< uint32_t >()->default_value("0"),
+                   ""),
                   (start_group, "", "create", "Group to create", cxxopts::value< uint32_t >(), ""))
 
 SISL_OPTIONS_ENABLE(logging, server, nuraft_mesg)
@@ -124,10 +126,10 @@ int main(int argc, char** argv) {
     }
 
     // Just prevent main() from exiting, require a SIGNAL
-    {
-        std::unique_lock< std::mutex > ulock(k_stop_cv_lock);
-        k_stop_cv.wait(ulock, []() { return k_stop; });
-    }
-    LOGERROR("Stopping Service!");
+    //{
+    //    std::unique_lock< std::mutex > ulock(k_stop_cv_lock);
+    //    k_stop_cv.wait(ulock, []() { return k_stop; });
+    //}
+    LOGWARN("Stopping Service!");
     return 0;
 }

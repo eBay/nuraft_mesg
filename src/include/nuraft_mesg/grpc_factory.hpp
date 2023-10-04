@@ -44,6 +44,7 @@ public:
     std::string const& workerName() const { return _worker_name; }
 
     nuraft::ptr< nuraft::rpc_client > create_client(const std::string& client) override;
+    nuraft::ptr< nuraft::rpc_client > create_client(peer_id_t const& client);
 
     virtual std::error_condition create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 

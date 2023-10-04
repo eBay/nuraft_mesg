@@ -12,7 +12,7 @@
 
 SISL_OPTION_GROUP(client, (add, "a", "add", "Add a server to the cluster", cxxopts::value< uint32_t >(), "id"),
                   (clean, "", "clean", "Reset all persistence", cxxopts::value< bool >(), ""),
-                  (group, "g", "group", "Group ID", cxxopts::value< uint32_t >(), ""),
+                  (group, "g", "group", "Group ID", cxxopts::value< uint32_t >()->default_value("0"), ""),
                   (server, "", "server", "Server to send message to", cxxopts::value< uint32_t >()->default_value("0"),
                    "id"),
                   (echo, "m", "echo", "Send message to echo service", cxxopts::value< std::string >(), "message"),

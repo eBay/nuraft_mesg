@@ -41,11 +41,11 @@ public:
         case 1:
             [[fallthrough]];
         case 2: {
-            LOGERRORMOD_USING_LOGGER(nuraft, _custom_logger, "ERROR {}", mesg);
+            LOGERRORMOD(nuraft, "{}", mesg);
         } break;
             ;
         case 3: {
-            LOGWARNMOD_USING_LOGGER(nuraft, _custom_logger, "WARNING {}", mesg);
+            LOGWARNMOD(nuraft, "{}", mesg);
         } break;
             ;
         case 4: {
