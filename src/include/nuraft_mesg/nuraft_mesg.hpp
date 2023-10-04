@@ -57,7 +57,7 @@ class Manager {
 public:
     struct Params {
         boost::uuids::uuid server_uuid_;
-        uint32_t mesg_port_;
+        uint16_t mesg_port_;
         group_type_t default_group_type_;
         std::string ssl_key_;
         std::string ssl_cert_;

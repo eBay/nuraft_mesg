@@ -87,7 +87,7 @@ public:
                             .with_hb_interval(heartbeat_period)
                             .with_max_append_size(10)
                             .with_rpc_failure_backoff(rpc_backoff)
-                            .with_auto_forwarding(true)
+                            .with_auto_forwarding(false)
                             .with_snapshot_enabled(0);
         r_params.return_method_ = nuraft::raft_params::async_handler;
         instance_->register_mgr_type("test_type", r_params);
@@ -192,7 +192,7 @@ TEST_F(MessagingFixture, ClientRequest) {
 }
 
 // Basic resiliency test (append_entries)
-TEST_F(MessagingFixture, ClientReset) {
+TEST_F(MessagingFixture, MemberCrash) {
     // Simulate a Member crash
     auto our_id = app_3_->id_;
     app_3_.reset();
@@ -207,11 +207,12 @@ TEST_F(MessagingFixture, ClientReset) {
     app_3_->set_id(our_id);
     app_3_->map_peers(lookup_map);
     app_3_->start();
-
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-    auto err = app_3_->instance_->append_entries(group_id_, {buf}).get();
-    if (!!err) { LOGERROR("Failed to commit: {}", err.error()); }
-    EXPECT_FALSE(err);
+    app_3_->instance_->join_group(group_id_, "test_type",
+                                  std::static_pointer_cast< mesg_state_mgr >(std::make_shared< test_state_mgr >(
+                                      nuraft_mesg::to_server_id(our_id), our_id, group_id_)));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    EXPECT_TRUE(!!app_3_->instance_->become_leader(group_id_).get());
+    EXPECT_TRUE(!!app_3_->instance_->append_entries(group_id_, {buf}).get());
 
     app_3_->instance_->leave_group(group_id_);
     app_2_->instance_->leave_group(group_id_);
@@ -234,6 +235,7 @@ TEST_F(MessagingFixture, UnknownGroup) {
 
 TEST_F(MessagingFixture, RemoveMember) {
     EXPECT_TRUE(app_1_->instance_->rem_member(group_id_, app_3_->id_).get());
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     auto buf = nuraft_mesg::create_message(nlohmann::json{
         {"op_type", 2},
