@@ -18,7 +18,6 @@
 //   inherited rpc_client instances sharing a common worker pool.
 #pragma once
 
-#include <future>
 #include <memory>
 
 #include <folly/SharedMutex.h>
@@ -51,15 +50,13 @@ public:
     virtual std::error_condition reinit_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 
     // Construct and send an AddServer message to the cluster
-    std::future< nuraft::cmd_result_code > add_server(uint32_t const srv_id, std::string const& srv_addr,
-                                                      nuraft::srv_config const& dest_cfg);
+    NullAsyncResult add_server(uint32_t const srv_id, peer_id_t const& srv_addr, nuraft::srv_config const& dest_cfg);
 
     // Send a client request to the cluster
-    std::future< nuraft::cmd_result_code > client_request(std::shared_ptr< nuraft::buffer > buf,
-                                                          nuraft::srv_config const& dest_cfg);
+    NullAsyncResult client_request(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg);
 
     // Construct and send a RemoveServer message to the cluster
-    std::future< nuraft::cmd_result_code > rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);
+    NullAsyncResult rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);
 };
 
 } // namespace nuraft_mesg

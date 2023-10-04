@@ -98,6 +98,23 @@ private:
     std::map< nuraft_mesg::peer_id_t, std::string > lookup_map_;
 };
 
+struct custom_factory : public nuraft_mesg::group_factory {
+    custom_factory(int const threads, nuraft_mesg::group_id_t const& name) :
+            nuraft_mesg::group_factory::group_factory(threads, name, nullptr) {}
+
+    std::string lookupEndpoint(nuraft_mesg::peer_id_t const& peer) override {
+        auto lg = std::scoped_lock(lookup_lock_);
+        return (lookup_map_.count(peer) > 0) ? lookup_map_[peer] : std::string();
+    }
+
+    void map_peers(std::map< nuraft_mesg::peer_id_t, std::string > const& peers) {
+        auto lg = std::scoped_lock(lookup_lock_);
+        lookup_map_ = peers;
+    }
+    std::mutex lookup_lock_;
+    std::map< nuraft_mesg::peer_id_t, std::string > lookup_map_;
+};
+
 extern nuraft::ptr< nuraft::cluster_config > fromClusterConfig(nlohmann::json const& cluster_config);
 
 static nuraft::ptr< nuraft::buffer > create_message(nlohmann::json const& j_obj) {
@@ -125,6 +142,8 @@ protected:
     std::map< nuraft_mesg::peer_id_t, std::string > lookup_map;
 
     group_id_t group_id_;
+
+    std::shared_ptr< custom_factory > custom_factory_;
 
     void get_random_ports(const uint16_t n) {
         auto cur_size = ports.size();
@@ -161,13 +180,19 @@ protected:
         EXPECT_TRUE(!!app_1_->instance_->create_group(group_id_, "test_type").get());
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
+        // Use app1 to add Server 3
         auto add2 = app_1_->instance_->add_member(group_id_, app_2_->id_);
         std::this_thread::sleep_for(std::chrono::seconds(1));
         EXPECT_TRUE(std::move(add2).get());
 
-        auto add3 = app_1_->instance_->add_member(group_id_, app_3_->id_);
+        custom_factory_ = std::make_shared< custom_factory >(2, group_id_);
+        custom_factory_->map_peers(lookup_map);
+
+        // Use custom factory to add Server 3
+        auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
+        auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_), to_string(app_1_->id_));
+        EXPECT_TRUE(!!factory->add_server(to_server_id(app_3_->id_), app_3_->id_, dest_cfg).get());
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        EXPECT_TRUE(std::move(add3).get());
     }
 };
 

@@ -37,7 +37,7 @@ class group_factory : public grpc_factory {
     static std::string m_ssl_cert;
 
 public:
-    group_factory(int const cli_thread_count, boost::uuids::uuid const& name,
+    group_factory(int const cli_thread_count, group_id_t const& name,
                   std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert = "");
 
     using grpc_factory::create_client;
