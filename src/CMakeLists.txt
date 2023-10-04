@@ -7,6 +7,8 @@ include(${sisl_INCLUDE_DIRS}/../cmake/settings_gen.cmake)
 
 add_subdirectory (proto)
 
+add_flags("-Wall -Wextra -Werror -Wpedantic")
+
 add_library(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} PRIVATE
     lib/grpc_client.cpp

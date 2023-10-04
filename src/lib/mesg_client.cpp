@@ -175,7 +175,7 @@ nuraft::cmd_result_code group_factory::create_client(peer_id_t const& client,
                                                      nuraft::ptr< nuraft::rpc_client >& raft_client) {
     LOGDEBUGMOD(nuraft_mesg, "Creating client to {}", client);
     auto endpoint = lookupEndpoint(client);
-    if (endpoint.empty()) nuraft::BAD_REQUEST;
+    if (endpoint.empty()) return nuraft::BAD_REQUEST;
 
     LOGDEBUGMOD(nuraft_mesg, "Creating client for [{}] @ [{}]", client, endpoint);
     raft_client =

@@ -23,7 +23,7 @@ SISL_OPTION_GROUP(nuraft_mesg,
         (resp)->when_ready(                                                                                            \
             [p = std::make_shared< decltype(p) >(std::move(p))](                                                       \
                 nuraft::cmd_result< nuraft::ptr< nuraft::buffer >, nuraft::ptr< std::exception > >& result,            \
-                auto& e) mutable {                                                                                     \
+                auto&) mutable {                                                                                       \
                 if (nuraft::cmd_result_code::OK != result.get_result_code())                                           \
                     p->setValue(folly::makeUnexpected(result.get_result_code()));                                      \
                 else                                                                                                   \
@@ -252,7 +252,7 @@ public:
     msg_group_listner(std::shared_ptr< msg_service > svc, group_id_t const& group) : _svc(svc), _group(group) {}
     ~msg_group_listner() { _svc->shutdown_for(_group); }
 
-    void listen(nuraft::ptr< nuraft::msg_handler >& handler) override {
+    void listen(nuraft::ptr< nuraft::msg_handler >&) override {
         LOGINFOMOD(nuraft_mesg, "Begin listening on {}", _group);
     }
     void stop() override { LOGINFOMOD(nuraft_mesg, "Stop {}", _group); }

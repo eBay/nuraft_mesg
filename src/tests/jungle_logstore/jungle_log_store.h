@@ -54,7 +54,7 @@ public:
                      const Options& opt = jungle_log_store::Options());
     ~jungle_log_store();
 
-    __nocopy__(jungle_log_store);
+    __nocopy__(jungle_log_store)
 
 public:
     /**

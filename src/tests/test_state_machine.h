@@ -54,14 +54,14 @@ public:
         LOGINFO("Rollback message [{}] op: {}", log_idx, j_obj.at("op_type").get< int >());
     }
 
-    virtual void save_snapshot_data(snapshot& s, const ulong offset, buffer& data) {}
-    virtual bool apply_snapshot(snapshot& s) { return true; }
+    virtual void save_snapshot_data(snapshot&, const ulong, buffer&) {}
+    virtual bool apply_snapshot(snapshot&) { return true; }
 
-    virtual int read_snapshot_data(snapshot& s, const ulong offset, buffer& data) { return 0; }
+    virtual int read_snapshot_data(snapshot&, const ulong, buffer&) { return 0; }
 
     virtual ptr< snapshot > last_snapshot() { return ptr< snapshot >(); }
 
-    virtual void create_snapshot(snapshot& s, async_result< bool >::handler_type& when_done) {}
+    virtual void create_snapshot(snapshot&, async_result< bool >::handler_type&) {}
 
     virtual ulong last_commit_index() {
         auto_lock(lock_);

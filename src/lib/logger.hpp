@@ -42,24 +42,21 @@ public:
             [[fallthrough]];
         case 2: {
             LOGERRORMOD(nuraft, "{}", mesg);
+            LOGERRORMOD_USING_LOGGER(nuraft, _custom_logger, "{}", mesg);
         } break;
-            ;
         case 3: {
             LOGWARNMOD(nuraft, "{}", mesg);
+            LOGWARNMOD_USING_LOGGER(nuraft, _custom_logger, "{}", mesg);
         } break;
-            ;
         case 4: {
-            LOGINFOMOD_USING_LOGGER(nuraft, _custom_logger, "INFO {}", mesg);
+            LOGINFOMOD_USING_LOGGER(nuraft, _custom_logger, "{}", mesg);
         } break;
-            ;
         case 5: {
-            LOGDEBUGMOD_USING_LOGGER(nuraft, _custom_logger, "DEBUG {}", mesg);
+            LOGDEBUGMOD_USING_LOGGER(nuraft, _custom_logger, "{}", mesg);
         } break;
-            ;
         default: {
-            LOGTRACEMOD_USING_LOGGER(nuraft, _custom_logger, "TRACE {}", mesg);
+            LOGTRACEMOD_USING_LOGGER(nuraft, _custom_logger, "{}", mesg);
         } break;
-            ;
         }
     }
 };

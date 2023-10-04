@@ -134,7 +134,7 @@ grpc_factory::grpc_factory(int const cli_thread_count, std::string const& name) 
 }
 
 class grpc_error_client : public grpc_base_client {
-    void send(RaftMessage const& message, handle_resp complete) override {
+    void send(RaftMessage const&, handle_resp complete) override {
         auto null_msg = RaftMessage();
         auto status = ::grpc::Status(::grpc::ABORTED, "Bad connection");
         complete(null_msg, status);
