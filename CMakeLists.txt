@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(nuraft_grpc)
 enable_testing()
 
+include (cmake/Flags.cmake)
 set(CMAKE_CXX_STANDARD 17)
 
 if(EXISTS ${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)

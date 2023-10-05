@@ -16,11 +16,11 @@
 
 #include <fstream>
 
-#include <jungle_log_store.h>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <libnuraft/state_machine.hxx>
 
+#include "jungle_logstore/jungle_log_store.h"
 #include "test_state_machine.h"
 #include "messaging.hpp"
 #include <gtest/gtest.h>

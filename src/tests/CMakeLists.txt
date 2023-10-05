@@ -1,9 +1,11 @@
 cmake_minimum_required (VERSION 3.11)
 
 find_package(GTest REQUIRED)
-find_package(jungle_logstore)
+find_package(jungle QUIET)
 
-if (jungle_logstore_FOUND)
+if (jungle_FOUND)
+    add_subdirectory(jungle_logstore)
+
     add_executable (messaging_test)
     target_sources(messaging_test PRIVATE
                 MessagingTest.cpp
@@ -11,7 +13,8 @@ if (jungle_logstore_FOUND)
               )
     target_link_libraries (messaging_test
           nuraft_grpc
-          jungle_logstore::jungle_logstore
+          $<TARGET_OBJECTS:jungle_logstore>
+          jungle::jungle
           GTest::gmock
         )
 
