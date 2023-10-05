@@ -177,7 +177,7 @@ protected:
 
         group_id_ = boost::uuids::random_generator()();
 
-        EXPECT_TRUE(!!app_1_->instance_->create_group(group_id_, "test_type").get());
+        EXPECT_TRUE(app_1_->instance_->create_group(group_id_, "test_type").get());
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
         // Use app1 to add Server 3
@@ -191,7 +191,7 @@ protected:
         // Use custom factory to add Server 3
         auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
         auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_), to_string(app_1_->id_));
-        EXPECT_TRUE(!!factory->add_server(to_server_id(app_3_->id_), app_3_->id_, dest_cfg).get());
+        EXPECT_TRUE(factory->add_server(to_server_id(app_3_->id_), app_3_->id_, dest_cfg).get());
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 };
@@ -209,7 +209,7 @@ TEST_F(MessagingFixture, ClientRequest) {
     auto buf = nuraft_mesg::create_message(nlohmann::json{
         {"op_type", 2},
     });
-    EXPECT_TRUE(!!app_1_->instance_->append_entries(group_id_, {buf}).get());
+    EXPECT_TRUE(app_1_->instance_->append_entries(group_id_, {buf}).get());
 
     app_3_->instance_->leave_group(group_id_);
     app_2_->instance_->leave_group(group_id_);
@@ -228,7 +228,7 @@ TEST_F(MessagingFixture, MemberCrash) {
     });
     auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
     auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_), to_string(app_1_->id_));
-    EXPECT_TRUE(!!factory->append_entry(buf, dest_cfg).get());
+    EXPECT_TRUE(factory->append_entry(buf, dest_cfg).get());
 
     app_3_ = std::make_shared< TestApplication >("sm3", ports[2]);
     app_3_->set_id(our_id);
@@ -238,8 +238,9 @@ TEST_F(MessagingFixture, MemberCrash) {
                                   std::static_pointer_cast< mesg_state_mgr >(std::make_shared< test_state_mgr >(
                                       nuraft_mesg::to_server_id(our_id), our_id, group_id_)));
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    EXPECT_TRUE(!!app_3_->instance_->become_leader(group_id_).get());
-    EXPECT_TRUE(!!app_3_->instance_->append_entries(group_id_, {buf}).get());
+    EXPECT_FALSE(app_3_->instance_->become_leader(boost::uuids::random_generator()()).get());
+    EXPECT_TRUE(app_3_->instance_->become_leader(group_id_).get());
+    EXPECT_TRUE(app_3_->instance_->append_entries(group_id_, {buf}).get());
 
     app_3_->instance_->leave_group(group_id_);
     app_2_->instance_->leave_group(group_id_);
@@ -264,7 +265,10 @@ TEST_F(MessagingFixture, RemoveMember) {
     // Expect failure trying to remove unknown member
     auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
     auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_), to_string(app_1_->id_));
-    EXPECT_FALSE(!!factory->rem_server(1000, dest_cfg).get());
+    EXPECT_FALSE(factory->rem_server(1000, dest_cfg).get());
+
+    // Expect failure trying to remove unknown group
+    EXPECT_FALSE(app_2_->instance_->rem_member(boost::uuids::random_generator()(), app_3_->id_).get());
 
     EXPECT_TRUE(app_1_->instance_->rem_member(group_id_, app_3_->id_).get());
     std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -272,7 +276,7 @@ TEST_F(MessagingFixture, RemoveMember) {
     auto buf = nuraft_mesg::create_message(nlohmann::json{
         {"op_type", 2},
     });
-    EXPECT_TRUE(!!app_1_->instance_->append_entries(group_id_, {buf}).get());
+    EXPECT_TRUE(app_1_->instance_->append_entries(group_id_, {buf}).get());
 }
 
 TEST_F(MessagingFixture, SyncAddMember) {
