@@ -12,17 +12,16 @@ namespace nuraft {
 class jungle_log_store : public log_store {
 public:
     struct Options {
-        Options()
-            : maxEntriesInLogFile(64*1024)
-            , maxLogFileSize(32*1024*1024)
-            , maxKeepingMemtables(8)
-            , maxCacheSizeBytes((uint64_t)512 * 1024 * 1024)
-            , maxCachedLogs(10000)
-            , compression(false)
-            , strongDurability(false)
-            , flushThreadSleepTimeUs(500)
-            , cbEndOfBatch(nullptr)
-            {}
+        Options() :
+                maxEntriesInLogFile(64 * 1024),
+                maxLogFileSize(32 * 1024 * 1024),
+                maxKeepingMemtables(8),
+                maxCacheSizeBytes((uint64_t)512 * 1024 * 1024),
+                maxCachedLogs(10000),
+                compression(false),
+                strongDurability(false),
+                flushThreadSleepTimeUs(500),
+                cbEndOfBatch(nullptr) {}
         uint64_t maxEntriesInLogFile;
         uint64_t maxLogFileSize;
         uint64_t maxKeepingMemtables;
@@ -50,19 +49,18 @@ public:
         std::function< void(uint64_t, uint64_t) > cbEndOfBatch;
     };
 
-    jungle_log_store(const std::string& log_dir,
-                     const Options& opt = jungle_log_store::Options());
+    jungle_log_store(const std::string& log_dir, const Options& opt = jungle_log_store::Options());
     ~jungle_log_store();
 
     __nocopy__(jungle_log_store)
 
-public:
-    /**
-     * The first available slot of the store, starts with 1.
-     *
-     * @return Last log index number + 1
-     */
-    virtual ulong next_slot() const;
+        public :
+            /**
+             * The first available slot of the store, starts with 1.
+             *
+             * @return Last log index number + 1
+             */
+            virtual ulong next_slot() const;
 
     /**
      * The start index of the log store, at the very beginning, it must be 1.
@@ -79,7 +77,7 @@ public:
      * @return If no log entry exists: a dummy constant entry with
      *         value set to null and term set to zero.
      */
-    virtual ptr<log_entry> last_entry() const;
+    virtual ptr< log_entry > last_entry() const;
 
     /**
      * Append a log entry to store
@@ -87,7 +85,7 @@ public:
      * @param entry Log entry
      * @return Log index number.
      */
-    virtual ulong append(ptr<log_entry>& entry);
+    virtual ulong append(ptr< log_entry >& entry);
 
     /**
      * Overwrite a log entry at the given `index`.
@@ -95,7 +93,7 @@ public:
      * @param index Log index number to overwrite.
      * @param entry New log entry to overwrite.
      */
-    virtual void write_at(ulong index, ptr<log_entry>& entry);
+    virtual void write_at(ulong index, ptr< log_entry >& entry);
 
     /**
      * Invoked after a batch of logs is written as a part of
@@ -116,7 +114,7 @@ public:
      * @param end The end log index number (exclusive).
      * @return The log entries between [start, end).
      */
-    virtual ptr<std::vector<ptr<log_entry>>> log_entries(ulong start, ulong end) {
+    virtual ptr< std::vector< ptr< log_entry > > > log_entries(ulong start, ulong end) {
         return log_entries_ext(start, end);
     }
 
@@ -137,10 +135,8 @@ public:
      * @return The log entries between [start, end) and limited by the total size
      *         given by the batch_size_hint_in_bytes.
      */
-    virtual ptr<std::vector<ptr<log_entry>>> log_entries_ext(
-        ulong start,
-        ulong end,
-        int64_t batch_size_hint_in_bytes = 0);
+    virtual ptr< std::vector< ptr< log_entry > > > log_entries_ext(ulong start, ulong end,
+                                                                   int64_t batch_size_hint_in_bytes = 0);
 
     /**
      * Get the log entry at the specified log index number.
@@ -148,7 +144,7 @@ public:
      * @param index Should be equal to or greater than 1.
      * @return The log entry or null if index >= this->next_slot().
      */
-    virtual ptr<log_entry> entry_at(ulong index);
+    virtual ptr< log_entry > entry_at(ulong index);
 
     /**
      * Get the term for the log entry at the specified index
@@ -167,7 +163,7 @@ public:
      * @param cnt The number of logs to pack.
      * @return log pack
      */
-    virtual ptr<buffer> pack(ulong index, int32 cnt);
+    virtual ptr< buffer > pack(ulong index, int32 cnt);
 
     /**
      * Apply the log pack to current log store, starting from index.
@@ -222,18 +218,13 @@ private:
 
     struct FlushElem;
 
-    void write_at_internal(ulong index, ptr<log_entry>& entry);
+    void write_at_internal(ulong index, ptr< log_entry >& entry);
 
-    ssize_t getCompMaxSize(jungle::DB* db,
-                           const jungle::Record& rec);
+    ssize_t getCompMaxSize(jungle::DB* db, const jungle::Record& rec);
 
-    ssize_t compress(jungle::DB* db,
-                     const jungle::Record& src,
-                     jungle::SizedBuf& dst);
+    ssize_t compress(jungle::DB* db, const jungle::Record& src, jungle::SizedBuf& dst);
 
-    ssize_t decompress(jungle::DB* db,
-                       const jungle::SizedBuf& src,
-                       jungle::SizedBuf& dst);
+    ssize_t decompress(jungle::DB* db, const jungle::SizedBuf& src, jungle::SizedBuf& dst);
 
     void flushLoop();
 
@@ -245,7 +236,7 @@ private:
     /**
      * Dummy log entry for invalid request.
      */
-    ptr<log_entry> dummyLogEntry;
+    ptr< log_entry > dummyLogEntry;
 
     /**
      * Jungle is basically lock-free for both read & write,
@@ -256,7 +247,7 @@ private:
     /**
      * DB instance.
      */
-    jungle::DB *dbInst;
+    jungle::DB* dbInst;
 
     /**
      * Log cache instance.
@@ -276,7 +267,7 @@ private:
     /**
      * List of awaiting flush requests.
      */
-    std::list< std::shared_ptr<FlushElem> > flushReqs;
+    std::list< std::shared_ptr< FlushElem > > flushReqs;
 
     /**
      * Mutex for `flushReqs`.
@@ -286,12 +277,12 @@ private:
     /**
      * The index number of the last durable Raft log.
      */
-    std::atomic<uint64_t> lastDurableLogIdx;
+    std::atomic< uint64_t > lastDurableLogIdx;
 
     /**
      * `true` if we are stopping flush thraed.
      */
-    std::atomic<bool> flushThreadStopSignal;
+    std::atomic< bool > flushThreadStopSignal;
 
     /**
      * Local copy of options.
@@ -299,5 +290,4 @@ private:
     Options myOpt;
 };
 
-}
-
+} // namespace nuraft

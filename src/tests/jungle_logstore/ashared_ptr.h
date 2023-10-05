@@ -36,32 +36,24 @@
 #include <atomic>
 #include <mutex>
 
-template<typename T>
+template < typename T >
 class ashared_ptr {
 public:
     ashared_ptr() : object(nullptr) {}
-    ashared_ptr(T* src_ptr) : object( (src_ptr)
-                                      ? new PtrWrapper<T>(src_ptr)
-                                      : nullptr ) {}
-    ashared_ptr(const ashared_ptr<T>& src) : object(nullptr) {
-        operator=(src);
-    }
+    ashared_ptr(T* src_ptr) : object((src_ptr) ? new PtrWrapper< T >(src_ptr) : nullptr) {}
+    ashared_ptr(const ashared_ptr< T >& src) : object(nullptr) { operator=(src); }
 
-    ~ashared_ptr() {
-        reset();
-    }
+    ~ashared_ptr() { reset(); }
 
     void reset() {
-        std::lock_guard<std::mutex> l(lock);
-        PtrWrapper<T>* ptr = object.load(MO);
+        std::lock_guard< std::mutex > l(lock);
+        PtrWrapper< T >* ptr = object.load(MO);
         // Unlink pointer first, destroy object next.
         object.store(nullptr, MO);
         releaseObject(ptr);
     }
 
-    bool operator==(const ashared_ptr<T>& src) const {
-        return object.load(MO) == src.object.load(MO);
-    }
+    bool operator==(const ashared_ptr< T >& src) const { return object.load(MO) == src.object.load(MO); }
 
     bool operator==(const T* src) const {
         if (!object.load(MO)) {
@@ -71,14 +63,14 @@ public:
         return object.load(MO)->ptr.load(MO) == src;
     }
 
-    void operator=(const ashared_ptr<T>& src) {
-        std::lock_guard<std::mutex> l(lock);
+    void operator=(const ashared_ptr< T >& src) {
+        std::lock_guard< std::mutex > l(lock);
 
-        ashared_ptr<T>& writable_src = const_cast<ashared_ptr<T>&>(src);
-        PtrWrapper<T>* src_object = writable_src.shareCurObject();
+        ashared_ptr< T >& writable_src = const_cast< ashared_ptr< T >& >(src);
+        PtrWrapper< T >* src_object = writable_src.shareCurObject();
 
         // Replace object.
-        PtrWrapper<T>* old = object.load(MO);
+        PtrWrapper< T >* old = object.load(MO);
         object.store(src_object, MO);
 
         // Release old object.
@@ -89,29 +81,23 @@ public:
     T& operator*() const { return *object.load(MO)->ptr.load(MO); }
     T* get() const { return object.load(MO)->ptr.load(MO); }
 
-    inline bool compare_exchange_strong(ashared_ptr<T>& expected,
-                                        ashared_ptr<T> src,
-                                        std::memory_order order)
-    {
+    inline bool compare_exchange_strong(ashared_ptr< T >& expected, ashared_ptr< T > src, std::memory_order order) {
         (void)order;
         return compare_exchange(expected, src);
     }
 
-    inline bool compare_exchange_weak(ashared_ptr<T>& expected,
-                                      ashared_ptr<T> src,
-                                      std::memory_order order)
-    {
+    inline bool compare_exchange_weak(ashared_ptr< T >& expected, ashared_ptr< T > src, std::memory_order order) {
         (void)order;
         return compare_exchange(expected, src);
     }
 
-    bool compare_exchange(ashared_ptr<T>& expected, ashared_ptr<T> src) {
+    bool compare_exchange(ashared_ptr< T >& expected, ashared_ptr< T > src) {
         // Note: it is OK that `expected` becomes outdated.
-        PtrWrapper<T>* expected_ptr = expected.object.load(MO);
-        PtrWrapper<T>* val_ptr = src.shareCurObject();
+        PtrWrapper< T >* expected_ptr = expected.object.load(MO);
+        PtrWrapper< T >* val_ptr = src.shareCurObject();
 
         { // Lock for `object`
-            std::lock_guard<std::mutex> l(lock);
+            std::lock_guard< std::mutex > l(lock);
             if (object.compare_exchange_weak(expected_ptr, val_ptr)) {
                 // Succeeded.
                 // Release old object.
@@ -127,18 +113,18 @@ public:
     }
 
 private:
-    template<typename T2>
+    template < typename T2 >
     struct PtrWrapper {
         PtrWrapper() : ptr(nullptr), refCount(0) {}
         PtrWrapper(T2* src) : ptr(src), refCount(1) {}
 
-        std::atomic<T2*> ptr;
-        std::atomic<uint64_t> refCount;
+        std::atomic< T2* > ptr;
+        std::atomic< uint64_t > refCount;
     };
 
     // Atomically increase ref count and then return.
-    PtrWrapper<T>* shareCurObject() {
-        std::lock_guard<std::mutex> l(lock);
+    PtrWrapper< T >* shareCurObject() {
+        std::lock_guard< std::mutex > l(lock);
         if (!object.load(MO)) return nullptr;
 
         // Now no one can change `object`.
@@ -149,7 +135,7 @@ private:
     }
 
     // Decrease ref count and delete if no one refers to it.
-    void releaseObject(PtrWrapper<T>* target) {
+    void releaseObject(PtrWrapper< T >* target) {
         if (!target) return;
         if (target->refCount.fetch_sub(1, MO) == 1) {
             // Last shared pointer, delete it.
@@ -160,6 +146,6 @@ private:
 
     const static std::memory_order MO = std::memory_order_relaxed;
 
-    std::atomic<PtrWrapper<T>*> object;
+    std::atomic< PtrWrapper< T >* > object;
     std::mutex lock;
 };

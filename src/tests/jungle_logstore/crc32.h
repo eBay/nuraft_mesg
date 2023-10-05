@@ -16,5 +16,4 @@ public:
     static uint32_t get(const std::string& str, uint32_t seed);
 };
 
-};
-
+}; // namespace nukv
