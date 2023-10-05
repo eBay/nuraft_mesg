@@ -1,5 +1,5 @@
 # nuRAFT-Messaging
-![Conan Build](https://github.com/ebay/nuraft_mesg/actions/workflows/merge_build.yml/badge.svg)
+[![Conan Build](https://github.com/eBay/nuraft_mesg/actions/workflows/merge_build.yml/badge.svg?branch=main)](https://github.com/eBay/nuraft_mesg/actions/workflows/merge_build.yml)
 [![CodeCov](https://codecov.io/gh/eBay/nuraft_mesg/branch/main/graph/badge.svg)](https://codecov.io/gh/eBay/nuraft_mesg)
 
 ## Brief
@@ -15,7 +15,7 @@ See the [Changelog](CHANGELOG.md) for release information.
 
 ## Usage
 
-The `nuraft_manager::Manager` provides a means to register means to instantiate `nuraft::state_manager`s. This is used
+The `nuraft_mesg::Manager` provides a means to register means to instantiate `nuraft::state_manager`s. This is used
 whenever a group is directly created (`Manager::create_group(...)` ) or when the `grpc::Service` receives a
 `RaftMessage` indicating a request to join a group which one does not already belong.
 
