@@ -15,6 +15,8 @@
 SISL_LOGGING_DECL(nuraft)
 SISL_LOGGING_DECL(nuraft_mesg)
 
+#define NURAFTMESG_LOG_MODS nuraft, nuraft_mesg, grpc_server
+
 namespace nuraft_mesg {
 
 using peer_id_t = boost::uuids::uuid;

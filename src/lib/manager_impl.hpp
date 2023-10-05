@@ -24,6 +24,7 @@
 #include <sisl/logging/logging.h>
 
 #include "nuraft_mesg/mesg_factory.hpp"
+#include "common_lib.hpp"
 
 namespace sisl {
 class GrpcServer;
@@ -89,7 +90,7 @@ public:
     bool bind_data_service_request(std::string const& request_name, group_id_t const& group_id,
                                    data_service_request_handler_t const& request_handler) override;
 
-    void get_srv_config_all(group_id_t const& group_name,
+    void get_srv_config_all(group_id_t const& group_id,
                             std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) override;
 };
 

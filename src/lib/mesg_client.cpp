@@ -49,13 +49,13 @@ public:
             if (::grpc::INVALID_ARGUMENT == status.error_code()) {
                 if (auto mc = weak_this.lock(); mc) {
                     mc->bad_service.fetch_add(1, std::memory_order_relaxed);
-                    LOGERRORMOD(
-                        nuraft_mesg,
+                    LOGE(
+
                         "Sent message to wrong service, need to disconnect! Error Message: [{}] Client IP: [{}]",
                         status.error_message(), mc->_addr);
                 } else {
-                    LOGERRORMOD(nuraft_mesg, "Sent message to wrong service, need to disconnect! Error Message: [{}]",
-                                status.error_message());
+                    LOGE("Sent message to wrong service, need to disconnect! Error Message: [{}]",
+                         status.error_message());
                 }
             }
             complete(*response.mutable_msg(), status);
@@ -76,7 +76,7 @@ public:
             cli_byte_buf, request_name,
             [c = copyable_promise](grpc::ByteBuffer& resp, ::grpc::Status& status) mutable {
                 if (!status.ok()) {
-                    LOGERRORMOD(nuraft_mesg, "Failed to send data_service_request, error: {}", status.error_message());
+                    LOGE("Failed to send data_service_request, error: {}", status.error_message());
                     c->setValue(folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED));
                 } else {
                     sisl::io_blob svr_buf;
@@ -95,7 +95,7 @@ protected:
 
 class group_client : public grpc_base_client {
     std::shared_ptr< messaging_client > _client;
-    group_id_t const _group_name;
+    group_id_t const _group_id;
     group_type_t const _group_type;
     std::shared_ptr< group_metrics > _metrics;
     std::string const _client_addr;
@@ -105,7 +105,7 @@ public:
                  group_type_t const& grp_type, std::shared_ptr< sisl::MetricsGroupWrapper > metrics) :
             grpc_base_client(),
             _client(client),
-            _group_name(grp_name),
+            _group_id(grp_name),
             _group_type(grp_type),
             _metrics(std::static_pointer_cast< group_metrics >(metrics)),
             _client_addr(to_string(client_addr)) {}
@@ -118,12 +118,12 @@ public:
     void send(RaftMessage const& message, handle_resp complete) override {
         RaftGroupMsg group_msg;
 
-        LOGTRACEMOD(nuraft_mesg, "Sending [{}] from: [{}] to: [{}] Group: [{}]",
-                    nuraft::msg_type_to_string(nuraft::msg_type(message.base().type())), message.base().src(),
-                    message.base().dest(), _group_name);
+        LOGT("Sending [{}] from: [{}] to: [{}] Group: [{}]",
+             nuraft::msg_type_to_string(nuraft::msg_type(message.base().type())), message.base().src(),
+             message.base().dest(), _group_id);
         if (_metrics) { COUNTER_INCREMENT(*_metrics, group_sends, 1); }
         group_msg.set_intended_addr(_client_addr);
-        group_msg.set_group_name(to_string(_group_name));
+        group_msg.set_group_id(to_string(_group_id));
         group_msg.set_group_type(_group_type);
         group_msg.mutable_msg()->CopyFrom(message);
         _client->send(group_msg, complete);
@@ -137,16 +137,16 @@ public:
 nuraft::cmd_result_code mesg_factory::create_client(peer_id_t const& client,
                                                     nuraft::ptr< nuraft::rpc_client >& raft_client) {
     // Re-direct this call to a global factory so we can re-use clients to the same endpoints
-    LOGDEBUGMOD(nuraft_mesg, "Creating client to {}", client);
+    LOGD("Creating client to {}", client);
     auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_client(to_string(client)));
     if (!m_client) return nuraft::CANCELLED;
-    raft_client = std::make_shared< group_client >(m_client, client, _group_name, _group_type, _metrics);
+    raft_client = std::make_shared< group_client >(m_client, client, _group_id, _group_type, _metrics);
     return (!raft_client) ? nuraft::BAD_REQUEST : nuraft::OK;
 }
 
 nuraft::cmd_result_code mesg_factory::reinit_client(peer_id_t const& client,
                                                     std::shared_ptr< nuraft::rpc_client >& raft_client) {
-    LOGDEBUGMOD(nuraft_mesg, "Re-init client to {}", client);
+    LOGD("Re-init client to {}", client);
     auto g_client = std::dynamic_pointer_cast< group_client >(raft_client);
     auto new_raft_client = std::static_pointer_cast< nuraft::rpc_client >(g_client->realClient());
     if (auto err = _group_factory->reinit_client(client, new_raft_client); err) { return err; }
@@ -160,7 +160,7 @@ AsyncResult< sisl::io_blob > mesg_factory::data_service_request(std::string cons
     auto calls = std::list< AsyncResult< sisl::io_blob > >();
     for (auto& nuraft_client : _clients) {
         auto g_client = std::dynamic_pointer_cast< nuraft_mesg::group_client >(nuraft_client.second);
-        calls.push_back(g_client->data_service_request(get_generic_method_name(request_name, _group_name), cli_buf));
+        calls.push_back(g_client->data_service_request(get_generic_method_name(request_name, _group_id), cli_buf));
     }
     return folly::collectAnyWithoutException(calls).deferValue([](auto&& p) { return p.second; });
 }
@@ -173,11 +173,11 @@ group_factory::group_factory(int const cli_thread_count, group_id_t const& name,
 
 nuraft::cmd_result_code group_factory::create_client(peer_id_t const& client,
                                                      nuraft::ptr< nuraft::rpc_client >& raft_client) {
-    LOGDEBUGMOD(nuraft_mesg, "Creating client to {}", client);
+    LOGD("Creating client to {}", client);
     auto endpoint = lookupEndpoint(client);
     if (endpoint.empty()) return nuraft::BAD_REQUEST;
 
-    LOGDEBUGMOD(nuraft_mesg, "Creating client for [{}] @ [{}]", client, endpoint);
+    LOGD("Creating client for [{}] @ [{}]", client, endpoint);
     raft_client =
         sisl::GrpcAsyncClient::make< messaging_client >(workerName(), endpoint, m_token_client, "", m_ssl_cert);
     return (!raft_client) ? nuraft::CANCELLED : nuraft::OK;
@@ -185,7 +185,7 @@ nuraft::cmd_result_code group_factory::create_client(peer_id_t const& client,
 
 nuraft::cmd_result_code group_factory::reinit_client(peer_id_t const& client,
                                                      std::shared_ptr< nuraft::rpc_client >& raft_client) {
-    LOGDEBUGMOD(nuraft_mesg, "Re-init client to {}", client);
+    LOGD("Re-init client to {}", client);
     assert(raft_client);
     auto mesg_client = std::dynamic_pointer_cast< messaging_client >(raft_client);
     if (!mesg_client->is_connection_ready() || 0 < mesg_client->bad_service.load(std::memory_order_relaxed)) {

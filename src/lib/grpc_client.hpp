@@ -23,7 +23,7 @@
 #include <sisl/grpc/rpc_client.hpp>
 #include <sisl/logging/logging.h>
 
-#include "nuraft_mesg/common.hpp"
+#include "common_lib.hpp"
 
 namespace nuraft_mesg {
 
@@ -76,13 +76,13 @@ public:
 
     void init() override {
         // Re-create channel only if current channel is busted.
-        if (!_stub || !is_connection_ready()) {
-            LOGDEBUGMOD(nuraft_mesg, "Client init ({}) to {}", (!!_stub ? "Again" : "First"), _addr);
-            sisl::GrpcAsyncClient::init();
-            _stub = sisl::GrpcAsyncClient::make_stub< TSERVICE >(_worker_name);
-        } else {
-            LOGDEBUGMOD(nuraft_mesg, "Channel looks fine, re-using");
+        if (_stub && is_connection_ready()) {
+            LOGD("Channel looks fine, re-using");
+            return;
         }
+        LOGD("Client init ({}) to {}", (!!_stub ? "Again" : "First"), _addr);
+        sisl::GrpcAsyncClient::init();
+        _stub = sisl::GrpcAsyncClient::make_stub< TSERVICE >(_worker_name);
     }
 
 protected:

@@ -93,27 +93,26 @@ void respHandler(std::shared_ptr< ContextType > ctx, std::shared_ptr< nuraft::re
                  std::shared_ptr< nuraft::rpc_exception >& err) {
     auto factory = ctx->cli_factory();
     if (err || !rsp) {
-        LOGERROR("{}", (err ? err->what() : "No response."));
+        LOGE("{}", (err ? err->what() : "No response."));
         ctx->set((rsp ? rsp->get_result_code() : nuraft::cmd_result_code::SERVER_NOT_FOUND));
         return;
     } else if (rsp->get_accepted()) {
-        LOGDEBUGMOD(nuraft_mesg, "Accepted response");
+        LOGD("Accepted response");
         ctx->set(rsp->get_result_code());
         return;
     } else if (ctx->_cur_dest == rsp->get_dst()) {
-        LOGWARN("Request ignored");
+        LOGW("Request ignored");
         ctx->set(rsp->get_result_code());
         return;
     } else if (0 > rsp->get_dst()) {
-        LOGWARN("No known leader!");
+        LOGW("No known leader!");
         ctx->set(rsp->get_result_code());
         return;
     }
 
     // Not accepted: means that `get_dst()` is a new leader.
     auto gresp = std::dynamic_pointer_cast< grpc_resp >(rsp);
-    LOGDEBUGMOD(nuraft_mesg, "Updating destination from {} to {}[{}]", ctx->_cur_dest, rsp->get_dst(),
-                gresp->dest_addr);
+    LOGD("Updating destination from {} to {}[{}]", ctx->_cur_dest, rsp->get_dst(), gresp->dest_addr);
     ctx->_cur_dest = rsp->get_dst();
     auto client = factory->create_client(gresp->dest_addr);
 
@@ -123,7 +122,7 @@ void respHandler(std::shared_ptr< ContextType > ctx, std::shared_ptr< nuraft::re
             respHandler(ctx, rsp, err);
         });
 
-    LOGDEBUGMOD(nuraft_mesg, "Creating new message: {}", ctx->_new_srv_addr);
+    LOGD("Creating new message: {}", ctx->_new_srv_addr);
     auto msg = createMessage(ctx->payload(), ctx->_new_srv_addr);
     client->send(msg, handler);
 }
@@ -144,7 +143,7 @@ class grpc_error_client : public grpc_base_client {
 nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(std::string const& client) {
     try {
         return create_client(boost::uuids::string_generator()(client));
-    } catch (std::runtime_error const& e) { LOGCRITICAL("Client Endpoint Invalid! [{}]", client); }
+    } catch (std::runtime_error const& e) { LOGC("Client Endpoint Invalid! [{}]", client); }
     return nullptr;
 }
 
@@ -155,17 +154,17 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(peer_id_t const& c
     auto [it, happened] = _clients.emplace(client, nullptr);
     if (_clients.end() != it) {
         if (!happened) {
-            LOGDEBUGMOD(nuraft_mesg, "Re-creating client for {}", client);
+            LOGD("Re-creating client for {}", client);
             if (auto err = reinit_client(client, it->second); nuraft::OK != err) {
-                LOGERROR("Failed to re-initialize client {}: {}", client, err);
+                LOGE("Failed to re-initialize client {}: {}", client, err);
                 new_client = std::make_shared< grpc_error_client >();
             } else {
                 new_client = it->second;
             }
         } else {
-            LOGDEBUGMOD(nuraft_mesg, "Creating client for {}", client);
+            LOGD("Creating client for {}", client);
             if (auto err = create_client(client, it->second); nuraft::OK != err) {
-                LOGERROR("Failed to create client for {}: {}", client, err);
+                LOGE("Failed to create client for {}: {}", client, err);
                 new_client = std::make_shared< grpc_error_client >();
             } else {
                 new_client = it->second;

@@ -18,6 +18,6 @@ if (jungle_FOUND)
           GTest::gmock
         )
 
-    add_test(NAME MessagingTest COMMAND messaging_test -csv 3)
+    add_test(NAME MessagingTest COMMAND messaging_test -cv 0)
     set_property(TEST MessagingTest PROPERTY RUN_SERIAL 1)
 endif ()

@@ -20,7 +20,7 @@ import "raft_types.proto";
 package nuraft_mesg;
 
 message RaftGroupMsg {
-    string                  group_name          = 1;
+    string                  group_id            = 1;
     RaftMessage             msg                 = 2;
     string                  intended_addr       = 3;
     string                  group_type          = 4;

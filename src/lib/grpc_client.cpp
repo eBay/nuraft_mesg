@@ -54,7 +54,7 @@ inline std::shared_ptr< nuraft::resp_msg > toResponse(RaftMessage const& raft_ms
                                                  resp.next_index(), resp.accepted());
     message->set_result_code((nuraft::cmd_result_code)(0 - resp.result_code()));
     if (nuraft::cmd_result_code::NOT_LEADER == message->get_result_code()) {
-        LOGINFOMOD(nuraft_mesg, "Leader has changed!");
+        LOGI("Leader has changed!");
         message->dest_addr = resp.dest_addr();
     }
     if (0 < resp.context().length()) {
@@ -67,16 +67,14 @@ inline std::shared_ptr< nuraft::resp_msg > toResponse(RaftMessage const& raft_ms
 
 std::atomic_uint64_t grpc_base_client::_client_counter = 0ul;
 
-void grpc_base_client::send(std::shared_ptr< nuraft::req_msg >& req, nuraft::rpc_handler& complete,
-                            uint64_t) {
+void grpc_base_client::send(std::shared_ptr< nuraft::req_msg >& req, nuraft::rpc_handler& complete, uint64_t) {
     assert(req && complete);
     RaftMessage grpc_request;
     grpc_request.set_allocated_base(fromBaseRequest(*req));
     grpc_request.set_allocated_rc_request(fromRCRequest(*req));
 
-    LOGTRACEMOD(nuraft_mesg, "Sending [{}] from: [{}] to: [{}]",
-                nuraft::msg_type_to_string(nuraft::msg_type(grpc_request.base().type())), grpc_request.base().src(),
-                grpc_request.base().dest());
+    LOGT("Sending [{}] from: [{}] to: [{}]", nuraft::msg_type_to_string(nuraft::msg_type(grpc_request.base().type())),
+         grpc_request.base().src(), grpc_request.base().dest());
 
     send(grpc_request, [req, complete](RaftMessage& response, ::grpc::Status& status) mutable -> void {
         std::shared_ptr< nuraft::rpc_exception > err;

@@ -50,7 +50,7 @@ public:
 
 class mesg_factory final : public grpc_factory {
     std::shared_ptr< group_factory > _group_factory;
-    group_id_t const _group_name;
+    group_id_t const _group_id;
     group_type_t const _group_type;
     std::shared_ptr< sisl::MetricsGroupWrapper > _metrics;
 
@@ -59,11 +59,11 @@ public:
                  std::shared_ptr< sisl::MetricsGroupWrapper > metrics = nullptr) :
             grpc_factory(0, to_string(grp_id)),
             _group_factory(g_factory),
-            _group_name(grp_id),
+            _group_id(grp_id),
             _group_type(grp_type),
             _metrics(metrics) {}
 
-    group_id_t group_name() const { return _group_name; }
+    group_id_t group_id() const { return _group_id; }
 
     nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >& rpc_ptr) override;
 
