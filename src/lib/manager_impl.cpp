@@ -20,7 +20,6 @@
 #include "logger.hpp"
 #include "utils.hpp"
 
-constexpr auto cfg_change_timeout = std::chrono::milliseconds(200);
 constexpr auto leader_change_timeout = std::chrono::milliseconds(3200);
 constexpr auto grpc_client_threads = 1u;
 constexpr auto grpc_server_threads = 1u;
@@ -220,7 +219,7 @@ NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, peer_id_t co
             // TODO This should not block, but attach a new promise!
             auto lk = std::unique_lock< std::mutex >(_manager_lock);
             if (!_config_change.wait_for(
-                    lk, cfg_change_timeout * 20, [this, g_id = std::move(g_id), n_id = std::move(n_id)]() {
+                    lk, leader_change_timeout, [this, g_id = std::move(g_id), n_id = std::move(n_id)]() {
                         std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
                         _mesg_service->get_srv_config_all(g_id, srv_list);
                         return std::find_if(srv_list.begin(), srv_list.end(),
@@ -234,13 +233,32 @@ NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, peer_id_t co
         });
 }
 
+NullAsyncResult ManagerImpl::rem_member(group_id_t const& group_id, peer_id_t const& old_id) {
+    return _mesg_service->rm_srv(group_id, to_server_id(old_id));
+}
+
+NullAsyncResult ManagerImpl::become_leader(group_id_t const& group_id) {
+    {
+        auto lk = std::unique_lock< std::mutex >(_manager_lock);
+        if (_is_leader[group_id]) { return folly::Unit(); }
+    }
+
+    return folly::makeSemiFuture< folly::Unit >(folly::Unit())
+        .deferValue([this, g_id = group_id](auto) mutable -> NullResult {
+            if (!_mesg_service->request_leadership(g_id))
+                return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+
+            auto lk = std::unique_lock< std::mutex >(_manager_lock);
+            if (!_config_change.wait_for(lk, leader_change_timeout,
+                                         [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; }))
+                return folly::makeUnexpected(nuraft::cmd_result_code::TIMEOUT);
+            return folly::Unit();
+        });
+}
+
 NullAsyncResult ManagerImpl::append_entries(group_id_t const& group_id,
                                             std::vector< std::shared_ptr< nuraft::buffer > > const& buf) {
     return _mesg_service->append_entries(group_id, buf);
-}
-
-NullAsyncResult ManagerImpl::rem_member(group_id_t const& group_id, peer_id_t const& old_id) {
-    return _mesg_service->rm_srv(group_id, to_server_id(old_id));
 }
 
 std::shared_ptr< mesg_state_mgr > ManagerImpl::lookup_state_manager(group_id_t const& group_id) const {
@@ -282,7 +300,6 @@ NullResult ManagerImpl::join_group(group_id_t const& group_id, group_type_t cons
         _state_managers.erase(group_id);
         return folly::makeUnexpected(err);
     }
-    std::this_thread::sleep_for(cfg_change_timeout);
     return folly::Unit();
 }
 
@@ -297,33 +314,6 @@ void ManagerImpl::append_peers(group_id_t const& group_id, std::list< peer_id_t 
             servers.push_back(boost::uuids::string_generator()(server->get_endpoint()));
         }
     }
-}
-
-NullAsyncResult ManagerImpl::become_leader(group_id_t const& group_id) {
-    {
-        auto lk = std::unique_lock< std::mutex >(_manager_lock);
-        if (_is_leader[group_id]) { return folly::Unit(); }
-    }
-
-    return folly::makeSemiFuture< folly::Unit >(folly::Unit())
-        .deferValue([this, g_id = group_id](auto) mutable -> NullResult {
-            bool request_success{false};
-            for (auto max_retries = 5ul; max_retries > 0; --max_retries) {
-                if (_mesg_service->request_leadership(g_id)) {
-                    request_success = true;
-                    break;
-                }
-                // Do not sleep on the last try
-                if (max_retries != 1) { std::this_thread::sleep_for(std::chrono::milliseconds(leader_change_timeout)); }
-            }
-            if (!request_success) return folly::makeUnexpected(nuraft::cmd_result_code::TIMEOUT);
-
-            auto lk = std::unique_lock< std::mutex >(_manager_lock);
-            if (!_config_change.wait_for(lk, leader_change_timeout,
-                                         [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; }))
-                return folly::makeUnexpected(nuraft::cmd_result_code::TIMEOUT);
-            return folly::Unit();
-        });
 }
 
 void ManagerImpl::leave_group(group_id_t const& group_id) {
