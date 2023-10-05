@@ -15,15 +15,14 @@
 #include <memory>
 #include <string>
 
-#include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/random_generator.hpp>
+#include <folly/init/Init.h>
+#include <folly/executors/GlobalExecutor.h>
 #include <sisl/grpc/rpc_client.hpp>
 #include <sisl/logging/logging.h>
 #include <sisl/options/options.h>
 #include <nlohmann/json.hpp>
-
-#include <sisl/utility/thread_buffer.hpp>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -34,9 +33,8 @@
 #include "nuraft_mesg/mesg_factory.hpp"
 
 #include "test_state_manager.h"
-#include <sisl/fds/buffer.hpp>
 
-SISL_LOGGING_INIT(nuraft, nuraft_mesg, grpc_server)
+SISL_LOGGING_INIT(NURAFTMESG_LOG_MODS)
 
 SISL_OPTIONS_ENABLE(logging)
 
@@ -54,6 +52,8 @@ public:
     boost::uuids::uuid id_;
     std::shared_ptr< Manager > instance_;
 
+    std::map< group_id_t, std::shared_ptr< test_state_mgr > > state_mgr_map_;
+
     TestApplication(std::string const& name, uint32_t port) : name_(name), port_(port) {
         id_ = boost::uuids::random_generator()();
     }
@@ -67,7 +67,11 @@ public:
     }
 
     std::shared_ptr< mesg_state_mgr > create_state_mgr(int32_t const srv_id, group_id_t const& group_id) override {
-        return std::static_pointer_cast< mesg_state_mgr >(std::make_shared< test_state_mgr >(srv_id, id_, group_id));
+        auto [it, happened] =
+            state_mgr_map_.try_emplace(group_id, std::make_shared< test_state_mgr >(srv_id, id_, group_id));
+        RELEASE_ASSERT(happened, "Failed!");
+        it->second->register_data_service_apis(instance_.get());
+        return std::static_pointer_cast< mesg_state_mgr >(it->second);
     }
 
     void map_peers(std::map< nuraft_mesg::peer_id_t, std::string > const& peers) {
@@ -309,113 +313,111 @@ TEST_F(MessagingFixture, SyncAddMember) {
     EXPECT_EQ(srv_list.size(), 4u);
 }
 
-// class DataServiceFixture : public MessagingFixtureBase {
-// protected:
-//     void SetUp() override {
-//         MessagingFixtureBase::SetUp();
-//         start(true);
-//     }
-// };
-//
-// TEST_F(DataServiceFixture, DataServiceBasic) {
-//     get_random_ports(2u);
-//     // create new servers
-//     auto app_4 = std::make_shared< TestApplication >("sm4", ports[3]);
-//     lookup_map.emplace(app_4->id_, fmt::format("127.0.0.1:{}", ports[3]));
-//     app_1_->map_peers(lookup_map);
-//     app_2_->map_peers(lookup_map);
-//     app_3_->map_peers(lookup_map);
-//     app_4->map_peers(lookup_map);
-//     app_4->start(true);
-//     auto add4 = app_1_->instance_->add_member("test_group", app_4->id_);
-//     std::this_thread::sleep_for(std::chrono::seconds(1));
-//     EXPECT_TRUE(std::move(add4).get());
-//
-//     auto app_5 = std::make_shared< TestApplication >("sm5", ports[4]);
-//     lookup_map.emplace(app_5->id_, fmt::format("127.0.0.1:{}", ports[4]));
-//     app_1_->map_peers(lookup_map);
-//     app_2_->map_peers(lookup_map);
-//     app_3_->map_peers(lookup_map);
-//     app_4->map_peers(lookup_map);
-//     app_5->map_peers(lookup_map);
-//     app_5->start(true);
-//     auto add5 = app_1_->instance_->add_member("test_group", app_5->id_);
-//     std::this_thread::sleep_for(std::chrono::seconds(1));
-//     EXPECT_TRUE(std::move(add5).get());
-//
-//     // create new group
-//     app_4->instance_->create_group("data_service_test_group", "test_type");
-//     std::this_thread::sleep_for(std::chrono::seconds(1));
-//     auto add1 = app_4->instance_->add_member("data_service_test_group", app_1_->id_);
-//     std::this_thread::sleep_for(std::chrono::seconds(1));
-//     EXPECT_TRUE(std::move(add1).get());
-//     auto add2 = app_4->instance_->add_member("data_service_test_group", app_2_->id_);
-//     std::this_thread::sleep_for(std::chrono::seconds(1));
-//     EXPECT_TRUE(std::move(add2).get());
-//     add5 = app_4->instance_->add_member("data_service_test_group", app_5->id_);
-//     std::this_thread::sleep_for(std::chrono::seconds(1));
-//     EXPECT_TRUE(std::move(add5).get());
-//
-//     for (auto& [key, smgr] : state_mgr_map) {
-//         smgr.first->register_data_service_apis(smgr.second);
-//     }
-//
-//     io_blob_list_t cli_buf;
-//     test_state_mgr::fill_data_vec(cli_buf);
-//
-//     auto sm1 = state_mgr_map["test_group_sm1"].first;
-//     auto sm4 = state_mgr_map["data_service_test_group_sm4"].first;
-//
-//     std::string const SEND_DATA{"send_data"};
-//     std::string const REQUEST_DATA{"request_data"};
-//
-//     std::vector< NullAsyncResult > results;
-//     results.push_back(sm1->data_service_request(SEND_DATA, cli_buf).deferValue([](auto e) -> NullResult {
-//         test_state_mgr::verify_data(e.value());
-//         return folly::Unit();
-//     }));
-//     results.push_back(sm4->data_service_request(SEND_DATA, cli_buf).deferValue([](auto e) -> NullResult {
-//         test_state_mgr::verify_data(e.value());
-//         return folly::Unit();
-//     }));
-//
-//     results.push_back(sm1->data_service_request(REQUEST_DATA, cli_buf).deferValue([](auto e) -> NullResult {
-//         test_state_mgr::verify_data(e.value());
-//         return folly::Unit();
-//     }));
-//     folly::collectAll(results).via(folly::getGlobalCPUExecutor()).get();
-//
-//     // add a new member to data_service_test_group and check if repl_ctx4 sends data to newly added member
-//     auto add_3 = app_4->instance_->add_member("data_service_test_group", app_3_->id_);
-//     std::this_thread::sleep_for(std::chrono::seconds(1));
-//     EXPECT_TRUE(std::move(add_3).get());
-//     auto sm3 = state_mgr_map["data_service_test_group_sm3"].first;
-//     sm3->register_data_service_apis(app_3_->instance_.get());
-//     sm4->data_service_request(SEND_DATA, cli_buf)
-//         .deferValue([](auto e) -> folly::Unit {
-//             test_state_mgr::verify_data(e.value());
-//             return folly::Unit();
-//         })
-//         .get();
-//
-//     // the count is 4 (2 methods from group test_group) + 7 (from data_service_test_group)
-//     EXPECT_EQ(test_state_mgr::get_server_counter(), 11);
-//
-//     // free client buf
-//     for (auto& buf : cli_buf) {
-//         buf.buf_free();
-//     }
-// }
+class DataServiceFixture : public MessagingFixtureBase {
+protected:
+    void SetUp() override {
+        MessagingFixtureBase::SetUp();
+        start(true);
+    }
+};
+
+TEST_F(DataServiceFixture, DataServiceBasic) {
+    get_random_ports(2u);
+    // create new servers
+    auto app_4 = std::make_shared< TestApplication >("sm4", ports[3]);
+    lookup_map.emplace(app_4->id_, fmt::format("127.0.0.1:{}", ports[3]));
+    app_1_->map_peers(lookup_map);
+    app_2_->map_peers(lookup_map);
+    app_3_->map_peers(lookup_map);
+    app_4->map_peers(lookup_map);
+    app_4->start(true);
+    auto add4 = app_1_->instance_->add_member(group_id_, app_4->id_);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    EXPECT_TRUE(std::move(add4).get());
+
+    auto app_5 = std::make_shared< TestApplication >("sm5", ports[4]);
+    lookup_map.emplace(app_5->id_, fmt::format("127.0.0.1:{}", ports[4]));
+    app_1_->map_peers(lookup_map);
+    app_2_->map_peers(lookup_map);
+    app_3_->map_peers(lookup_map);
+    app_4->map_peers(lookup_map);
+    app_5->map_peers(lookup_map);
+    app_5->start(true);
+    auto add5 = app_1_->instance_->add_member(group_id_, app_5->id_);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    EXPECT_TRUE(std::move(add5).get());
+
+    // create new group
+    auto data_group = boost::uuids::random_generator()();
+    app_4->instance_->create_group(data_group, "test_type");
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    auto add1 = app_4->instance_->add_member(data_group, app_1_->id_);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    EXPECT_TRUE(std::move(add1).get());
+    auto add2 = app_4->instance_->add_member(data_group, app_2_->id_);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    EXPECT_TRUE(std::move(add2).get());
+    add5 = app_4->instance_->add_member(data_group, app_5->id_);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    EXPECT_TRUE(std::move(add5).get());
+
+    io_blob_list_t cli_buf;
+    test_state_mgr::fill_data_vec(cli_buf);
+
+    auto sm1 = app_1_->state_mgr_map_[group_id_];
+    RELEASE_ASSERT(sm1, "Bad pointer!");
+    auto sm4 = app_4->state_mgr_map_[data_group];
+    RELEASE_ASSERT(sm4, "Bad pointer!");
+
+    std::string const SEND_DATA{"send_data"};
+    std::string const REQUEST_DATA{"request_data"};
+
+    std::vector< NullAsyncResult > results;
+    results.push_back(sm1->data_service_request(SEND_DATA, cli_buf).deferValue([](auto e) -> NullResult {
+        test_state_mgr::verify_data(e.value());
+        return folly::Unit();
+    }));
+    results.push_back(sm4->data_service_request(SEND_DATA, cli_buf).deferValue([](auto e) -> NullResult {
+        test_state_mgr::verify_data(e.value());
+        return folly::Unit();
+    }));
+
+    results.push_back(sm1->data_service_request(REQUEST_DATA, cli_buf).deferValue([](auto e) -> NullResult {
+        test_state_mgr::verify_data(e.value());
+        return folly::Unit();
+    }));
+    folly::collectAll(results).via(folly::getGlobalCPUExecutor()).get();
+
+    // add a new member to data_service_test_group and check if repl_ctx4 sends data to newly added member
+    auto add_3 = app_4->instance_->add_member(data_group, app_3_->id_);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    EXPECT_TRUE(std::move(add_3).get());
+    auto sm3 = app_3_->state_mgr_map_[data_group];
+    sm4->data_service_request(SEND_DATA, cli_buf)
+        .deferValue([](auto e) -> folly::Unit {
+            test_state_mgr::verify_data(e.value());
+            return folly::Unit();
+        })
+        .get();
+
+    // TODO REVIEW THIS
+    // the count is 12 (2 methods from group test_group) + 8 (from data_service_test_group)
+    EXPECT_EQ(test_state_mgr::get_server_counter(), 12);
+
+    // free client buf
+    for (auto& buf : cli_buf) {
+        buf.buf_free();
+    }
+}
 
 int main(int argc, char* argv[]) {
-    ::testing::InitGoogleTest(&argc, argv);
-    SISL_OPTIONS_LOAD(argc, argv, logging)
+    int parsed_argc = argc;
+    ::testing::InitGoogleTest(&parsed_argc, argv);
+    SISL_OPTIONS_LOAD(parsed_argc, argv, logging);
     sisl::logging::SetLogger(std::string(argv[0]));
-    spdlog::set_pattern("[%D %T.%f%z] [%^%l%$] [%t] %v");
-    sisl::logging::GetLogger()->flush_on(spdlog::level::level_enum::err);
-
-    auto ret = RUN_ALL_TESTS();
-    sisl::GrpcAsyncClientWorker::shutdown_all();
-
-    return ret;
+    spdlog::set_pattern("[%D %T.%e] [%n] [%^%l%$] [%t] %v");
+    parsed_argc = 1;
+    auto f = ::folly::Init(&parsed_argc, &argv, true);
+    return RUN_ALL_TESTS();
+    // sisl::GrpcAsyncClientWorker::shutdown_all();
 }
