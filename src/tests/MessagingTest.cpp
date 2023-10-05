@@ -227,8 +227,10 @@ TEST_F(MessagingFixture, MemberCrash) {
         {"op_type", 2},
     });
     auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
-    auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_), to_string(app_1_->id_));
-    EXPECT_TRUE(factory->append_entry(buf, dest_cfg).get());
+    auto const dest_cfg_1 = nuraft::srv_config(to_server_id(app_1_->id_), to_string(app_1_->id_));
+    auto const dest_cfg_2 = nuraft::srv_config(to_server_id(app_2_->id_), to_string(app_2_->id_));
+    EXPECT_TRUE(factory->append_entry(buf, dest_cfg_1).get());
+    EXPECT_TRUE(factory->append_entry(buf, dest_cfg_2).get());
 
     app_3_ = std::make_shared< TestApplication >("sm3", ports[2]);
     app_3_->set_id(our_id);
