@@ -8,7 +8,7 @@ required_conan_version = ">=1.50.0"
 
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "1.0.1"
+    version = "2.0.1"
 
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
@@ -58,7 +58,7 @@ class NuRaftMesgConan(ConanFile):
 
     def requirements(self):
         self.requires("sisl/[~=10, include_prerelease=True]@oss/master")
-        self.requires("nuraft/2.2.0")
+        self.requires("nuraft/2.3.0")
 
         self.requires("boost/1.82.0")
         self.requires("openssl/3.1.1")
@@ -90,7 +90,7 @@ class NuRaftMesgConan(ConanFile):
     def package(self):
         lib_dir = join(self.package_folder, "lib")
         copy(self, "LICENSE", self.source_folder, join(self.package_folder, "licenses"), keep_path=False)
-        copy(self, "*.h*", join(self.source_folder, "src", "include"), join(self.package_folder, "include", "nuraft_mesg"), keep_path=True)
+        copy(self, "*.h*", join(self.source_folder, "src", "include"), join(self.package_folder, "include"), keep_path=True)
         copy(self, "*.lib", self.build_folder, lib_dir, keep_path=False)
         copy(self, "*.a", self.build_folder, lib_dir, keep_path=False)
         copy(self, "*.so*", self.build_folder, lib_dir, keep_path=False)

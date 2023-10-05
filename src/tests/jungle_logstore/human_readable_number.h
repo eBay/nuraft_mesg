@@ -8,28 +8,19 @@
 #include <string>
 #include <regex>
 
-class HumanReadableNumber{
+class HumanReadableNumber {
 public:
-    HumanReadableNumber(const std::string& str_in)
-        : str(str_in)
-    {
+    HumanReadableNumber(const std::string& str_in) : str(str_in) {
         try {
             conv(str_in, size_in_bytes);
-        } catch(std::exception& e){
-            throw std::invalid_argument("Convert fails input : " + str_in + " "
-                                        + e.what());
-        }
+        } catch (std::exception& e) { throw std::invalid_argument("Convert fails input : " + str_in + " " + e.what()); }
     };
 
-    HumanReadableNumber(const unsigned long long& size_in)
-        : size_in_bytes(size_in)
-    {
+    HumanReadableNumber(const unsigned long long& size_in) : size_in_bytes(size_in) {
         try {
             conv(size_in, str);
         } catch (std::exception& e) {
-            throw std::invalid_argument( "Convert fails input : " +
-                                         std::to_string(size_in) +
-                                         " " + e.what() );
+            throw std::invalid_argument("Convert fails input : " + std::to_string(size_in) + " " + e.what());
         }
     };
 
@@ -40,24 +31,19 @@ public:
 
         try {
             coeff = stod(in, &pos);
-        } catch(std::invalid_argument& einval) {
-            throw einval;
-        } catch (std::out_of_range& erange) {
+        } catch (std::invalid_argument& einval) { throw einval; } catch (std::out_of_range& erange) {
             throw erange;
         }
 
         // if coeff is less than zero, return
-        if (coeff <= 0.0) {
-            throw std::invalid_argument
-                  ( "Numeric factor less than or equal to zero" );
-        }
+        if (coeff <= 0.0) { throw std::invalid_argument("Numeric factor less than or equal to zero"); }
 
         auto it = in.begin();
         std::advance(it, pos);
 
         // pure numeric
         if (it == in.end()) {
-            size_out = static_cast<unsigned long long>(coeff);
+            size_out = static_cast< unsigned long long >(coeff);
             return;
         }
 
@@ -67,13 +53,13 @@ public:
 
         // all bytes form from 'b' to 'ZB'
         if (std::regex_match(it, in.end(), match, r)) {
-            int exp  = 0;
+            int exp = 0;
             int unit = 1024;
 
             // parse and decide exponential
             // TODO : Need to address locale problem
             if (match.size() == 2) {
-                switch(std::toupper(*match[1].first)) {
+                switch (std::toupper(*match[1].first)) {
                 case 'B':
                     exp = 0;
                     break;
@@ -106,10 +92,8 @@ public:
                 }
             }
 
-            size_out =
-                exp
-                ? static_cast<unsigned long long>(coeff * pow(unit, exp / 3))
-                : static_cast<unsigned long long>(coeff);
+            size_out = exp ? static_cast< unsigned long long >(coeff * pow(unit, exp / 3))
+                           : static_cast< unsigned long long >(coeff);
             return;
         }
 
@@ -119,16 +103,16 @@ public:
 
     void conv(const unsigned long long bytes, std::string& str_out) {
         unsigned unit = 1024;
-        char tmp[10]={};
+        char tmp[10] = {};
         if (bytes < unit) {
             str_out = std::to_string(bytes) + "B";
             return;
         }
-        unsigned exp = (unsigned) (std::log(bytes) / std::log(unit));
+        unsigned exp = (unsigned)(std::log(bytes) / std::log(unit));
 
         // we can't represent over YB
         static const std::string si_unit_str = "KMGTPEZ";
-        char postfix = si_unit_str[exp-1];
+        char postfix = si_unit_str[exp - 1];
         sprintf(tmp, "%.2f%cB", bytes / std::pow(unit, exp), postfix);
         str_out = tmp;
     }
@@ -138,9 +122,7 @@ public:
     unsigned long long toBytes() const { return size_in_bytes; }
 
     HumanReadableNumber& operator=(const HumanReadableNumber& hh) {
-        if (this == &hh) {
-            return *this;
-        }
+        if (this == &hh) { return *this; }
 
         str = hh.str;
         size_in_bytes = hh.size_in_bytes;
@@ -153,4 +135,3 @@ private:
     std::string str;
     unsigned long long size_in_bytes;
 }; // end of class HumanReadableNumber
-

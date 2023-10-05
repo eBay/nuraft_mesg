@@ -2,6 +2,8 @@ cmake_minimum_required (VERSION 3.11)
 
 file (GLOB LIBRARY_SOURCES *.cc)
 
+add_flags("-w")
+
 if (APPLE)
     set(OPEN_MEMSTREAM open_memstream.c)
     message(STATUS "APPLE: Use custom ${OPEN_MEMSTREAM}")

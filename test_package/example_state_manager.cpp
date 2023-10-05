@@ -2,6 +2,7 @@
 #include "example_state_machine.h"
 
 #include <fstream>
+#include <system_error>
 
 #include <nlohmann/json.hpp>
 
@@ -74,8 +75,9 @@ nuraft::ptr< nuraft::cluster_config > fromClusterConfig(json const& cluster_conf
     return raft_config;
 }
 
-simple_state_mgr::simple_state_mgr(int32_t srv_id, std::string const& srv_addr, std::string const& group_id) :
-        nuraft_mesg::mesg_state_mgr(), _srv_id(srv_id), _srv_addr(srv_addr), _group_id(group_id.c_str()) {}
+simple_state_mgr::simple_state_mgr(int32_t srv_id, nuraft_mesg::peer_id_t const& srv_addr,
+                                   nuraft_mesg::group_id_t const& group_id) :
+        nuraft_mesg::mesg_state_mgr(), _srv_id(srv_id), _srv_addr(to_string(srv_addr)), _group_id(to_string(group_id)) {}
 
 nuraft::ptr< nuraft::cluster_config > simple_state_mgr::load_config() {
     LOGDEBUG("Loading config for [{}]", _group_id);
@@ -129,7 +131,7 @@ void simple_state_mgr::save_state(const nuraft::srv_state& state) {
 uint32_t simple_state_mgr::get_logstore_id() const { return 0; }
 
 std::shared_ptr< nuraft::state_machine > simple_state_mgr::get_state_machine() {
-    return std::make_shared<echo_state_machine>();
+    return std::make_shared< echo_state_machine >();
 }
 
 void simple_state_mgr::permanent_destroy() {}

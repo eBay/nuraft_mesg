@@ -16,11 +16,9 @@
 // Brief:
 //   grpc_server step function and response transformations
 //
-#include "grpc_server.hpp"
+#include "nuraft_mesg/grpc_server.hpp"
 #include "utils.hpp"
 #include "proto/raft_types.pb.h"
-
-SISL_LOGGING_DECL(nuraft_mesg)
 
 namespace nuraft_mesg {
 
@@ -45,8 +43,8 @@ static std::shared_ptr< nuraft::req_msg > toRequest(RaftMessage const& raft_msg)
     for (auto const& log : req.log_entries()) {
         auto log_buffer = nuraft::buffer::alloc(log.buffer().size());
         memcpy(log_buffer->data(), log.buffer().data(), log.buffer().size());
-        log_entries.push_back(
-            std::make_shared< nuraft::log_entry >(log.term(), log_buffer, (nuraft::log_val_type)log.type(), log.timestamp()));
+        log_entries.push_back(std::make_shared< nuraft::log_entry >(log.term(), log_buffer,
+                                                                    (nuraft::log_val_type)log.type(), log.timestamp()));
     }
     return message;
 }
@@ -73,9 +71,8 @@ grpc_server::append_entries(std::vector< nuraft::ptr< nuraft::buffer > > const& 
 }
 
 ::grpc::Status grpc_server::step(const RaftMessage& request, RaftMessage& reply) {
-    LOGTRACEMOD(nuraft_mesg, "Stepping [{}] from: [{}] to: [{}]",
-                nuraft::msg_type_to_string(nuraft::msg_type(request.base().type())), request.base().src(),
-                request.base().dest());
+    LOGT("Stepping [{}] from: [{}] to: [{}]", nuraft::msg_type_to_string(nuraft::msg_type(request.base().type())),
+         request.base().src(), request.base().dest());
     auto rcreq = toRequest(request);
     auto resp = nuraft::raft_server_handler::process_req(_raft_server.get(), *rcreq);
     if (!resp) { return ::grpc::Status(::grpc::StatusCode::CANCELLED, "Server rejected request"); }

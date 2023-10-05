@@ -18,13 +18,13 @@
 //   inherited rpc_client instances sharing a common worker pool.
 #pragma once
 
-#include <future>
+#include <libnuraft/async.hxx>
 #include <memory>
 
 #include <folly/SharedMutex.h>
 #include <libnuraft/nuraft.hxx>
 
-SISL_LOGGING_DECL(nuraft)
+#include "common.hpp"
 
 namespace nuraft_mesg {
 
@@ -35,7 +35,7 @@ class grpc_factory : public nuraft::rpc_client_factory, public std::enable_share
 
 protected:
     client_factory_lock_type _client_lock;
-    std::map< std::string, std::shared_ptr< nuraft::rpc_client > > _clients;
+    std::map< peer_id_t, std::shared_ptr< nuraft::rpc_client > > _clients;
 
 public:
     grpc_factory(int const cli_thread_count, std::string const& name);
@@ -44,21 +44,20 @@ public:
     std::string const& workerName() const { return _worker_name; }
 
     nuraft::ptr< nuraft::rpc_client > create_client(const std::string& client) override;
+    nuraft::ptr< nuraft::rpc_client > create_client(peer_id_t const& client);
 
-    virtual std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
+    virtual nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 
-    virtual std::error_condition reinit_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
+    virtual nuraft::cmd_result_code reinit_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 
     // Construct and send an AddServer message to the cluster
-    std::future< nuraft::cmd_result_code > add_server(uint32_t const srv_id, std::string const& srv_addr,
-                                                      nuraft::srv_config const& dest_cfg);
+    NullAsyncResult add_server(uint32_t const srv_id, peer_id_t const& srv_addr, nuraft::srv_config const& dest_cfg);
 
     // Send a client request to the cluster
-    std::future< nuraft::cmd_result_code > client_request(std::shared_ptr< nuraft::buffer > buf,
-                                                          nuraft::srv_config const& dest_cfg);
+    NullAsyncResult append_entry(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg);
 
     // Construct and send a RemoveServer message to the cluster
-    std::future< nuraft::cmd_result_code > rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);
+    NullAsyncResult rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);
 };
 
 } // namespace nuraft_mesg

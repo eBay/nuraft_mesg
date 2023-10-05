@@ -2,11 +2,10 @@
 #define OPEN_MEMSTREAM_H_
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
-FILE *open_memstream(char **cp, size_t *lenp);
+FILE* open_memstream(char** cp, size_t* lenp);
 
 #ifdef __cplusplus
 }

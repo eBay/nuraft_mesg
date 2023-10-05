@@ -1,7 +1,8 @@
 #include <cassert>
 #include <csignal>
 
-#include <nuraft_mesg/messaging.hpp>
+#include <boost/uuid/string_generator.hpp>
+#include <nuraft_mesg/nuraft_mesg.hpp>
 #include <sisl/grpc/rpc_client.hpp>
 #include <sisl/grpc/rpc_server.hpp>
 #include <sisl/logging/logging.h>
@@ -11,8 +12,10 @@
 #include "example_state_manager.h"
 #include "uuids.h"
 
-SISL_OPTION_GROUP(server, (server_id, "", "server_id", "Servers ID (0-9)", cxxopts::value< uint32_t >(), ""),
-                  (start_group, "", "create", "Group Name to create initialy", cxxopts::value< std::string >(), ""))
+SISL_OPTION_GROUP(server,
+                  (server_id, "", "server_id", "Servers ID (0-9)", cxxopts::value< uint32_t >()->default_value("0"),
+                   ""),
+                  (start_group, "", "create", "Group to create", cxxopts::value< uint32_t >(), ""))
 
 SISL_OPTIONS_ENABLE(logging, server, nuraft_mesg)
 SISL_LOGGING_INIT(nuraft, nuraft_mesg, grpc_server, flip)
@@ -45,6 +48,50 @@ void handle(int signal) {
     }
 }
 
+class Application : public nuraft_mesg::MessagingApplication, public std::enable_shared_from_this< Application > {
+public:
+    uint32_t port_;
+    nuraft_mesg::peer_id_t id_;
+    std::shared_ptr< nuraft_mesg::Manager > manager_;
+
+    Application(nuraft_mesg::peer_id_t const& name, uint32_t port) : port_(port) { id_ = name; }
+    ~Application() override = default;
+
+    std::string lookup_peer(nuraft_mesg::peer_id_t const& peer) override {
+        // Provide a method for the service layer to lookup an IPv4:port address
+        // from a uuid; however the process wants to do that.
+        auto id_str = to_string(peer);
+        for (auto i = 0u; i < 5; ++i) {
+            if (uuids[i] == id_str) { return fmt::format(FMT_STRING("127.0.0.1:{}"), 9000 + i); }
+        }
+        RELEASE_ASSERT(false, "Missing Peer: {}", peer);
+        return std::string();
+    }
+
+    std::shared_ptr< nuraft_mesg::mesg_state_mgr > create_state_mgr(int32_t const srv_id,
+                                                                    nuraft_mesg::group_id_t const& group_id) override {
+        return std::static_pointer_cast< nuraft_mesg::mesg_state_mgr >(
+            std::make_shared< simple_state_mgr >(srv_id, id_, group_id));
+    }
+
+    void start() {
+        auto params = nuraft_mesg::Manager::Params();
+        params.server_uuid_ = id_;
+        params.mesg_port_ = port_;
+        params.default_group_type_ = "test_package";
+        manager_ = init_messaging(params, weak_from_this(), false);
+        auto r_params = nuraft::raft_params()
+                            .with_election_timeout_lower(elect_to_low)
+                            .with_election_timeout_upper(elect_to_high)
+                            .with_hb_interval(heartbeat_period)
+                            .with_max_append_size(10)
+                            .with_rpc_failure_backoff(rpc_backoff)
+                            .with_auto_forwarding(true)
+                            .with_snapshot_enabled(0);
+        manager_->register_mgr_type(params.default_group_type_, r_params);
+    }
+};
+
 int main(int argc, char** argv) {
     SISL_OPTIONS_LOAD(argc, argv, logging, server, nuraft_mesg);
 
@@ -52,7 +99,7 @@ int main(int argc, char** argv) {
     // defined in uuids.h from the CLI without having to iterate
     // and store multiple maps in the code and test script.
     auto const offset_id = SISL_OPTIONS["server_id"].as< uint32_t >();
-    auto const server_uuid = uuids[offset_id];
+    auto const server_uuid = boost::uuids::string_generator()(uuids[offset_id]);
 
     // Can start using LOG from this point onward.
     sisl::logging::SetLogger(fmt::format(FMT_STRING("server_{}"), offset_id));
@@ -64,46 +111,8 @@ int main(int argc, char** argv) {
     auto const server_port = 9000 + offset_id;
     LOGINFO("Server starting as: [{}], port: [{}]", server_uuid, server_port);
 
-    // Provide a method for the service layer to lookup an IPv4:port address
-    // from a uuid; however the process wants to do that.
-    auto messaging_params =
-        nuraft_mesg::consensus_component::params{server_uuid, server_port,
-                                                    [](std::string const& client) -> std::string {
-                                                        for (auto i = 0u; i < 5; ++i) {
-                                                            if (uuids[i] == client) {
-                                                                return fmt::format(FMT_STRING("127.0.0.1:{}"),
-                                                                                   9000 + i);
-                                                            }
-                                                        }
-                                                        return client;
-                                                    },
-                                                    "none"};
-
-    // Intitialize the messaging layer.
-    auto messaging = nuraft_mesg::service();
-
-    // RAFT server parameters
-    nuraft::raft_params r_params;
-    r_params.with_election_timeout_lower(elect_to_low)
-        .with_election_timeout_upper(elect_to_high)
-        .with_hb_interval(heartbeat_period)
-        .with_max_append_size(10)
-        .with_rpc_failure_backoff(rpc_backoff)
-        .with_auto_forwarding(true)
-        .with_snapshot_enabled(0);
-    // Each group has a type so we can attach different state_machines upon Join request.
-    // This callback should provide a mechanism to return a new state_manager.
-    auto group_type_params = nuraft_mesg::consensus_component::register_params{
-        r_params,
-        [server_uuid](int32_t const srv_id,
-                      std::string const& group_id) -> std::shared_ptr< nuraft_mesg::mesg_state_mgr > {
-            return std::make_shared< simple_state_mgr >(srv_id, server_uuid, group_id);
-        }};
-    messaging.register_mgr_type("test_package", group_type_params);
-
-    // This will start the RPC service and begin listening for incomming JOIN groups request.
-    // You can also call create_group and join_group following this operation.
-    messaging.start(messaging_params);
+    auto app = std::make_shared< Application >(server_uuid, server_port);
+    app->start();
 
     {
         auto lck = std::lock_guard< std::mutex >(k_stop_cv_lock);
@@ -112,14 +121,15 @@ int main(int argc, char** argv) {
 
     // Create a new group with ourself as the only member
     if (0 < SISL_OPTIONS.count("create")) {
-        messaging.create_group(SISL_OPTIONS["create"].as< std::string >(), "test_package");
+        auto gid = boost::uuids::string_generator()(guids[SISL_OPTIONS["create"].as< uint32_t >()]);
+        app->manager_->create_group(gid, "test_package");
     }
 
     // Just prevent main() from exiting, require a SIGNAL
-    {
-        std::unique_lock< std::mutex > ulock(k_stop_cv_lock);
-        k_stop_cv.wait(ulock, []() { return k_stop; });
-    }
-    LOGERROR("Stopping Service!");
+    //{
+    //    std::unique_lock< std::mutex > ulock(k_stop_cv_lock);
+    //    k_stop_cv.wait(ulock, []() { return k_stop; });
+    //}
+    LOGWARN("Stopping Service!");
     return 0;
 }

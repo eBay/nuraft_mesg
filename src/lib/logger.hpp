@@ -17,49 +17,55 @@
 #include <libnuraft/logger.hxx>
 #include <sisl/logging/logging.h>
 
-SISL_LOGGING_DECL(nuraft)
-SISL_LOGGING_DECL(nuraft_mesg)
+#include "common_lib.hpp"
 
 class nuraft_mesg_logger : public ::nuraft::logger {
-    std::string const _group_id;
+    nuraft_mesg::group_id_t const _group_id;
     std::shared_ptr< sisl::logging::logger_t > _custom_logger;
 
 public:
-    explicit nuraft_mesg_logger(std::string const& group_id, std::shared_ptr< sisl::logging::logger_t > custom_logger) :
+    explicit nuraft_mesg_logger(nuraft_mesg::group_id_t const& group_id,
+                                std::shared_ptr< sisl::logging::logger_t > custom_logger) :
             ::nuraft::logger(), _group_id(group_id), _custom_logger(custom_logger) {}
 
     void set_level(int l) override {
-        LOGDEBUGMOD(nuraft_mesg, "Updating level to: {}", l);
+        LOGD("Updating level to: {}", l);
         SISL_LOG_LEVEL(nuraft, static_cast< spdlog::level::level_enum >(abs(l - 6)));
     }
 
     void put_details(int level, const char* source_file, const char* func_name, size_t line_number,
                      const std::string& log_line) override {
-        auto const mesg =
-            fmt::format("[vol={}] {}:{}#{} : {}", _group_id, file_name(source_file), func_name, line_number, log_line);
         switch (level) {
-        case 1:
-            [[fallthrough]];
+        case 1: {
+            if (LEVELCHECK(nuraft_mesg, spdlog::level::level_enum::critical))
+                sisl::logging::GetLogger()->critical("[{}:{}:{}] {} [group={}]", file_name(source_file), line_number,
+                                                     func_name, log_line, _group_id);
+        } break;
         case 2: {
-            LOGERRORMOD_USING_LOGGER(nuraft, _custom_logger, "ERROR {}", mesg);
+            if (LEVELCHECK(nuraft_mesg, spdlog::level::level_enum::err))
+                sisl::logging::GetLogger()->error("[{}:{}:{}] {} [group={}]", file_name(source_file), line_number,
+                                                  func_name, log_line, _group_id);
         } break;
-            ;
         case 3: {
-            LOGWARNMOD_USING_LOGGER(nuraft, _custom_logger, "WARNING {}", mesg);
+            if (LEVELCHECK(nuraft_mesg, spdlog::level::level_enum::warn))
+                sisl::logging::GetLogger()->warn("[{}:{}:{}] {} [group={}]", file_name(source_file), line_number,
+                                                 func_name, log_line, _group_id);
         } break;
-            ;
         case 4: {
-            LOGINFOMOD_USING_LOGGER(nuraft, _custom_logger, "INFO {}", mesg);
+            if (LEVELCHECK(nuraft_mesg, spdlog::level::level_enum::info))
+                _custom_logger->info("[{}:{}:{}] {} [group={}]", file_name(source_file), line_number, func_name,
+                                     log_line, _group_id);
         } break;
-            ;
         case 5: {
-            LOGDEBUGMOD_USING_LOGGER(nuraft, _custom_logger, "DEBUG {}", mesg);
+            if (LEVELCHECK(nuraft_mesg, spdlog::level::level_enum::debug))
+                _custom_logger->debug("[{}:{}:{}] {} [group={}]", file_name(source_file), line_number, func_name,
+                                      log_line, _group_id);
         } break;
-            ;
         default: {
-            LOGTRACEMOD_USING_LOGGER(nuraft, _custom_logger, "TRACE {}", mesg);
+            if (LEVELCHECK(nuraft_mesg, spdlog::level::level_enum::trace))
+                _custom_logger->trace("[{}:{}:{}] {} [group={}]", file_name(source_file), line_number, func_name,
+                                      log_line, _group_id);
         } break;
-            ;
         }
     }
 };

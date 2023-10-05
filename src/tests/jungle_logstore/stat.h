@@ -31,9 +31,7 @@ public:
         assert(statType == HISTOGRAM);
         hist->add(us);
     }
-    inline void addVal(uint64_t val) {
-        addLatency(val);
-    }
+    inline void addVal(uint64_t val) { addLatency(val); }
 
     inline void set(int64_t value) {
         assert(statType != HISTOGRAM);
@@ -55,7 +53,8 @@ public:
         case GAUGE:
             assert(0);
             break;
-        default: break;
+        default:
+            break;
         }
         return *this;
     }
@@ -77,8 +76,8 @@ public:
 protected:
     Type statType;
     std::string statName;
-    std::atomic<uint64_t> counter;
-    std::atomic<int64_t> gauge;
+    std::atomic< uint64_t > counter;
+    std::atomic< int64_t > gauge;
     Histogram* hist;
 };
 
@@ -93,10 +92,7 @@ public:
     };
 
     struct CpuStat {
-        CpuStat()
-            : userTimeMs(0), kernelTimeMs(0)
-            , userMilliCores(0), kernelMilliCores(0)
-            {}
+        CpuStat() : userTimeMs(0), kernelTimeMs(0), userMilliCores(0), kernelMilliCores(0) {}
         uint64_t userTimeMs;
         uint64_t kernelTimeMs;
 
@@ -107,18 +103,17 @@ public:
     };
 
     struct IoStat {
-        IoStat()
-            : bytesRead(0)
-            , bytesReadFromDisk(0)
-            , bytesWritten(0)
-            , bytesWrittenToDisk(0)
-            , numReads(0)
-            , numWrites(0)
-            , avgRTimeUs(0)
-            , avgWTimeUs(0)
-            , partitionUtil(0)
-            , deviceUtil(0)
-            {}
+        IoStat() :
+                bytesRead(0),
+                bytesReadFromDisk(0),
+                bytesWritten(0),
+                bytesWrittenToDisk(0),
+                numReads(0),
+                numWrites(0),
+                avgRTimeUs(0),
+                avgWTimeUs(0),
+                partitionUtil(0),
+                deviceUtil(0) {}
         uint64_t bytesRead;
         uint64_t bytesReadFromDisk;
         uint64_t bytesWritten;
@@ -146,16 +141,15 @@ public:
 
     StatElem* getStat(const std::string& stat_name);
     StatElem* createStat(StatElem::Type type, const std::string& stat_name);
-    void getAllStats(std::vector<StatElem*>& stats_out);
+    void getAllStats(std::vector< StatElem* >& stats_out);
 
 private:
     static std::mutex instanceLock;
-    static std::atomic<StatMgr*> instance;
+    static std::atomic< StatMgr* > instance;
 
     StatMgr();
     ~StatMgr();
 
     std::mutex statMapLock;
-    std::map<std::string, StatElem*> statMap;
-
+    std::map< std::string, StatElem* > statMap;
 };

@@ -14,7 +14,7 @@
  *********************************************************************************/
 #pragma once
 
-#include "messaging_if.hpp"
+#include "nuraft_mesg/nuraft_mesg.hpp"
 #include <sisl/logging/logging.h>
 
 class test_state_machine;
@@ -25,7 +25,7 @@ class service;
 
 class test_state_mgr : public nuraft_mesg::mesg_state_mgr {
 public:
-    test_state_mgr(int32_t srv_id, std::string const& srv_addr, std::string const& group_id);
+    test_state_mgr(int32_t srv_id, nuraft_mesg::peer_id_t const& srv_addr, nuraft_mesg::group_id_t const& group_id);
     ~test_state_mgr() override = default;
 
     nuraft::ptr< nuraft::cluster_config > load_config() override;
@@ -43,11 +43,10 @@ public:
     void leave() override;
 
     ///// data service helper apis
-    std::error_condition data_service_request(std::string const& request_name,
-                                              nuraft_mesg::io_blob_list_t const& cli_buf,
-                                              nuraft_mesg::data_service_response_handler_t const& response_cb);
+    nuraft_mesg::AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name,
+                                                                   nuraft_mesg::io_blob_list_t const& cli_buf);
 
-    bool register_data_service_apis(nuraft_mesg::service* messaging);
+    bool register_data_service_apis(nuraft_mesg::Manager* messaging);
     static void fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf);
     static uint16_t get_random_num();
     static uint32_t get_server_counter();
@@ -56,8 +55,8 @@ public:
 private:
 private:
     int32_t const _srv_id;
-    std::string const _srv_addr;
-    std::string const _group_id;
+    nuraft_mesg::peer_id_t const _srv_addr;
+    nuraft_mesg::group_id_t const _group_id;
     std::shared_ptr< test_state_machine > _state_machine;
 
     inline static std::atomic< uint32_t > server_counter{0};

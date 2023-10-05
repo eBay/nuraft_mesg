@@ -7,15 +7,17 @@ include(${sisl_INCLUDE_DIRS}/../cmake/settings_gen.cmake)
 
 add_subdirectory (proto)
 
+add_flags("-Wall -Wextra -Werror -Wpedantic")
+
 add_library(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} PRIVATE
     lib/grpc_client.cpp
     lib/grpc_factory.cpp
     lib/grpc_server.cpp
-    lib/mesg_factory.cpp
+    lib/mesg_client.cpp
     lib/service.cpp
     lib/data_service_grpc.cpp
-    lib/messaging.cpp
+    lib/manager_impl.cpp
     $<TARGET_OBJECTS:${PROJECT_NAME}-proto>
   )
 settings_gen_cpp($<TARGET_FILE:flatbuffers::flatc> ${CMAKE_CURRENT_BINARY_DIR}/generated/ ${PROJECT_NAME} lib/nuraft_mesg_config.fbs)

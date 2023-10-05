@@ -15,7 +15,7 @@ class NuRaftConan(ConanFile):
     topics = ("raft",)
     url = "https://github.com/conan-io/conan-center-index"
     license = "Apache-2.0"
-    version = "2.2.0"
+    version = "2.3.0"
 
     package_type = "library"
     settings = "os", "arch", "compiler", "build_type"
@@ -55,7 +55,7 @@ class NuRaftConan(ConanFile):
             check_min_cppstd(self, 11)
 
     def source(self):
-        get(self, "https://github.com/eBay/nuraft/archive/62d73b52b6897d4ec1c02d77fe5f7909705399be.tar.gz", strip_root=True)
+        get(self, "https://github.com/eBay/nuraft/archive/f42b12c3ec9f20a085de61e1294e8167fa747c7d.tar.gz", strip_root=True)
 
     def generate(self):
         tc = CMakeToolchain(self)

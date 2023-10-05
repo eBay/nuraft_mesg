@@ -1,8 +1,8 @@
+#include <boost/uuid/uuid_io.hpp>
 #include <sisl/grpc/generic_service.hpp>
+
 #include "data_service_grpc.hpp"
 #include "utils.hpp"
-
-SISL_LOGGING_DECL(nuraft_mesg)
 
 namespace nuraft_mesg {
 
@@ -23,11 +23,11 @@ void data_service_grpc::bind() {
     }
 }
 
-bool data_service_grpc::bind(std::string const& request_name, std::string const& group_id,
+bool data_service_grpc::bind(std::string const& request_name, group_id_t const& group_id,
                              data_service_request_handler_t const& request_cb) {
     RELEASE_ASSERT(_grpc_server, "NULL _grpc_server!");
     if (!request_cb) {
-        LOGWARNMOD(nuraft_mesg, "request_cb null for the request {}, cannot bind.", request_name);
+        LOGW("request_cb null for the request {}, cannot bind.", request_name);
         return false;
     }
     // This is an async call, hence the "return false". The user should invoke rpc_data->send_response to finish the
@@ -35,7 +35,7 @@ bool data_service_grpc::bind(std::string const& request_name, std::string const&
     auto generic_handler_cb = [request_cb](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
         sisl::io_blob svr_buf;
         if (auto status = deserialize_from_byte_buffer(rpc_data->request(), svr_buf); !status.ok()) {
-            LOGERRORMOD(nuraft_mesg, "ByteBuffer DumpToSingleSlice failed, {}", status.error_message());
+            LOGE(, "ByteBuffer DumpToSingleSlice failed, {}", status.error_message());
             rpc_data->set_status(status);
             return true; // respond immediately
         }
@@ -50,7 +50,7 @@ bool data_service_grpc::bind(std::string const& request_name, std::string const&
                 throw std::runtime_error(fmt::format("Could not register generic rpc {} with gRPC!", request_name));
             }
         } else {
-            LOGWARNMOD(nuraft_mesg, "data service rpc {} exists", it->first);
+            LOGW(, "data service rpc {} exists", it->first);
             return false;
         }
     } else {

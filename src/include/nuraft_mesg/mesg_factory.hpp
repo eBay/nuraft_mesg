@@ -14,15 +14,17 @@
  *********************************************************************************/
 #pragma once
 
-#include <future>
+#include <libnuraft/async.hxx>
 #include <memory>
 #include <mutex>
 #include <string>
 
+#include <boost/uuid/uuid_io.hpp>
+
 #include "grpc_factory.hpp"
 #include <sisl/logging/logging.h>
 #include <sisl/metrics/metrics.hpp>
-#include "messaging_if.hpp"
+#include "nuraft_mesg.hpp"
 
 namespace sisl {
 struct io_blob;
@@ -30,51 +32,45 @@ struct io_blob;
 
 namespace nuraft_mesg {
 
-using group_name_t = std::string;
-using group_type_t = std::string;
-
-class mesg_client;
-
 class group_factory : public grpc_factory {
     std::shared_ptr< sisl::GrpcTokenClient > m_token_client;
     static std::string m_ssl_cert;
 
 public:
-    group_factory(int const cli_thread_count, std::string const& name,
+    group_factory(int const cli_thread_count, group_id_t const& name,
                   std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert = "");
 
     using grpc_factory::create_client;
+    nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) override;
+    nuraft::cmd_result_code reinit_client(peer_id_t const& client,
+                                          std::shared_ptr< nuraft::rpc_client >& raft_client) override;
 
-    std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >&) override;
-
-    std::error_condition reinit_client(std::string const& client, std::shared_ptr< nuraft::rpc_client >& raft_client) override;
-
-    virtual std::string lookupEndpoint(std::string const& client) = 0;
+    virtual std::string lookupEndpoint(peer_id_t const& client) = 0;
 };
 
 class mesg_factory final : public grpc_factory {
     std::shared_ptr< group_factory > _group_factory;
-    group_name_t const _group_name;
+    group_id_t const _group_id;
     group_type_t const _group_type;
     std::shared_ptr< sisl::MetricsGroupWrapper > _metrics;
 
 public:
-    mesg_factory(std::shared_ptr< group_factory > g_factory, group_name_t const& grp_id, group_type_t const& grp_type,
+    mesg_factory(std::shared_ptr< group_factory > g_factory, group_id_t const& grp_id, group_type_t const& grp_type,
                  std::shared_ptr< sisl::MetricsGroupWrapper > metrics = nullptr) :
-            grpc_factory(0, grp_id),
+            grpc_factory(0, to_string(grp_id)),
             _group_factory(g_factory),
-            _group_name(grp_id),
+            _group_id(grp_id),
             _group_type(grp_type),
             _metrics(metrics) {}
 
-    group_name_t group_name() const { return _group_name; }
+    group_id_t group_id() const { return _group_id; }
 
-    std::error_condition create_client(const std::string& client, nuraft::ptr< nuraft::rpc_client >& rpc_ptr) override;
+    nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >& rpc_ptr) override;
 
-    std::error_condition reinit_client(const std::string& client, std::shared_ptr< nuraft::rpc_client >& raft_client) override;
+    nuraft::cmd_result_code reinit_client(peer_id_t const& client,
+                                          std::shared_ptr< nuraft::rpc_client >& raft_client) override;
 
-    std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
-                                              data_service_response_handler_t const& response_cb);
+    AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf);
 };
 
 } // namespace nuraft_mesg

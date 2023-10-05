@@ -8,33 +8,23 @@
 #include <memory>
 #include <string>
 
-
 namespace nukv {
 
 struct SEBuf {
     /**
      * Empty buffer.
      */
-    SEBuf()
-        : len(0)
-        , buf(nullptr)
-        {}
+    SEBuf() : len(0), buf(nullptr) {}
 
     /**
      * Reference to given address.
      */
-    SEBuf(size_t _len, void* _buf)
-        : len(_len)
-        , buf(_buf)
-        {}
+    SEBuf(size_t _len, void* _buf) : len(_len), buf(_buf) {}
 
     /**
      * Reference to given string object.
      */
-    SEBuf(const std::string& str)
-        : len(str.size())
-        , buf((void*)str.data())
-        {}
+    SEBuf(const std::string& str) : len(str.size()), buf((void*)str.data()) {}
 
     /**
      * Allocate own memory.
@@ -42,9 +32,7 @@ struct SEBuf {
      */
     static SEBuf alloc(size_t _len) {
         if (!_len) return SEBuf();
-        if (auto alloc = malloc(_len); nullptr != alloc) {
-            return SEBuf(_len, alloc);
-        }
+        if (auto alloc = malloc(_len); nullptr != alloc) { return SEBuf(_len, alloc); }
         return SEBuf();
     }
 
@@ -81,24 +69,22 @@ struct SEBuf {
     /**
      * Return `true` if this buffer is empty.
      */
-    inline bool empty() const   { return (buf == nullptr); }
+    inline bool empty() const { return (buf == nullptr); }
 
     /**
      * Return the size of this buffer.
      */
-    inline size_t size() const  { return len; }
+    inline size_t size() const { return len; }
 
     /**
      * Return the pointer to the data of this buffer.
      */
-    inline void* data() const   { return buf; }
+    inline void* data() const { return buf; }
 
     /**
      * Create a std::string object that is clone of this buffer.
      */
-    inline std::string toString() const {
-        return std::string((const char*)buf, len);
-    }
+    inline std::string toString() const { return std::string((const char*)buf, len); }
 
     /**
      * Return a string replacing non-readable character with `.`.
@@ -119,9 +105,7 @@ struct SEBuf {
      */
     inline void copyTo(SEBuf& dst) const {
         dst = alloc(len);
-        if (len) {
-            memcpy(dst.buf, buf, len);
-        }
+        if (len) { memcpy(dst.buf, buf, len); }
     }
 
     size_t len;
@@ -140,13 +124,10 @@ struct SEBuf {
 using SEBufHolder = SEBuf::AutoFree;
 
 struct SEBufSerializer {
-    SEBufSerializer(const SEBuf& _buf)
-        : buf(_buf)
-        , offset(0)
-        , errHappened(false) {}
+    SEBufSerializer(const SEBuf& _buf) : buf(_buf), offset(0), errHappened(false) {}
 
     inline bool isValid(size_t len) {
-        if ( errHappened || len + pos() > buf.len ) {
+        if (errHappened || len + pos() > buf.len) {
             errHappened = true;
             return false;
         }
@@ -160,13 +141,9 @@ struct SEBufSerializer {
         offset = _pos;
     }
 
-    inline size_t pos() const {
-        return offset;
-    }
+    inline size_t pos() const { return offset; }
 
-    inline void clearError() {
-        errHappened = false;
-    }
+    inline void clearError() { errHappened = false; }
 
     inline void* data() {
         uint8_t* ptr = (uint8_t*)buf.buf;
@@ -177,53 +154,53 @@ struct SEBufSerializer {
         if (!isValid(sizeof(val))) return;
         uint64_t u64 = _enc(val);
         memcpy(data(), &u64, sizeof(u64));
-        pos( pos() + sizeof(u64) );
+        pos(pos() + sizeof(u64));
     }
 
     inline void putU32(uint32_t val) {
         if (!isValid(sizeof(val))) return;
         uint32_t u32 = _enc(val);
         memcpy(data(), &u32, sizeof(u32));
-        pos( pos() + sizeof(u32) );
+        pos(pos() + sizeof(u32));
     }
 
     inline void putU16(uint16_t val) {
         if (!isValid(sizeof(val))) return;
         uint16_t u16 = _enc(val);
         memcpy(data(), &u16, sizeof(u16));
-        pos( pos() + sizeof(u16) );
+        pos(pos() + sizeof(u16));
     }
 
     inline void putU8(uint8_t val) {
         if (!isValid(sizeof(val))) return;
         memcpy(data(), &val, sizeof(val));
-        pos( pos() + sizeof(val) );
+        pos(pos() + sizeof(val));
     }
 
     inline void putI64(int64_t val) {
         if (!isValid(sizeof(val))) return;
         int64_t i64 = _enc(val);
         memcpy(data(), &i64, sizeof(i64));
-        pos( pos() + sizeof(i64) );
+        pos(pos() + sizeof(i64));
     }
 
     inline void putI32(int32_t val) {
         if (!isValid(sizeof(val))) return;
         int32_t i32 = _enc(val);
         memcpy(data(), &i32, sizeof(i32));
-        pos( pos() + sizeof(i32) );
+        pos(pos() + sizeof(i32));
     }
 
     inline void putI16(int16_t val) {
         if (!isValid(sizeof(val))) return;
         int16_t i16 = _enc(val);
         memcpy(data(), &i16, sizeof(i16));
-        pos( pos() + sizeof(i16) );
+        pos(pos() + sizeof(i16));
     }
 
     inline void putRaw(size_t len, const void* src) {
         memcpy(data(), src, len);
-        pos( pos() + len );
+        pos(pos() + len);
     }
 
     inline void put(size_t len, const void* src) {
@@ -232,19 +209,15 @@ struct SEBufSerializer {
         putRaw(len, src);
     }
 
-    inline void putString(const std::string& str) {
-        put(str.size(), str.data());
-    }
+    inline void putString(const std::string& str) { put(str.size(), str.data()); }
 
-    inline void putSEBuf(const SEBuf& buf) {
-        put(buf.len, buf.buf);
-    }
+    inline void putSEBuf(const SEBuf& buf) { put(buf.len, buf.buf); }
 
     inline uint64_t getU64() {
         if (!isValid(sizeof(uint64_t))) return 0;
         uint64_t u64;
         memcpy(&u64, data(), sizeof(u64));
-        pos( pos() + sizeof(u64) );
+        pos(pos() + sizeof(u64));
         return _dec(u64);
     }
 
@@ -252,7 +225,7 @@ struct SEBufSerializer {
         if (!isValid(sizeof(uint32_t))) return 0;
         uint32_t u32;
         memcpy(&u32, data(), sizeof(u32));
-        pos( pos() + sizeof(u32) );
+        pos(pos() + sizeof(u32));
         return _dec(u32);
     }
 
@@ -260,7 +233,7 @@ struct SEBufSerializer {
         if (!isValid(sizeof(uint16_t))) return 0;
         uint16_t u16;
         memcpy(&u16, data(), sizeof(u16));
-        pos( pos() + sizeof(u16) );
+        pos(pos() + sizeof(u16));
         return _dec(u16);
     }
 
@@ -268,7 +241,7 @@ struct SEBufSerializer {
         if (!isValid(sizeof(uint8_t))) return 0;
         uint8_t u8;
         memcpy(&u8, data(), sizeof(u8));
-        pos( pos() + sizeof(u8) );
+        pos(pos() + sizeof(u8));
         return u8;
     }
 
@@ -276,7 +249,7 @@ struct SEBufSerializer {
         if (!isValid(sizeof(int64_t))) return 0;
         int64_t i64;
         memcpy(&i64, data(), sizeof(i64));
-        pos( pos() + sizeof(i64) );
+        pos(pos() + sizeof(i64));
         return _dec(i64);
     }
 
@@ -284,7 +257,7 @@ struct SEBufSerializer {
         if (!isValid(sizeof(int32_t))) return 0;
         int32_t i32;
         memcpy(&i32, data(), sizeof(i32));
-        pos( pos() + sizeof(i32) );
+        pos(pos() + sizeof(i32));
         return _dec(i32);
     }
 
@@ -292,13 +265,13 @@ struct SEBufSerializer {
         if (!isValid(sizeof(int16_t))) return 0;
         int16_t i16;
         memcpy(&i16, data(), sizeof(i16));
-        pos( pos() + sizeof(i16) );
+        pos(pos() + sizeof(i16));
         return _dec(i16);
     }
 
     inline void* getRaw(size_t len) {
         void* _data = data();
-        pos( pos() + len );
+        pos(pos() + len);
         return _data;
     }
 
@@ -326,5 +299,4 @@ struct SEBufSerializer {
     bool errHappened;
 };
 
-
-}
+} // namespace nukv

@@ -15,8 +15,8 @@ See the [Changelog](CHANGELOG.md) for release information.
 
 ## Usage
 
-The `nuraft::service` provides a means to register callbacks which instantiate `nuraft::state_manager`s. This callback
-is used whenever a group is directly created (`service::create_group(...)` ) or when the `grpc::Service` receives a
+The `nuraft_manager::Manager` provides a means to register means to instantiate `nuraft::state_manager`s. This is used
+whenever a group is directly created (`Manager::create_group(...)` ) or when the `grpc::Service` receives a
 `RaftMessage` indicating a request to join a group which one does not already belong.
 
 Routing of messages is handled by this library and uses a `global` thread pool for `nuraft::raft_server` bg threads.
