@@ -71,9 +71,8 @@ grpc_server::append_entries(std::vector< nuraft::ptr< nuraft::buffer > > const& 
 }
 
 ::grpc::Status grpc_server::step(const RaftMessage& request, RaftMessage& reply) {
-    LOGTRACEMOD(nuraft_mesg, "Stepping [{}] from: [{}] to: [{}]",
-                nuraft::msg_type_to_string(nuraft::msg_type(request.base().type())), request.base().src(),
-                request.base().dest());
+    LOGT("Stepping [{}] from: [{}] to: [{}]", nuraft::msg_type_to_string(nuraft::msg_type(request.base().type())),
+         request.base().src(), request.base().dest());
     auto rcreq = toRequest(request);
     auto resp = nuraft::raft_server_handler::process_req(_raft_server.get(), *rcreq);
     if (!resp) { return ::grpc::Status(::grpc::StatusCode::CANCELLED, "Server rejected request"); }

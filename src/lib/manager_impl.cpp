@@ -42,7 +42,7 @@ public:
             application_(app) {}
 
     std::string lookupEndpoint(peer_id_t const& client) override {
-        LOGTRACEMOD(nuraft_mesg, "[peer={}]", client);
+        LOGT("[peer={}]", client);
         if (auto a = application_.lock(); a) return a->lookup_peer(client);
         return std::string();
     }
@@ -93,7 +93,7 @@ ManagerImpl::ManagerImpl(Manager::Params const& start_params, std::weak_ptr< Mes
 
 void ManagerImpl::restart_server() {
     auto listen_address = fmt::format(FMT_STRING("0.0.0.0:{}"), start_params_.mesg_port_);
-    LOGINFO("Starting Messaging Service on http://{}", listen_address);
+    LOGI("Starting Messaging Service on http://{}", listen_address);
 
     std::lock_guard< std::mutex > lg(_manager_lock);
     _grpc_server.reset();
@@ -111,31 +111,31 @@ void ManagerImpl::register_mgr_type(group_type_t const& group_type, group_params
     auto [it, happened] = _state_mgr_types.emplace(std::make_pair(group_type, params));
     DEBUG_ASSERT(_state_mgr_types.end() != it, "Out of memory?");
     DEBUG_ASSERT(!!happened, "Re-register?");
-    if (_state_mgr_types.end() == it) { LOGERROR("Could not register group type: {}", group_type); }
+    if (_state_mgr_types.end() == it) { LOGE("Could not register [group_type={}]", group_type); }
 }
 
 nuraft::cb_func::ReturnCode ManagerImpl::callback_handler(group_id_t const& group_id, nuraft::cb_func::Type type,
                                                           nuraft::cb_func::Param* param) {
     switch (type) {
     case nuraft::cb_func::RemovedFromCluster: {
-        LOGINFO("Removed from cluster [group={}]", group_id);
+        LOGI("Removed from cluster [group={}]", group_id);
         exit_group(group_id);
     } break;
     case nuraft::cb_func::JoinedCluster: {
         auto const my_id = param->myId;
         auto const leader_id = param->leaderId;
-        LOGINFO("Joined cluster: [group={}], [l_id:{},my_id:{}]", group_id, leader_id, my_id);
+        LOGI("Joined cluster: [group={}], [l_id:{},my_id:{}]", group_id, leader_id, my_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = (leader_id == my_id);
         }
     } break;
     case nuraft::cb_func::NewConfig: {
-        LOGDEBUGMOD(nuraft_mesg, "Cluster change for: [group={}]", group_id);
+        LOGD("Cluster change for: [group={}]", group_id);
         _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeLeader: {
-        LOGDEBUGMOD(nuraft_mesg, "I'm the leader of: [group={}]!", group_id);
+        LOGD("I'm the leader of: [group={}]!", group_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = true;
@@ -143,7 +143,7 @@ nuraft::cb_func::ReturnCode ManagerImpl::callback_handler(group_id_t const& grou
         _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeFollower: {
-        LOGINFOMOD(nuraft_mesg, "I'm a follower of: [group={}]!", group_id);
+        LOGI("I'm a follower of: [group={}]!", group_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = false;
@@ -167,7 +167,7 @@ void ManagerImpl::exit_group(group_id_t const& group_id) {
 nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t const& group_id,
                                                 group_type_t const& group_type, nuraft::context*& ctx,
                                                 std::shared_ptr< nuraft_mesg::group_metrics > metrics) {
-    LOGDEBUGMOD(nuraft_mesg, "Creating context for: [group_id={}] as Member: {}", group_id, srv_id);
+    LOGD("Creating context for: [group_id={}] as Member: {}", group_id, srv_id);
 
     // State manager (RAFT log store, config)
     std::shared_ptr< nuraft::state_mgr > smgr;
@@ -185,7 +185,7 @@ nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t
         if (it != _state_managers.end()) {
             if (happened) {
                 // A new logstore!
-                LOGDEBUGMOD(nuraft_mesg, "Creating new State Manager for: [group={}], type: {}", group_id, group_type);
+                LOGD("Creating new State Manager for: [group={}], type: {}", group_id, group_type);
                 it->second = application_.lock()->create_state_mgr(srv_id, group_id);
             }
             it->second->become_ready();
@@ -327,11 +327,11 @@ NullAsyncResult ManagerImpl::become_leader(group_id_t const& group_id) {
 }
 
 void ManagerImpl::leave_group(group_id_t const& group_id) {
-    LOGINFO("Leaving group [group={}]", group_id);
+    LOGI("Leaving group [group={}]", group_id);
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         if (0 == _state_managers.count(group_id)) {
-            LOGDEBUGMOD(nuraft_mesg, "Asked to leave [group={}] which we are not part of!", group_id);
+            LOGD("Asked to leave [group={}] which we are not part of!", group_id);
             return;
         }
     }
@@ -345,7 +345,7 @@ void ManagerImpl::leave_group(group_id_t const& group_id) {
         _state_managers.erase(it);
     }
 
-    LOGINFO("Finished leaving: [group={}]", group_id);
+    LOGI("Finished leaving: [group={}]", group_id);
 }
 
 uint32_t ManagerImpl::logstore_id(group_id_t const& group_id) const {
@@ -354,9 +354,9 @@ uint32_t ManagerImpl::logstore_id(group_id_t const& group_id) const {
     return UINT32_MAX;
 }
 
-void ManagerImpl::get_srv_config_all(group_id_t const& group_name,
+void ManagerImpl::get_srv_config_all(group_id_t const& group_id,
                                      std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) {
-    _mesg_service->get_srv_config_all(group_name, configs_out);
+    _mesg_service->get_srv_config_all(group_id, configs_out);
 }
 
 bool ManagerImpl::bind_data_service_request(std::string const& request_name, group_id_t const& group_id,

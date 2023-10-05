@@ -21,6 +21,8 @@
 #include "nuraft_mesg/mesg_factory.hpp"
 #include "proto/raft_types.pb.h"
 
+#include "common_lib.hpp"
+
 namespace nuraft_mesg {
 
 inline RCMsgBase* fromBaseRequest(nuraft::msg_base const& rcbase) {
