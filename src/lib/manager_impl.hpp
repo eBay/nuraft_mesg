@@ -44,7 +44,7 @@ class ManagerImpl : public Manager {
     std::weak_ptr< MessagingApplication > application_;
     std::shared_ptr< group_factory > _g_factory;
     std::shared_ptr< msg_service > _mesg_service;
-    std::unique_ptr< ::sisl::GrpcServer > _grpc_server;
+    std::unique_ptr<::sisl::GrpcServer > _grpc_server;
 
     std::mutex mutable _manager_lock;
     std::map< group_id_t, std::shared_ptr< mesg_state_mgr > > _state_managers;
@@ -99,6 +99,11 @@ public:
     repl_service_ctx_grpc(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory);
     ~repl_service_ctx_grpc() override = default;
     std::shared_ptr< mesg_factory > m_mesg_factory;
+
+    NullAsyncResult data_service_request_unidirectional(destination_t to, std::string const& request_name,
+                                                        io_blob_list_t const& cli_buf) override;
+    AsyncResult< sisl::io_blob > data_service_request_bidrectional(destination_t to, std::string const& request_name,
+                                                                   io_blob_list_t const& cli_buf) override;
 
     AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name,
                                                       io_blob_list_t const& cli_buf) override;

@@ -29,7 +29,14 @@ public:
     grpc_server* m_server;
     bool is_raft_leader() const;
 
-    // data service api client call
+    // data service api client calls
+    virtual NullAsyncResult data_service_request_unidirectional(destination_t to, std::string const& request_name,
+                                                                io_blob_list_t const& cli_buf) = 0;
+    virtual AsyncResult< sisl::io_blob > data_service_request_bidrectional(destination_t to,
+                                                                           std::string const& request_name,
+                                                                           io_blob_list_t const& cli_buf) = 0;
+
+    // Will be removed after the above two APIs are implemented
     virtual AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name,
                                                               io_blob_list_t const& cli_buf) = 0;
 
