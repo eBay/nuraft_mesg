@@ -66,7 +66,29 @@ public:
             NURAFT_MESG_CONFIG(mesg_factory_config->raft_request_deadline_secs));
     }
 
-    AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf) {
+    NullAsyncResult data_service_request_unidirectional(std::string const& request_name,
+                                                        io_blob_list_t const& cli_buf) {
+        grpc::ByteBuffer cli_byte_buf;
+        serialize_to_byte_buffer(cli_byte_buf, cli_buf);
+        auto [p, sf] = folly::makePromiseContract< Result< folly::Unit > >();
+        /// FIXME we shouldn't need a copy-constructible here should we?
+        auto copyable_promise = std::make_shared< decltype(p) >(std::move(p));
+        _generic_stub->call_unary(
+            cli_byte_buf, request_name,
+            [c = copyable_promise](grpc::ByteBuffer&, ::grpc::Status& status) mutable {
+                if (!status.ok()) {
+                    LOGE("Failed to send data_service_request, error: {}", status.error_message());
+                    c->setValue(folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED));
+                } else {
+                    c->setValue(folly::unit);
+                }
+            },
+            NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs));
+        return std::move(sf);
+    }
+
+    IoBlobAsyncResult data_service_request_bidirectional(std::string const& request_name,
+                                                         io_blob_list_t const& cli_buf) {
         grpc::ByteBuffer cli_byte_buf;
         serialize_to_byte_buffer(cli_byte_buf, cli_buf);
         auto [p, sf] = folly::makePromiseContract< Result< sisl::io_blob > >();
@@ -129,8 +151,14 @@ public:
         _client->send(group_msg, complete);
     }
 
-    AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf) {
-        return _client->data_service_request(request_name, cli_buf);
+    NullAsyncResult data_service_request_unidirectional(std::string const& request_name,
+                                                        io_blob_list_t const& cli_buf) {
+        return _client->data_service_request_unidirectional(request_name, cli_buf);
+    }
+
+    IoBlobAsyncResult data_service_request_bidirectional(std::string const& request_name,
+                                                         io_blob_list_t const& cli_buf) {
+        return _client->data_service_request_bidirectional(request_name, cli_buf);
     }
 };
 
@@ -154,13 +182,61 @@ nuraft::cmd_result_code mesg_factory::reinit_client(peer_id_t const& client,
     return nuraft::OK;
 }
 
-AsyncResult< sisl::io_blob > mesg_factory::data_service_request(std::string const& request_name,
-                                                                io_blob_list_t const& cli_buf) {
+NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional< peer_id_t > const& dest,
+                                                                  std::string const& request_name,
+                                                                  io_blob_list_t const& cli_buf) {
     std::shared_lock< client_factory_lock_type > rl(_client_lock);
-    auto calls = std::list< AsyncResult< sisl::io_blob > >();
+    auto calls = std::vector< NullAsyncResult >();
+    if (dest) {
+        if (auto it = _clients.find(*dest); _clients.end() != it) {
+            auto g_client = std::dynamic_pointer_cast< nuraft_mesg::group_client >(it->second);
+            return g_client->data_service_request_unidirectional(get_generic_method_name(request_name, _group_id),
+                                                                 cli_buf);
+        } else {
+            LOGE("Failed to find client for [{}], request name [{}]", *dest, request_name);
+            return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+        }
+    }
+    // else
     for (auto& nuraft_client : _clients) {
         auto g_client = std::dynamic_pointer_cast< nuraft_mesg::group_client >(nuraft_client.second);
-        calls.push_back(g_client->data_service_request(get_generic_method_name(request_name, _group_id), cli_buf));
+        calls.push_back(
+            g_client->data_service_request_unidirectional(get_generic_method_name(request_name, _group_id), cli_buf));
+    }
+    return folly::collectAll(calls).deferValue([](auto&&) {
+        auto [p, sf] = folly::makePromiseContract< Result< folly::Unit > >();
+        p.setValue(folly::unit);
+        return sf;
+    });
+}
+
+IoBlobAsyncResult mesg_factory::data_service_request_bidirectional(std::optional< peer_id_t > const& dest,
+                                                                   std::string const& request_name,
+                                                                   io_blob_list_t const& cli_buf) {
+    std::shared_lock< client_factory_lock_type > rl(_client_lock);
+    auto calls = std::vector< IoBlobAsyncResult >();
+    if (dest) {
+        if (auto it = _clients.find(*dest); _clients.end() != it) {
+            auto g_client = std::dynamic_pointer_cast< nuraft_mesg::group_client >(it->second);
+            return g_client->data_service_request_bidirectional(get_generic_method_name(request_name, _group_id),
+                                                                cli_buf);
+        } else {
+            LOGE("Failed to find client for [{}], request name [{}]", *dest, request_name);
+            return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+        }
+    }
+    // else
+    LOGE("Cannot send request to all the peers, not implemented yet!. Request name [{}]", request_name);
+    return folly::makeUnexpected(nuraft::cmd_result_code::BAD_REQUEST);
+}
+
+IoBlobAsyncResult mesg_factory::data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf) {
+    std::shared_lock< client_factory_lock_type > rl(_client_lock);
+    auto calls = std::vector< IoBlobAsyncResult >();
+    for (auto& nuraft_client : _clients) {
+        auto g_client = std::dynamic_pointer_cast< nuraft_mesg::group_client >(nuraft_client.second);
+        calls.push_back(
+            g_client->data_service_request_bidirectional(get_generic_method_name(request_name, _group_id), cli_buf));
     }
     return folly::collectAnyWithoutException(calls).deferValue([](auto&& p) { return p.second; });
 }

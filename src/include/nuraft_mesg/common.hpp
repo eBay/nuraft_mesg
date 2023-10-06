@@ -32,6 +32,10 @@ using AsyncResult = folly::SemiFuture< Result< T > >;
 
 using NullResult = Result< folly::Unit >;
 using NullAsyncResult = AsyncResult< folly::Unit >;
+using IoBlobAsyncResult = AsyncResult< sisl::io_blob >;
+
+ENUM(role_regex, uint8_t, LEADER, FOLLOWER, ALL, ANY);
+using destination_t = std::variant< peer_id_t, role_regex >;
 
 ENUM(role_regex, uint8_t, LEADER, FOLLOWER, ALL, ANY);
 using destination_t = std::variant< peer_id_t, role_regex >;

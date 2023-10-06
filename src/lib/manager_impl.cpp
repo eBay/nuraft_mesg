@@ -354,20 +354,55 @@ bool ManagerImpl::bind_data_service_request(std::string const& request_name, gro
     return _mesg_service->bind_data_service_request(request_name, group_id, request_handler);
 }
 
-NullAsyncResult repl_service_ctx_grpc::data_service_request_unidirectional(destination_t, std::string const&,
-                                                                           io_blob_list_t const&) {
-    LOGW("method not implemented");
-    return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+// The endpoint field of the raft_server config is the uuid of the server.
+std::string repl_service_ctx_grpc::id_to_str(int32_t const id) {
+    auto srv_config = m_server->raft_server()->get_config()->get_server(id);
+    return (srv_config) ? srv_config->get_endpoint() : std::string();
 }
 
-AsyncResult< sisl::io_blob > repl_service_ctx_grpc::data_service_request_bidrectional(destination_t, std::string const&,
-                                                                                      io_blob_list_t const&) {
-    LOGW("method not implemented");
-    return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+std::optional< peer_id_t > repl_service_ctx_grpc::get_peer_id_str(destination_t const& dest) {
+    if (std::holds_alternative< peer_id_t >(dest)) return std::get< peer_id_t >(dest);
+    if (std::holds_alternative< role_regex >(dest)) {
+        if (!m_server) {
+            LOGW("server not initialized");
+            return std::nullopt;
+        }
+        switch (std::get< role_regex >(dest)) {
+        case role_regex::LEADER: {
+            auto leader = m_server->raft_server()->get_leader();
+            if (leader == -1) return std::nullopt;
+            return boost::uuids::string_generator()(id_to_str(leader));
+        } break;
+        case role_regex::ALL:
+            [[fallthrough]];
+        default: {
+            return std::nullopt;
+        } break;
+        }
+    }
+    DEBUG_ASSERT(false, "Unknown destination type");
+    return std::nullopt;
 }
 
-AsyncResult< sisl::io_blob > repl_service_ctx_grpc::data_service_request(std::string const& request_name,
-                                                                         io_blob_list_t const& cli_buf) {
+NullAsyncResult repl_service_ctx_grpc::data_service_request_unidirectional(destination_t const& dest,
+                                                                           std::string const& request_name,
+                                                                           io_blob_list_t const& cli_buf) {
+    std::optional< peer_id_t > peer_id_str;
+    if (!m_mesg_factory) return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+
+    return m_mesg_factory->data_service_request_unidirectional(get_peer_id_str(dest), request_name, cli_buf);
+}
+
+IoBlobAsyncResult repl_service_ctx_grpc::data_service_request_bidirectional(destination_t const& dest,
+                                                                            std::string const& request_name,
+                                                                            io_blob_list_t const& cli_buf) {
+    std::optional< peer_id_t > peer_id_str;
+    if (!m_mesg_factory) return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+    return m_mesg_factory->data_service_request_bidirectional(get_peer_id_str(dest), request_name, cli_buf);
+}
+
+IoBlobAsyncResult repl_service_ctx_grpc::data_service_request(std::string const& request_name,
+                                                              io_blob_list_t const& cli_buf) {
 
     return (m_mesg_factory) ? m_mesg_factory->data_service_request(request_name, cli_buf)
                             : folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);

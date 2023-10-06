@@ -25,20 +25,20 @@ public:
     repl_service_ctx(grpc_server* server);
     virtual ~repl_service_ctx() = default;
 
-    // we do not own this pointer. Use this only if the lyfe cycle of the pointer is well known
+    // we do not own this pointer. Use this only if the life cycle of the pointer is well known
     grpc_server* m_server;
     bool is_raft_leader() const;
 
     // data service api client calls
-    virtual NullAsyncResult data_service_request_unidirectional(destination_t to, std::string const& request_name,
+    virtual NullAsyncResult data_service_request_unidirectional(destination_t const& dest,
+                                                                std::string const& request_name,
                                                                 io_blob_list_t const& cli_buf) = 0;
-    virtual AsyncResult< sisl::io_blob > data_service_request_bidrectional(destination_t to,
-                                                                           std::string const& request_name,
-                                                                           io_blob_list_t const& cli_buf) = 0;
+    virtual IoBlobAsyncResult data_service_request_bidirectional(destination_t const& dest,
+                                                                 std::string const& request_name,
+                                                                 io_blob_list_t const& cli_buf) = 0;
 
     // Will be removed after the above two APIs are implemented
-    virtual AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name,
-                                                              io_blob_list_t const& cli_buf) = 0;
+    virtual IoBlobAsyncResult data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf) = 0;
 
     // Send response to a data service request and finish the async call.
     virtual void send_data_service_response(io_blob_list_t const& outgoing_buf,

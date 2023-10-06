@@ -43,7 +43,7 @@ public:
     void leave() override;
 
     ///// data service helper apis
-    nuraft_mesg::AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name,
+    nuraft_mesg::IoBlobAsyncResult data_service_request(std::string const& request_name,
                                                                    nuraft_mesg::io_blob_list_t const& cli_buf);
 
     bool register_data_service_apis(nuraft_mesg::Manager* messaging);

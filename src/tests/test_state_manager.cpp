@@ -166,7 +166,7 @@ void test_state_mgr::leave() {}
 
 ///// data service api helpers
 
-nuraft_mesg::AsyncResult< sisl::io_blob >
+nuraft_mesg::IoBlobAsyncResult
 test_state_mgr::data_service_request(std::string const& request_name, nuraft_mesg::io_blob_list_t const& cli_buf) {
     return m_repl_svc_ctx->data_service_request(request_name, cli_buf);
 }
