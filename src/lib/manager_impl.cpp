@@ -354,6 +354,18 @@ bool ManagerImpl::bind_data_service_request(std::string const& request_name, gro
     return _mesg_service->bind_data_service_request(request_name, group_id, request_handler);
 }
 
+NullAsyncResult repl_service_ctx_grpc::data_service_request_unidirectional(destination_t, std::string const&,
+                                                                           io_blob_list_t const&) {
+    LOGW("method not implemented");
+    return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+}
+
+AsyncResult< sisl::io_blob > repl_service_ctx_grpc::data_service_request_bidrectional(destination_t, std::string const&,
+                                                                                      io_blob_list_t const&) {
+    LOGW("method not implemented");
+    return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+}
+
 AsyncResult< sisl::io_blob > repl_service_ctx_grpc::data_service_request(std::string const& request_name,
                                                                          io_blob_list_t const& cli_buf) {
 
