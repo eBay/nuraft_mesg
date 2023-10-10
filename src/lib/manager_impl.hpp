@@ -104,8 +104,6 @@ public:
                                                         io_blob_list_t const& cli_buf) override;
     IoBlobAsyncResult data_service_request_bidirectional(destination_t const& dest, std::string const& request_name,
                                                          io_blob_list_t const& cli_buf) override;
-
-    IoBlobAsyncResult data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf) override;
     void send_data_service_response(io_blob_list_t const& outgoing_buf,
                                     boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) override;
 

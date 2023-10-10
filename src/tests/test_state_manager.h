@@ -43,8 +43,12 @@ public:
     void leave() override;
 
     ///// data service helper apis
-    nuraft_mesg::IoBlobAsyncResult data_service_request(std::string const& request_name,
-                                                                   nuraft_mesg::io_blob_list_t const& cli_buf);
+    nuraft_mesg::IoBlobAsyncResult data_service_request_bidirectional(nuraft_mesg::destination_t const& dest,
+                                                                      std::string const& request_name,
+                                                                      nuraft_mesg::io_blob_list_t const& cli_buf);
+    nuraft_mesg::NullAsyncResult data_service_request_unidirectional(nuraft_mesg::destination_t const& dest,
+                                                                     std::string const& request_name,
+                                                                     nuraft_mesg::io_blob_list_t const& cli_buf);
 
     bool register_data_service_apis(nuraft_mesg::Manager* messaging);
     static void fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf);

@@ -37,9 +37,6 @@ using IoBlobAsyncResult = AsyncResult< sisl::io_blob >;
 ENUM(role_regex, uint8_t, LEADER, FOLLOWER, ALL, ANY);
 using destination_t = std::variant< peer_id_t, role_regex >;
 
-ENUM(role_regex, uint8_t, LEADER, FOLLOWER, ALL, ANY);
-using destination_t = std::variant< peer_id_t, role_regex >;
-
 } // namespace nuraft_mesg
 
 namespace fmt {

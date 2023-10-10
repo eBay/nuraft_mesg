@@ -203,6 +203,8 @@ NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional<
         calls.push_back(
             g_client->data_service_request_unidirectional(get_generic_method_name(request_name, _group_id), cli_buf));
     }
+    // We ignore the vector of future response from collect all and st the value as folly::unit.
+    // This is because we do not have a use case to handle the errors that happen during the unidirectional call to all the peers.
     return folly::collectAll(calls).deferValue([](auto&&) {
         auto [p, sf] = folly::makePromiseContract< Result< folly::Unit > >();
         p.setValue(folly::unit);
@@ -228,17 +230,6 @@ IoBlobAsyncResult mesg_factory::data_service_request_bidirectional(std::optional
     // else
     LOGE("Cannot send request to all the peers, not implemented yet!. Request name [{}]", request_name);
     return folly::makeUnexpected(nuraft::cmd_result_code::BAD_REQUEST);
-}
-
-IoBlobAsyncResult mesg_factory::data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf) {
-    std::shared_lock< client_factory_lock_type > rl(_client_lock);
-    auto calls = std::vector< IoBlobAsyncResult >();
-    for (auto& nuraft_client : _clients) {
-        auto g_client = std::dynamic_pointer_cast< nuraft_mesg::group_client >(nuraft_client.second);
-        calls.push_back(
-            g_client->data_service_request_bidirectional(get_generic_method_name(request_name, _group_id), cli_buf));
-    }
-    return folly::collectAnyWithoutException(calls).deferValue([](auto&& p) { return p.second; });
 }
 
 group_factory::group_factory(int const cli_thread_count, group_id_t const& name,

@@ -75,8 +75,6 @@ public:
 
     IoBlobAsyncResult data_service_request_bidirectional(std::optional< peer_id_t > const&, std::string const&,
                                                          io_blob_list_t const&);
-
-    IoBlobAsyncResult data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf);
 };
 
 } // namespace nuraft_mesg

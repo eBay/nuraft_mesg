@@ -37,9 +37,6 @@ public:
                                                                  std::string const& request_name,
                                                                  io_blob_list_t const& cli_buf) = 0;
 
-    // Will be removed after the above two APIs are implemented
-    virtual IoBlobAsyncResult data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf) = 0;
-
     // Send response to a data service request and finish the async call.
     virtual void send_data_service_response(io_blob_list_t const& outgoing_buf,
                                             boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) = 0;

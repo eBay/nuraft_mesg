@@ -401,13 +401,6 @@ IoBlobAsyncResult repl_service_ctx_grpc::data_service_request_bidirectional(dest
     return m_mesg_factory->data_service_request_bidirectional(get_peer_id_str(dest), request_name, cli_buf);
 }
 
-IoBlobAsyncResult repl_service_ctx_grpc::data_service_request(std::string const& request_name,
-                                                              io_blob_list_t const& cli_buf) {
-
-    return (m_mesg_factory) ? m_mesg_factory->data_service_request(request_name, cli_buf)
-                            : folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
-}
-
 repl_service_ctx::repl_service_ctx(grpc_server* server) : m_server(server) {}
 
 bool repl_service_ctx::is_raft_leader() const { return m_server->raft_server()->is_leader(); }

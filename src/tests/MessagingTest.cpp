@@ -366,26 +366,33 @@ TEST_F(DataServiceFixture, DataServiceBasic) {
 
     auto sm1 = app_1_->state_mgr_map_[group_id_];
     RELEASE_ASSERT(sm1, "Bad pointer!");
+    auto sm4_1 = app_4->state_mgr_map_[group_id_];
+    RELEASE_ASSERT(sm1, "Bad pointer!");
     auto sm4 = app_4->state_mgr_map_[data_group];
     RELEASE_ASSERT(sm4, "Bad pointer!");
+    auto sm5 = app_5->state_mgr_map_[data_group];
+    RELEASE_ASSERT(sm5, "Bad pointer!");
 
     std::string const SEND_DATA{"send_data"};
     std::string const REQUEST_DATA{"request_data"};
 
     std::vector< NullAsyncResult > results;
-    results.push_back(sm1->data_service_request(SEND_DATA, cli_buf).deferValue([](auto e) -> NullResult {
-        test_state_mgr::verify_data(e.value());
-        return folly::Unit();
-    }));
-    results.push_back(sm4->data_service_request(SEND_DATA, cli_buf).deferValue([](auto e) -> NullResult {
-        test_state_mgr::verify_data(e.value());
-        return folly::Unit();
-    }));
+    results.push_back(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, cli_buf)
+                          .deferValue([](auto e) -> NullResult {
+                              EXPECT_TRUE(e.hasValue());
+                              return folly::Unit();
+                          }));
+    results.push_back(sm5->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, cli_buf)
+                          .deferValue([](auto e) -> NullResult {
+                              EXPECT_TRUE(e.hasValue());
+                              return folly::Unit();
+                          }));
 
-    results.push_back(sm1->data_service_request(REQUEST_DATA, cli_buf).deferValue([](auto e) -> NullResult {
-        test_state_mgr::verify_data(e.value());
-        return folly::Unit();
-    }));
+    results.push_back(sm4_1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, cli_buf)
+                          .deferValue([](auto e) -> NullResult {
+                              test_state_mgr::verify_data(e.value());
+                              return folly::Unit();
+                          }));
     folly::collectAll(results).via(folly::getGlobalCPUExecutor()).get();
 
     // add a new member to data_service_test_group and check if repl_ctx4 sends data to newly added member
@@ -393,16 +400,18 @@ TEST_F(DataServiceFixture, DataServiceBasic) {
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(std::move(add_3).get());
     auto sm3 = app_3_->state_mgr_map_[data_group];
-    sm4->data_service_request(SEND_DATA, cli_buf)
+    sm4->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, cli_buf)
         .deferValue([](auto e) -> folly::Unit {
-            test_state_mgr::verify_data(e.value());
+            EXPECT_TRUE(e.hasValue());
             return folly::Unit();
         })
         .get();
 
     // TODO REVIEW THIS
+    // test_group: 4 (1 SEND_DATA) + 1 (1 REQUEST_DATA) = 5
+    // data_service_test_group: 1 (1 REQUEST_DATA) + 4 (1 SEND_DATA) = 5
     // the count is 12 (2 methods from group test_group) + 8 (from data_service_test_group)
-    EXPECT_GT(test_state_mgr::get_server_counter(), 6);
+    EXPECT_EQ(test_state_mgr::get_server_counter(), 10);
 
     // free client buf
     for (auto& buf : cli_buf) {
