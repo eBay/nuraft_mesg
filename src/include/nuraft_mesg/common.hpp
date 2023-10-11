@@ -2,6 +2,7 @@
 
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <boost/uuid/nil_generator.hpp>
 
 #include <folly/Expected.h>
 #include <folly/small_vector.h>
@@ -22,6 +23,7 @@ namespace nuraft_mesg {
 using peer_id_t = boost::uuids::uuid;
 using group_id_t = boost::uuids::uuid;
 using group_type_t = std::string;
+static auto const nil_id = boost::uuids::nil_uuid();
 
 using io_blob_list_t = folly::small_vector< sisl::io_blob, 4 >;
 

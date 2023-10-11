@@ -108,8 +108,8 @@ public:
                                     boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) override;
 
 private:
-    std::optional< peer_id_t > get_peer_id_str(destination_t const& dest);
-    std::string id_to_str(int32_t const id);
+    const std::optional< peer_id_t > get_peer_id(destination_t const& dest) const;
+    const std::string id_to_str(int32_t const id) const;
 };
 
 } // namespace nuraft_mesg
