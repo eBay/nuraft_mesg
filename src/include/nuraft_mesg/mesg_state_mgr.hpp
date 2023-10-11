@@ -33,9 +33,9 @@ public:
     virtual NullAsyncResult data_service_request_unidirectional(destination_t const& dest,
                                                                 std::string const& request_name,
                                                                 io_blob_list_t const& cli_buf) = 0;
-    virtual IoBlobAsyncResult data_service_request_bidirectional(destination_t const& dest,
-                                                                 std::string const& request_name,
-                                                                 io_blob_list_t const& cli_buf) = 0;
+    virtual AsyncResult< sisl::io_blob > data_service_request_bidirectional(destination_t const& dest,
+                                                                            std::string const& request_name,
+                                                                            io_blob_list_t const& cli_buf) = 0;
 
     // Send response to a data service request and finish the async call.
     virtual void send_data_service_response(io_blob_list_t const& outgoing_buf,

@@ -173,9 +173,10 @@ test_state_mgr::data_service_request_bidirectional(nuraft_mesg::destination_t co
     return m_repl_svc_ctx->data_service_request_bidirectional(dest, request_name, cli_buf);
 }
 
-nuraft_mesg::NullAsyncResult test_state_mgr::data_service_request_unidirectional(nuraft_mesg::destination_t const& dest,
-                                                                 std::string const& request_name,
-                                                                 nuraft_mesg::io_blob_list_t const& cli_buf) {
+nuraft_mesg::NullAsyncResult
+test_state_mgr::data_service_request_unidirectional(nuraft_mesg::destination_t const& dest,
+                                                    std::string const& request_name,
+                                                    nuraft_mesg::io_blob_list_t const& cli_buf) {
     return m_repl_svc_ctx->data_service_request_unidirectional(dest, request_name, cli_buf);
 }
 

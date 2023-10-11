@@ -309,8 +309,8 @@ uint32_t Crc32::get(const void* data, size_t len, uint32_t seed) {
 
         uint32_t one = *cur++ ^ crc;
         uint32_t two = *cur++;
-        crc = crc_lookup[7][(one)&0xFF] ^ crc_lookup[6][(one >> 8) & 0xFF] ^ crc_lookup[5][(one >> 16) & 0xFF] ^
-            crc_lookup[4][(one >> 24) & 0xFF] ^ crc_lookup[3][(two)&0xFF] ^ crc_lookup[2][(two >> 8) & 0xFF] ^
+        crc = crc_lookup[7][(one) & 0xFF] ^ crc_lookup[6][(one >> 8) & 0xFF] ^ crc_lookup[5][(one >> 16) & 0xFF] ^
+            crc_lookup[4][(one >> 24) & 0xFF] ^ crc_lookup[3][(two) & 0xFF] ^ crc_lookup[2][(two >> 8) & 0xFF] ^
             crc_lookup[1][(two >> 16) & 0xFF] ^ crc_lookup[0][(two >> 24) & 0xFF];
 #endif
         len -= 8;
