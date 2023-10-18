@@ -70,44 +70,34 @@ public:
                                                         io_blob_list_t const& cli_buf) {
         grpc::ByteBuffer cli_byte_buf;
         serialize_to_byte_buffer(cli_byte_buf, cli_buf);
-        auto [p, sf] = folly::makePromiseContract< Result< folly::Unit > >();
-        /// FIXME we shouldn't need a copy-constructible here should we?
-        auto copyable_promise = std::make_shared< decltype(p) >(std::move(p));
-        _generic_stub->call_unary(
-            cli_byte_buf, request_name,
-            [c = copyable_promise](grpc::ByteBuffer&, ::grpc::Status& status) mutable {
-                if (!status.ok()) {
-                    LOGE("Failed to send data_service_request, error: {}", status.error_message());
-                    c->setValue(folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED));
-                } else {
-                    c->setValue(folly::unit);
+        return _generic_stub
+            ->call_unary(cli_byte_buf, request_name,
+                         NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs))
+            .deferValue([](auto&& response) -> NullResult {
+                if (response.hasError()) {
+                    LOGE("Failed to send data_service_request, error: {}", response.error().error_message());
+                    return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
                 }
-            },
-            NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs));
-        return std::move(sf);
+                return folly::unit;
+            });
     }
 
     AsyncResult< sisl::io_blob > data_service_request_bidirectional(std::string const& request_name,
                                                                     io_blob_list_t const& cli_buf) {
         grpc::ByteBuffer cli_byte_buf;
         serialize_to_byte_buffer(cli_byte_buf, cli_buf);
-        auto [p, sf] = folly::makePromiseContract< Result< sisl::io_blob > >();
-        /// FIXME we shouldn't need a copy-constructible here should we?
-        auto copyable_promise = std::make_shared< decltype(p) >(std::move(p));
-        _generic_stub->call_unary(
-            cli_byte_buf, request_name,
-            [c = copyable_promise](grpc::ByteBuffer& resp, ::grpc::Status& status) mutable {
-                if (!status.ok()) {
-                    LOGE("Failed to send data_service_request, error: {}", status.error_message());
-                    c->setValue(folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED));
-                } else {
-                    sisl::io_blob svr_buf;
-                    deserialize_from_byte_buffer(resp, svr_buf);
-                    c->setValue(std::move(svr_buf));
+        return _generic_stub
+            ->call_unary(cli_byte_buf, request_name,
+                         NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs))
+            .deferValue([](auto&& response) -> Result< sisl::io_blob > {
+                if (response.hasError()) {
+                    LOGE("Failed to send data_service_request, error: {}", response.error().error_message());
+                    return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
                 }
-            },
-            NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs));
-        return std::move(sf);
+                sisl::io_blob svr_buf;
+                deserialize_from_byte_buffer(response.value(), svr_buf);
+                return svr_buf;
+            });
     }
 
 protected:
@@ -207,11 +197,7 @@ NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional<
     // We ignore the vector of future response from collect all and st the value as folly::unit.
     // This is because we do not have a use case to handle the errors that happen during the unidirectional call to all
     // the peers.
-    return folly::collectAll(calls).deferValue([](auto&&) {
-        auto [p, sf] = folly::makePromiseContract< Result< folly::Unit > >();
-        p.setValue(folly::unit);
-        return sf;
-    });
+    return folly::collectAll(calls).deferValue([](auto &&) -> NullResult { return folly::unit; });
 }
 
 AsyncResult< sisl::io_blob >
