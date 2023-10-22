@@ -356,20 +356,20 @@ bool ManagerImpl::bind_data_service_request(std::string const& request_name, gro
 
 // The endpoint field of the raft_server config is the uuid of the server.
 const std::string repl_service_ctx_grpc::id_to_str(int32_t const id) const {
-    auto const& srv_config = m_server->raft_server()->get_config()->get_server(id);
+    auto const& srv_config = _server->get_config()->get_server(id);
     return (srv_config) ? srv_config->get_endpoint() : std::string();
 }
 
 const std::optional< Result< peer_id_t > > repl_service_ctx_grpc::get_peer_id(destination_t const& dest) const {
     if (std::holds_alternative< peer_id_t >(dest)) return std::get< peer_id_t >(dest);
     if (std::holds_alternative< role_regex >(dest)) {
-        if (!m_server) {
+        if (!_server) {
             LOGW("server not initialized");
             return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
         }
         switch (std::get< role_regex >(dest)) {
         case role_regex::LEADER: {
-            auto const leader = m_server->raft_server()->get_leader();
+            auto const leader = _server->get_leader();
             if (leader == -1) return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
             return boost::uuids::string_generator()(id_to_str(leader));
         } break;
@@ -402,12 +402,19 @@ AsyncResult< sisl::io_blob > repl_service_ctx_grpc::data_service_request_bidirec
         : m_mesg_factory->data_service_request_bidirectional(get_peer_id(dest), request_name, cli_buf);
 }
 
-repl_service_ctx::repl_service_ctx(grpc_server* server) : m_server(server) {}
+repl_service_ctx::repl_service_ctx(nuraft::raft_server* server) : _server(server) {}
 
-bool repl_service_ctx::is_raft_leader() const { return m_server->raft_server()->is_leader(); }
+bool repl_service_ctx::is_raft_leader() const { return _server->is_leader(); }
+
+void repl_service_ctx::get_cluster_config(std::list< replica_config >& cluster_config) const {
+    auto const& srv_configs = _server->get_config()->get_servers();
+    for (auto const& srv_config : srv_configs) {
+        cluster_config.emplace_back(replica_config{srv_config->get_endpoint(), srv_config->get_aux()});
+    }
+}
 
 repl_service_ctx_grpc::repl_service_ctx_grpc(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory) :
-        repl_service_ctx(server), m_mesg_factory(cli_factory) {}
+        repl_service_ctx(server->raft_server().get()), m_mesg_factory(cli_factory) {}
 
 void repl_service_ctx_grpc::send_data_service_response(io_blob_list_t const& outgoing_buf,
                                                        boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
