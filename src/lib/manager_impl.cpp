@@ -369,6 +369,7 @@ const std::optional< Result< peer_id_t > > repl_service_ctx_grpc::get_peer_id(de
         }
         switch (std::get< role_regex >(dest)) {
         case role_regex::LEADER: {
+            if (is_raft_leader()) return folly::makeUnexpected(nuraft::cmd_result_code::BAD_REQUEST);
             auto const leader = _server->get_leader();
             if (leader == -1) return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
             return boost::uuids::string_generator()(id_to_str(leader));
@@ -378,12 +379,12 @@ const std::optional< Result< peer_id_t > > repl_service_ctx_grpc::get_peer_id(de
         } break;
         default: {
             LOGE("Method not implemented");
-            return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+            return folly::makeUnexpected(nuraft::cmd_result_code::BAD_REQUEST);
         } break;
         }
     }
     DEBUG_ASSERT(false, "Unknown destination type");
-    return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+    return folly::makeUnexpected(nuraft::cmd_result_code::BAD_REQUEST);
 }
 
 NullAsyncResult repl_service_ctx_grpc::data_service_request_unidirectional(destination_t const& dest,
@@ -414,7 +415,7 @@ void repl_service_ctx::get_cluster_config(std::list< replica_config >& cluster_c
 }
 
 repl_service_ctx_grpc::repl_service_ctx_grpc(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory) :
-        repl_service_ctx(server->raft_server().get()), m_mesg_factory(cli_factory) {}
+        repl_service_ctx(server ? server->raft_server().get() : nullptr), m_mesg_factory(cli_factory) {}
 
 void repl_service_ctx_grpc::send_data_service_response(io_blob_list_t const& outgoing_buf,
                                                        boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
@@ -422,7 +423,7 @@ void repl_service_ctx_grpc::send_data_service_response(io_blob_list_t const& out
     rpc_data->send_response();
 }
 
-void mesg_state_mgr::make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory >& cli_factory) {
+void mesg_state_mgr::make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory) {
     m_repl_svc_ctx = std::make_unique< repl_service_ctx_grpc >(server, cli_factory);
 }
 

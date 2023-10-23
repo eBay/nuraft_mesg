@@ -55,6 +55,7 @@ public:
     static uint16_t get_random_num();
     static uint32_t get_server_counter();
     static void verify_data(sisl::io_blob const& buf);
+    nuraft_mesg::repl_service_ctx* get_repl_context() { return m_repl_svc_ctx.get(); }
 
 private:
 private:

@@ -55,7 +55,7 @@ class mesg_state_mgr : public nuraft::state_mgr {
 public:
     using nuraft::state_mgr::state_mgr;
     virtual ~mesg_state_mgr() = default;
-    void make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory >& cli_factory);
+    void make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory);
 
     virtual void become_ready() {}
     virtual uint32_t get_logstore_id() const = 0;
