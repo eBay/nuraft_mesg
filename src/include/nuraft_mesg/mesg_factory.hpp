@@ -70,7 +70,11 @@ public:
     nuraft::cmd_result_code reinit_client(peer_id_t const& client,
                                           std::shared_ptr< nuraft::rpc_client >& raft_client) override;
 
-    AsyncResult< sisl::io_blob > data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf);
+    NullAsyncResult data_service_request_unidirectional(std::optional< Result< peer_id_t > > const& dest,
+                                                        std::string const& request_name, io_blob_list_t const& cli_buf);
+
+    AsyncResult< sisl::io_blob > data_service_request_bidirectional(std::optional< Result< peer_id_t > > const&,
+                                                                    std::string const&, io_blob_list_t const&);
 };
 
 } // namespace nuraft_mesg
