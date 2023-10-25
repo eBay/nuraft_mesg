@@ -48,9 +48,17 @@ inline RCMsgBase* fromBaseRequest(nuraft::msg_base const& rcbase) {
                                                                   sisl::io_blob& cli_buf) {
     grpc::Slice slice;
     auto status = cli_byte_buf.TrySingleSlice(&slice);
-    if (!status.ok()) { return status; }
-    cli_buf.bytes = const_cast< uint8_t* >(slice.begin());
-    cli_buf.size = slice.size();
+    if (status.ok()) {
+        cli_buf.bytes = const_cast< uint8_t* >(slice.begin());
+        cli_buf.size = slice.size();
+    } else if (status.error_code() == grpc::StatusCode::FAILED_PRECONDITION) {
+        // If the ByteBuffer is not made up of single slice, TrySingleSlice() will fail.
+        // DumpSingleSlice() should work in those cases but will incur a copy.
+        status = cli_byte_buf.DumpToSingleSlice(&slice);
+        if (!status.ok()) { return status; }
+        cli_buf.buf_alloc(slice.size());
+        std::memcpy(static_cast< void* >(cli_buf.bytes), static_cast< const void* >(slice.begin()), slice.size());
+    }
     return status;
 }
 
