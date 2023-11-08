@@ -8,7 +8,7 @@ required_conan_version = ">=1.50.0"
 
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "2.0.2"
+    version = "2.0.3"
 
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
@@ -52,7 +52,7 @@ class NuRaftMesgConan(ConanFile):
                     raise ConanInvalidConfiguration("Coverage/Sanitizer requires Testing!")
 
     def build_requirements(self):
-        self.build_requires("gtest/1.13.0")
+        self.build_requires("gtest/1.14.0")
         if (self.options.testing):
             self.build_requires("jungle/cci.20221201")
 
@@ -61,6 +61,7 @@ class NuRaftMesgConan(ConanFile):
         self.requires("nuraft/2.3.0")
 
         self.requires("boost/1.82.0")
+        self.requires("flatbuffers/23.5.26")
         self.requires("openssl/3.1.1")
         self.requires("lz4/1.9.4")
 
@@ -102,9 +103,13 @@ class NuRaftMesgConan(ConanFile):
         copy(self, "*.pb.h", join(self.build_folder, "src"), gen_dir, keep_path=False)
 
     def package_info(self):
-        self.cpp_info.libs = ["nuraft_mesg"]
+        self.cpp_info.names["cmake_find_package"] = "NuraftMesg"
+        self.cpp_info.names["cmake_find_package_multi"] = "NuraftMesg"
+        self.cpp_info.components["proto"].libs = ["nuraft_mesg", "nuraft_mesg_proto"]
+        self.cpp_info.components["proto"].requires = ["nuraft::nuraft", "sisl::sisl"]
+
         if self.settings.build_type == "Debug" and self.options.sanitize:
-            self.cpp_info.sharedlinkflags.append("-fsanitize=address")
-            self.cpp_info.exelinkflags.append("-fsanitize=address")
-            self.cpp_info.sharedlinkflags.append("-fsanitize=undefined")
-            self.cpp_info.exelinkflags.append("-fsanitize=undefined")
+            self.cpp_info.components["proto"].sharedlinkflags.append("-fsanitize=address")
+            self.cpp_info.components["proto"].exelinkflags.append("-fsanitize=address")
+            self.cpp_info.components["proto"].sharedlinkflags.append("-fsanitize=undefined")
+            self.cpp_info.components["proto"].exelinkflags.append("-fsanitize=undefined")

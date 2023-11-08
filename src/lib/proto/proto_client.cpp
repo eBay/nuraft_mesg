@@ -18,9 +18,9 @@
 // Brief:
 //   grpc_client does the protobuf transformations on nuraft req's
 //
-#include "grpc_client.hpp"
+#include "proto_client.hpp"
 #include "utils.hpp"
-#include "proto/raft_types.pb.h"
+#include "raft_types.pb.h"
 
 namespace nuraft_mesg {
 

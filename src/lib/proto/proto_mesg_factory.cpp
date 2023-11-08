@@ -12,17 +12,26 @@
  * specific language governing permissions and limitations under the License.
  *
  *********************************************************************************/
-#include "grpc_client.hpp"
+#include "proto_client.hpp"
 #include <libnuraft/async.hxx>
 #include <string>
 
 #include <folly/futures/Future.h>
+#include <sisl/settings/settings.hpp>
 
 #include "nuraft_mesg/mesg_factory.hpp"
-#include "service.hpp"
-#include "proto/messaging_service.grpc.pb.h"
+#include "lib/service.hpp"
+#include "messaging_service.grpc.pb.h"
 #include "utils.hpp"
-#include "nuraft_mesg_config.hpp"
+#include "lib/generated/nuraft_mesg_config_generated.h"
+
+SETTINGS_INIT(nuraftmesgcfg::NuraftMesgConfig, nuraft_mesg_config);
+
+#define NURAFT_MESG_CONFIG_WITH(...) SETTINGS(nuraft_mesg_config, __VA_ARGS__)
+#define NURAFT_MESG_CONFIG_THIS(...) SETTINGS_THIS(nuraft_mesg_config, __VA_ARGS__)
+#define NURAFT_MESG_CONFIG(...) SETTINGS_VALUE(nuraft_mesg_config, __VA_ARGS__)
+
+#define NURAFT_MESG_SETTINGS_FACTORY() SETTINGS_FACTORY(nuraft_mesg_config)
 
 namespace nuraft_mesg {
 
@@ -197,7 +206,7 @@ NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional<
     // We ignore the vector of future response from collect all and st the value as folly::unit.
     // This is because we do not have a use case to handle the errors that happen during the unidirectional call to all
     // the peers.
-    return folly::collectAll(calls).deferValue([](auto &&) -> NullResult { return folly::unit; });
+    return folly::collectAll(calls).deferValue([](auto&&) -> NullResult { return folly::unit; });
 }
 
 AsyncResult< sisl::io_blob >

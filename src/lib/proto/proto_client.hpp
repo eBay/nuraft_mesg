@@ -23,7 +23,7 @@
 #include <sisl/grpc/rpc_client.hpp>
 #include <sisl/logging/logging.h>
 
-#include "common_lib.hpp"
+#include "lib/common_lib.hpp"
 
 namespace nuraft_mesg {
 

@@ -2,7 +2,7 @@
 #include <sisl/grpc/generic_service.hpp>
 
 #include "data_service_grpc.hpp"
-#include "utils.hpp"
+#include "common_lib.hpp"
 
 namespace nuraft_mesg {
 

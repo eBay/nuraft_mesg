@@ -12,7 +12,8 @@ if (jungle_FOUND)
                 test_state_manager.cpp
               )
     target_link_libraries (messaging_test
-          nuraft_mesg
+          ${PROJECT_NAME}
+          ${PROJECT_NAME}_proto
           $<TARGET_OBJECTS:jungle_logstore>
           jungle::jungle
           GTest::gmock

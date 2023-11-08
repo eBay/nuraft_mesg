@@ -13,7 +13,6 @@
 
 #include "nuraft_mesg/grpc_server.hpp"
 
-#include "proto/messaging_service.grpc.pb.h"
 #include "manager_impl.hpp"
 #include "data_service_grpc.hpp"
 
@@ -22,6 +21,8 @@ namespace nuraft_mesg {
 template < typename T >
 using shared = std::shared_ptr< T >;
 
+class RaftGroupMsg;
+class Messaging;
 class msg_service;
 class mesg_factory;
 class repl_service_ctx_grpc;

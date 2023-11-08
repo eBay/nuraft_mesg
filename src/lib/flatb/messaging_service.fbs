@@ -1,0 +1,8 @@
+include "raft_types.fbs";
+
+namespace nuraft_mesg;
+
+rpc_service Messaging {
+  RaftStep(Request):Response;
+}
+
