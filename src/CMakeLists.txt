@@ -14,7 +14,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     lib/grpc_client.cpp
     lib/grpc_factory.cpp
     lib/grpc_server.cpp
-    lib/mesg_client.cpp
+    lib/mesg_factory.cpp
     lib/data_service_grpc.cpp
     lib/manager_impl.cpp
     $<TARGET_OBJECTS:${PROJECT_NAME}-proto>
