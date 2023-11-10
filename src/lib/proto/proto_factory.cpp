@@ -22,7 +22,7 @@
 #include <libnuraft/async.hxx>
 #include <sisl/grpc/rpc_client.hpp>
 
-#include "proto_client.hpp"
+#include "lib/client.hpp"
 #include "nuraft_mesg/grpc_factory.hpp"
 #include "raft_types.pb.h"
 

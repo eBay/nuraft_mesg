@@ -12,7 +12,7 @@
  * specific language governing permissions and limitations under the License.
  *
  *********************************************************************************/
-#include "proto_client.hpp"
+#include "lib/client.hpp"
 #include <libnuraft/async.hxx>
 #include <string>
 
@@ -22,7 +22,6 @@
 #include "nuraft_mesg/mesg_factory.hpp"
 #include "lib/service.hpp"
 #include "messaging_service.grpc.pb.h"
-#include "utils.hpp"
 #include "lib/generated/nuraft_mesg_config_generated.h"
 
 SETTINGS_INIT(nuraftmesgcfg::NuraftMesgConfig, nuraft_mesg_config);
