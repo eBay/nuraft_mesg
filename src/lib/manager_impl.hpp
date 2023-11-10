@@ -21,8 +21,10 @@
 #include <mutex>
 #include <string>
 
+#include <folly/SharedMutex.h>
 #include <sisl/logging/logging.h>
 
+#include "data_service_grpc.hpp"
 #include "nuraft_mesg/mesg_factory.hpp"
 #include "common_lib.hpp"
 
@@ -32,10 +34,17 @@ class GrpcServer;
 
 namespace nuraft_mesg {
 class group_factory;
-class msg_service;
-class group_metrics;
+class Messaging;
+class RaftGroupMsg;
 
-class ManagerImpl : public Manager {
+struct grpc_server_wrapper {
+    explicit grpc_server_wrapper(group_id_t const& group_id);
+
+    std::shared_ptr< grpc_server > m_server;
+    std::shared_ptr< group_metrics > m_metrics;
+};
+
+class ManagerImpl : public Manager, public std::enable_shared_from_this< ManagerImpl > {
     Manager::Params start_params_;
     int32_t _srv_id;
 
@@ -43,8 +52,11 @@ class ManagerImpl : public Manager {
 
     std::weak_ptr< MessagingApplication > application_;
     std::shared_ptr< group_factory > _g_factory;
-    std::shared_ptr< msg_service > _mesg_service;
-    std::unique_ptr<::sisl::GrpcServer > _grpc_server;
+
+    folly::SharedMutex _raft_servers_lock;
+    std::map< group_id_t, grpc_server_wrapper > _raft_servers;
+
+    std::unique_ptr< ::sisl::GrpcServer > _grpc_server;
 
     std::mutex mutable _manager_lock;
     std::map< group_id_t, std::shared_ptr< mesg_state_mgr > > _state_managers;
@@ -55,11 +67,18 @@ class ManagerImpl : public Manager {
     nuraft::ptr< nuraft::delayed_task_scheduler > _scheduler;
     std::shared_ptr< sisl::logging::logger_t > _custom_logger;
 
+    data_service_grpc _data_service;
+    bool _data_service_enabled;
+
     nuraft::cmd_result_code group_init(int32_t const srv_id, group_id_t const& group_id, group_type_t const& group_type,
                                        nuraft::context*& ctx, std::shared_ptr< group_metrics > metrics);
-    nuraft::cb_func::ReturnCode callback_handler(group_id_t const& group_id, nuraft::cb_func::Type type,
-                                                 nuraft::cb_func::Param* param);
+    nuraft::cb_func::ReturnCode raft_event(group_id_t const& group_id, nuraft::cb_func::Type type,
+                                           nuraft::cb_func::Param* param);
     void exit_group(group_id_t const& group_id);
+
+    nuraft::cmd_result_code joinRaftGroup(int32_t srv_id, group_id_t const& group_id, group_type_t const&);
+
+    bool raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
 
 public:
     ManagerImpl(Manager::Params const&, std::weak_ptr< MessagingApplication >, bool and_data_svc = false);
@@ -92,6 +111,8 @@ public:
 
     void get_srv_config_all(group_id_t const& group_id,
                             std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) override;
+
+    void shutdown_for(group_id_t const&);
 };
 
 class repl_service_ctx_grpc : public repl_service_ctx {

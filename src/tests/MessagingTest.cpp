@@ -51,6 +51,7 @@ public:
     uint32_t port_;
     boost::uuids::uuid id_;
     std::shared_ptr< Manager > instance_;
+    bool data_svc_;
 
     std::map< group_id_t, std::shared_ptr< test_state_mgr > > state_mgr_map_;
 
@@ -70,7 +71,7 @@ public:
         auto [it, happened] =
             state_mgr_map_.try_emplace(group_id, std::make_shared< test_state_mgr >(srv_id, id_, group_id));
         RELEASE_ASSERT(happened, "Failed!");
-        it->second->register_data_service_apis(instance_.get());
+        if (data_svc_) it->second->register_data_service_apis(instance_.get());
         return std::static_pointer_cast< mesg_state_mgr >(it->second);
     }
 
@@ -80,6 +81,7 @@ public:
     }
 
     void start(bool data_svc_enabled = false) {
+        data_svc_ = data_svc_enabled;
         auto params = Manager::Params();
         params.server_uuid_ = id_;
         params.mesg_port_ = port_;

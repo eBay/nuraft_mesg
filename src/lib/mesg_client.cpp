@@ -19,7 +19,6 @@
 #include <folly/futures/Future.h>
 
 #include "nuraft_mesg/mesg_factory.hpp"
-#include "service.hpp"
 #include "proto/messaging_service.grpc.pb.h"
 #include "utils.hpp"
 #include "nuraft_mesg_config.hpp"
@@ -197,7 +196,7 @@ NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional<
     // We ignore the vector of future response from collect all and st the value as folly::unit.
     // This is because we do not have a use case to handle the errors that happen during the unidirectional call to all
     // the peers.
-    return folly::collectAll(calls).deferValue([](auto &&) -> NullResult { return folly::unit; });
+    return folly::collectAll(calls).deferValue([](auto&&) -> NullResult { return folly::unit; });
 }
 
 AsyncResult< sisl::io_blob >
