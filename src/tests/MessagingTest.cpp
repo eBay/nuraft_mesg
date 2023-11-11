@@ -176,6 +176,12 @@ protected:
         app_3_->map_peers(lookup_map);
     }
 
+    void TearDown() override {
+        app_3_->instance_->leave_group(group_id_);
+        app_2_->instance_->leave_group(group_id_);
+        app_1_->instance_->leave_group(group_id_);
+    }
+
     void start(bool data_svc_enabled = false) {
         app_1_->start(data_svc_enabled);
         app_2_->start(data_svc_enabled);
@@ -216,10 +222,6 @@ TEST_F(MessagingFixture, ClientRequest) {
         {"op_type", 2},
     });
     EXPECT_TRUE(app_1_->instance_->append_entries(group_id_, {buf}).get());
-
-    app_3_->instance_->leave_group(group_id_);
-    app_2_->instance_->leave_group(group_id_);
-    app_1_->instance_->leave_group(group_id_);
 }
 
 // Basic resiliency test (append_entries)
@@ -249,10 +251,6 @@ TEST_F(MessagingFixture, MemberCrash) {
     EXPECT_FALSE(app_3_->instance_->become_leader(boost::uuids::random_generator()()).get());
     EXPECT_TRUE(app_3_->instance_->become_leader(group_id_).get());
     EXPECT_TRUE(app_3_->instance_->append_entries(group_id_, {buf}).get());
-
-    app_3_->instance_->leave_group(group_id_);
-    app_2_->instance_->leave_group(group_id_);
-    app_1_->instance_->leave_group(group_id_);
 }
 
 // Test sending a message for a group the messaging service is not aware of.
@@ -313,6 +311,7 @@ TEST_F(MessagingFixture, SyncAddMember) {
     srv_list.clear();
     app_1_->instance_->get_srv_config_all(group_id_, srv_list);
     EXPECT_EQ(srv_list.size(), 4u);
+    app_4->instance_->leave_group(group_id_);
 }
 
 class DataServiceFixture : public MessagingFixtureBase {
@@ -324,6 +323,7 @@ protected:
     }
 
     void TearDown() override {
+        MessagingFixtureBase::TearDown();
         for (auto& buf : cli_buf) {
             buf.buf_free();
         }
@@ -425,6 +425,13 @@ TEST_F(DataServiceFixture, BasicTest1) {
     // test_group: 4 (1 SEND_DATA) + 1 (1 REQUEST_DATA) + 1 (SEND_DATA to a peer) = 6
     // data_service_test_group: 1 (1 REQUEST_DATA) + 4 (1 SEND_DATA) = 5
     EXPECT_EQ(test_state_mgr::get_server_counter(), 11);
+    app_5->instance_->leave_group(data_group);
+    app_5->instance_->leave_group(group_id_);
+    app_4->instance_->leave_group(data_group);
+    app_4->instance_->leave_group(group_id_);
+    app_3_->instance_->leave_group(data_group);
+    app_2_->instance_->leave_group(data_group);
+    app_1_->instance_->leave_group(data_group);
 }
 
 TEST_F(DataServiceFixture, BasicTest2) {

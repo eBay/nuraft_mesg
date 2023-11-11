@@ -14,6 +14,7 @@
  *********************************************************************************/
 #include "test_state_manager.h"
 
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <random>
@@ -28,6 +29,8 @@
 #include "jungle_logstore/jungle_log_store.h"
 
 #include "test_state_machine.h"
+
+#define STATE_PATH(g, s, f) fmt::format(FMT_STRING("{}_s{}{}"), (g), (s), (f))
 
 using json = nlohmann::json;
 
@@ -50,12 +53,12 @@ std::error_condition jsonObjectFromFile(std::string const& filename, json& json_
 }
 
 std::error_condition loadConfigFile(json& config_map, nuraft_mesg::group_id_t const& _group_id, int32_t const _srv_id) {
-    auto const config_file = fmt::format(FMT_STRING("{}_s{}/config.json"), _group_id, _srv_id);
+    auto const config_file = STATE_PATH(_group_id, _srv_id, "/config.json");
     return jsonObjectFromFile(config_file, config_map);
 }
 
 std::error_condition loadStateFile(json& state_map, nuraft_mesg::group_id_t const& _group_id, int32_t const _srv_id) {
-    auto const state_file = fmt::format(FMT_STRING("{}_s{}/state.json"), _group_id, _srv_id);
+    auto const state_file = STATE_PATH(_group_id, _srv_id, "/state.json");
     return jsonObjectFromFile(state_file, state_map);
 }
 
@@ -116,7 +119,7 @@ nuraft::ptr< nuraft::cluster_config > test_state_mgr::load_config() {
 }
 
 nuraft::ptr< nuraft::log_store > test_state_mgr::load_log_store() {
-    return nuraft::cs_new< nuraft::jungle_log_store >(fmt::format(FMT_STRING("{}_s{}"), _group_id, _srv_id));
+    return nuraft::cs_new< nuraft::jungle_log_store >(STATE_PATH(_group_id, _srv_id, ""));
 }
 
 nuraft::ptr< nuraft::srv_state > test_state_mgr::read_state() {
@@ -133,7 +136,7 @@ nuraft::ptr< nuraft::srv_state > test_state_mgr::read_state() {
 }
 
 void test_state_mgr::save_config(const nuraft::cluster_config& config) {
-    auto const config_file = fmt::format(FMT_STRING("{}_s{}/config.json"), _group_id, _srv_id);
+    auto const config_file = STATE_PATH(_group_id, _srv_id, "/config.json");
     auto json_obj = json{{"log_idx", config.get_log_idx()},
                          {"prev_log_idx", config.get_prev_log_idx()},
                          {"eventual_consistency", config.is_async_replication()},
@@ -146,7 +149,7 @@ void test_state_mgr::save_config(const nuraft::cluster_config& config) {
 }
 
 void test_state_mgr::save_state(const nuraft::srv_state& state) {
-    auto const state_file = fmt::format(FMT_STRING("{}_s{}/state.json"), _group_id, _srv_id);
+    auto const state_file = STATE_PATH(_group_id, _srv_id, "/state.json");
     auto json_obj = json{{"term", state.get_term()}, {"voted_for", state.get_voted_for()}};
 
     try {
@@ -161,7 +164,13 @@ std::shared_ptr< nuraft::state_machine > test_state_mgr::get_state_machine() {
     return std::static_pointer_cast< nuraft::state_machine >(_state_machine);
 }
 
-void test_state_mgr::permanent_destroy() {}
+test_state_mgr::~test_state_mgr() {
+    if (auto path = std::filesystem::weakly_canonical(STATE_PATH(_group_id, _srv_id, ""));
+        _will_destroy && std::filesystem::exists(path))
+        std::filesystem::remove_all(path);
+}
+
+void test_state_mgr::permanent_destroy() { _will_destroy = true; }
 
 void test_state_mgr::leave() {}
 
