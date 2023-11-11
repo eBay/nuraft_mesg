@@ -26,7 +26,6 @@ target_link_libraries(${PROJECT_NAME}-proto-specs
 add_library(${PROJECT_NAME}_proto)
 target_sources(${PROJECT_NAME}_proto PRIVATE
    proto_client.cpp
-   proto_grpc_server.cpp
    proto_mesg_factory.cpp
    proto_service.cpp
    $<TARGET_OBJECTS:${PROJECT_NAME}-proto-specs>
