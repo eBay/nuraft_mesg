@@ -56,8 +56,7 @@ ManagerImpl::~ManagerImpl() {
     }
 }
 
-ManagerImpl::ManagerImpl(Manager::Params const& start_params, std::weak_ptr< MessagingApplication > app,
-                         bool and_data_svc) :
+ManagerImpl::ManagerImpl(Manager::Params const& start_params, std::weak_ptr< MessagingApplication > app) :
         start_params_(start_params), _srv_id(to_server_id(start_params_.server_uuid_)), application_(app) {
     _g_factory = std::make_shared< engine_factory >(grpc_client_threads, start_params_, app);
     auto logger_name = fmt::format("nuraft_{}", start_params_.server_uuid_);
@@ -76,19 +75,13 @@ ManagerImpl::ManagerImpl(Manager::Params const& start_params, std::weak_ptr< Mes
     nuraft::asio_service::options service_options;
     service_options.thread_pool_size_ = 1;
     _scheduler = std::make_shared< nuraft::asio_service >(service_options, logger);
+}
 
-    // The function passed to msg_service will be called each time a new group is joined,
-    // allowing sharing of the Server and client amongst raft instances.
-
-    _mesg_service = msg_service::create(
-        [this](int32_t const srv_id, group_id_t const& group_id, group_type_t const& group_type, nuraft::context*& ctx,
-               std::shared_ptr< group_metrics > metrics) mutable -> nuraft::cmd_result_code {
-            return this->group_init(srv_id, group_id, group_type, ctx, metrics);
-        },
-        start_params_.server_uuid_, and_data_svc);
-    _mesg_service->setDefaultGroupType(start_params_.default_group_type_);
-
-    // Start a gRPC server and create and associate nuraft_mesg services.
+void ManagerImpl::start(bool and_data_svc) {
+    if (auto lg = std::lock_guard< std::mutex >(_manager_lock); !_mesg_service) {
+        _mesg_service = msg_service::create(shared_from_this(), start_params_.server_uuid_, and_data_svc);
+        _mesg_service->setDefaultGroupType(start_params_.default_group_type_);
+    }
     restart_server();
 }
 
@@ -97,6 +90,7 @@ void ManagerImpl::restart_server() {
     LOGI("Starting Messaging Service on http://{}", listen_address);
 
     std::lock_guard< std::mutex > lg(_manager_lock);
+    RELEASE_ASSERT(_mesg_service, "Need to call ::start() first!");
     _grpc_server.reset();
     _grpc_server = std::unique_ptr< sisl::GrpcServer >(
         sisl::GrpcServer::make(listen_address, start_params_.token_verifier_, grpc_server_threads,
@@ -115,8 +109,7 @@ void ManagerImpl::register_mgr_type(group_type_t const& group_type, group_params
     if (_state_mgr_types.end() == it) { LOGE("Could not register [group_type={}]", group_type); }
 }
 
-nuraft::cb_func::ReturnCode ManagerImpl::raft_event(group_id_t const& group_id, nuraft::cb_func::Type type,
-                                                    nuraft::cb_func::Param* param) {
+void ManagerImpl::raft_event(group_id_t const& group_id, nuraft::cb_func::Type type, nuraft::cb_func::Param* param) {
     switch (type) {
     case nuraft::cb_func::RemovedFromCluster: {
         LOGI("[srv_id={}] evicted from: [group={}]", start_params_.server_uuid_, group_id);
@@ -154,7 +147,6 @@ nuraft::cb_func::ReturnCode ManagerImpl::raft_event(group_id_t const& group_id, 
     default:
         break;
     };
-    return nuraft::cb_func::Ok;
 }
 
 void ManagerImpl::exit_group(group_id_t const& group_id) {
@@ -207,8 +199,10 @@ nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t
 
     nuraft::ptr< nuraft::logger > logger = std::make_shared< nuraft_mesg_logger >(group_id, _custom_logger);
     ctx = new nuraft::context(smgr, sm, listener, logger, rpc_cli_factory, _scheduler, params);
-    ctx->set_cb_func([this, group_id](nuraft::cb_func::Type type, nuraft::cb_func::Param* param) mutable {
-        return this->raft_event(group_id, type, param);
+    ctx->set_cb_func([wp = std::weak_ptr< ManagerImpl >(shared_from_this()), group_id](nuraft::cb_func::Type type,
+                                                                                       nuraft::cb_func::Param* param) {
+        if (auto sp = wp.lock(); sp) sp->raft_event(group_id, type, param);
+        return nuraft::cb_func::Ok;
     });
 
     return nuraft::cmd_result_code::OK;
@@ -275,7 +269,7 @@ NullAsyncResult ManagerImpl::create_group(group_id_t const& group_id, std::strin
         std::lock_guard< std::mutex > lg(_manager_lock);
         _is_leader.insert(std::make_pair(group_id, false));
     }
-    if (auto const err = _mesg_service->createRaftGroup(_srv_id, group_id, group_type_name); err) {
+    if (auto const err = _mesg_service->joinRaftGroup(_srv_id, group_id, group_type_name); err) {
         return folly::makeUnexpected(err);
     }
 
@@ -354,6 +348,7 @@ void ManagerImpl::get_srv_config_all(group_id_t const& group_id,
 
 bool ManagerImpl::bind_data_service_request(std::string const& request_name, group_id_t const& group_id,
                                             data_service_request_handler_t const& request_handler) {
+    RELEASE_ASSERT(_mesg_service, "Need to call ::start() first!");
     return _mesg_service->bind_data_service_request(request_name, group_id, request_handler);
 }
 
@@ -364,7 +359,9 @@ void mesg_state_mgr::make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_fa
 std::shared_ptr< Manager > init_messaging(Manager::Params const& p, std::weak_ptr< MessagingApplication > w,
                                           bool with_data_svc) {
     RELEASE_ASSERT(w.lock(), "Could not acquire application!");
-    return std::make_shared< ManagerImpl >(p, w, with_data_svc);
+    auto m = std::make_shared< ManagerImpl >(p, w);
+    m->start(with_data_svc);
+    return m;
 }
 
 } // namespace nuraft_mesg

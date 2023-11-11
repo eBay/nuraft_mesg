@@ -151,9 +151,9 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
     return true;
 }
 
-std::shared_ptr< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, group_id_t const& service_address,
-                                                   bool const enable_data_service) {
-    return std::make_shared< proto_service >(get_server_ctx, service_address, enable_data_service);
+std::shared_ptr< msg_service > msg_service::create(std::shared_ptr< ManagerImpl > const& manager,
+                                                   group_id_t const& service_address, bool const enable_data_service) {
+    return std::make_shared< proto_service >(manager, service_address, enable_data_service);
 }
 
 } // namespace nuraft_mesg

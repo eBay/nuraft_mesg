@@ -38,11 +38,9 @@ grpc_server_wrapper::grpc_server_wrapper(group_id_t const& group_id) {
     if (0 < SISL_OPTIONS.count("msg_metrics")) m_metrics = std::make_shared< group_metrics >(group_id);
 }
 
-msg_service::msg_service(get_server_ctx_cb get_server_ctx, group_id_t const& service_address,
+msg_service::msg_service(std::shared_ptr< ManagerImpl > const& manager, group_id_t const& service_address,
                          bool const enable_data_service) :
-        _data_service_enabled(enable_data_service),
-        _get_server_ctx(get_server_ctx),
-        _service_address(service_address) {}
+        _data_service_enabled(enable_data_service), _manager(manager), _service_address(service_address) {}
 
 msg_service::~msg_service() {
     std::unique_lock< lock_type > lck(_raft_servers_lock);
@@ -179,9 +177,14 @@ nuraft::cmd_result_code msg_service::joinRaftGroup(int32_t const srv_id, group_i
         if (g_type.empty()) { g_type = _default_group_type; }
         std::tie(it, happened) = _raft_servers.emplace(std::make_pair(group_id, group_id));
         if (_raft_servers.end() != it && happened) {
-            if (auto err = _get_server_ctx(srv_id, group_id, g_type, ctx, it->second.m_metrics); err) {
-                LOGE("Error during RAFT server creation [group={}]: {}", group_id, err);
-                return err;
+            if (auto mgr = _manager.lock(); !mgr) {
+                LOGW("Got join after shutdown...skipping [group={}]", group_id);
+                return nuraft::cmd_result_code::CANCELLED;
+            } else {
+                if (auto err = mgr->group_init(srv_id, group_id, g_type, ctx, it->second.m_metrics); err) {
+                    LOGE("Error during RAFT server creation [group={}]: {}", group_id, err);
+                    return err;
+                }
             }
             DEBUG_ASSERT(!ctx->rpc_listener_, "RPC listner should not be set!");
             auto new_listner = std::make_shared< msg_group_listner >(shared_from_this(), group_id);
