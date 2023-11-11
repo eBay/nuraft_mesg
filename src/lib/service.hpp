@@ -21,12 +21,6 @@ namespace nuraft_mesg {
 template < typename T >
 using shared = std::shared_ptr< T >;
 
-class RaftGroupMsg;
-class Messaging;
-class msg_service;
-class mesg_factory;
-class repl_service_ctx_grpc;
-
 using lock_type = folly::SharedMutex;
 
 class group_metrics : public sisl::MetricsGroupWrapper {
@@ -56,20 +50,24 @@ struct grpc_server_wrapper {
 };
 
 class msg_service : public std::enable_shared_from_this< msg_service > {
-    get_server_ctx_cb _get_server_ctx;
+    bool _data_service_enabled;
+    data_service_t _data_service;
+
     std::mutex _raft_sync_lock;
     std::condition_variable_any _raft_servers_sync;
+
+    std::string _default_group_type;
+
+    msg_service(get_server_ctx_cb get_server_ctx, peer_id_t const& service_address, bool const enable_data_service);
+
+protected:
+    get_server_ctx_cb _get_server_ctx;
     lock_type _raft_servers_lock;
     std::map< group_id_t, grpc_server_wrapper > _raft_servers;
     peer_id_t const _service_address;
-    std::string _default_group_type;
-    data_service_t _data_service;
-    bool _data_service_enabled;
-
-    msg_service(get_server_ctx_cb get_server_ctx, peer_id_t const& service_address, bool const enable_data_service);
-    ~msg_service();
 
 public:
+    virtual ~msg_service();
     static std::shared_ptr< msg_service > create(get_server_ctx_cb get_server_ctx, peer_id_t const& service_address,
                                                  bool const enable_data_service);
 
@@ -87,13 +85,10 @@ public:
     void get_srv_config_all(group_id_t const& group_id,
                             std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out);
 
-    void associate(sisl::GrpcServer* server);
-    void bind(sisl::GrpcServer* server);
+    virtual void associate(sisl::GrpcServer* server);
+    virtual void bind(sisl::GrpcServer* server);
     bool bind_data_service_request(std::string const& request_name, group_id_t const& group_id,
                                    data_service_request_handler_t const& request_handler);
-
-    //::grpc::Status raftStep(RaftGroupMsg& request, RaftGroupMsg& response);
-    bool raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
 
     void setDefaultGroupType(std::string const& _type);
 
