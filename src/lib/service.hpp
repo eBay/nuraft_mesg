@@ -33,10 +33,6 @@ public:
     ~group_metrics() { deregister_me_from_farm(); }
 };
 
-using get_server_ctx_cb =
-    std::function< nuraft::cmd_result_code(int32_t srv_id, group_id_t const&, group_type_t const&,
-                                           nuraft::context*& ctx_out, std::shared_ptr< group_metrics > metrics) >;
-
 // pluggable type for data service
 using data_service_t = data_service_grpc;
 
@@ -51,18 +47,19 @@ class msg_service : public std::enable_shared_from_this< msg_service >, public n
     bool _data_service_enabled;
     data_service_t _data_service;
     std::string _default_group_type;
+    std::weak_ptr< ManagerImpl > _manager;
 
 protected:
-    get_server_ctx_cb _get_server_ctx;
     lock_type _raft_servers_lock;
     std::map< group_id_t, grpc_server_wrapper > _raft_servers;
     peer_id_t const _service_address;
 
 public:
-    msg_service(get_server_ctx_cb get_server_ctx, peer_id_t const& service_address, bool const enable_data_service);
+    msg_service(std::shared_ptr< ManagerImpl > const& manager, peer_id_t const& service_address,
+                bool const enable_data_service);
     virtual ~msg_service();
-    static std::shared_ptr< msg_service > create(get_server_ctx_cb get_server_ctx, peer_id_t const& service_address,
-                                                 bool const enable_data_service);
+    static std::shared_ptr< msg_service > create(std::shared_ptr< ManagerImpl > const& manager,
+                                                 peer_id_t const& service_address, bool const enable_data_service);
 
     msg_service(msg_service const&) = delete;
     msg_service& operator=(msg_service const&) = delete;
@@ -84,11 +81,6 @@ public:
                                    data_service_request_handler_t const& request_handler);
 
     void setDefaultGroupType(std::string const& _type);
-
-    nuraft::cmd_result_code createRaftGroup(int const srv_id, group_id_t const& group_id,
-                                            group_type_t const& group_type) {
-        return joinRaftGroup(srv_id, group_id, group_type);
-    }
 
     nuraft::cmd_result_code joinRaftGroup(int32_t srv_id, group_id_t const& group_id, group_type_t const&);
 
