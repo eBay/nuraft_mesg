@@ -44,7 +44,7 @@ class ManagerImpl : public Manager {
     std::weak_ptr< MessagingApplication > application_;
     std::shared_ptr< group_factory > _g_factory;
     std::shared_ptr< msg_service > _mesg_service;
-    std::unique_ptr<::sisl::GrpcServer > _grpc_server;
+    std::unique_ptr< ::sisl::GrpcServer > _grpc_server;
 
     std::mutex mutable _manager_lock;
     std::map< group_id_t, std::shared_ptr< mesg_state_mgr > > _state_managers;
@@ -57,8 +57,8 @@ class ManagerImpl : public Manager {
 
     nuraft::cmd_result_code group_init(int32_t const srv_id, group_id_t const& group_id, group_type_t const& group_type,
                                        nuraft::context*& ctx, std::shared_ptr< group_metrics > metrics);
-    nuraft::cb_func::ReturnCode callback_handler(group_id_t const& group_id, nuraft::cb_func::Type type,
-                                                 nuraft::cb_func::Param* param);
+    nuraft::cb_func::ReturnCode raft_event(group_id_t const& group_id, nuraft::cb_func::Type type,
+                                           nuraft::cb_func::Param* param);
     void exit_group(group_id_t const& group_id);
 
 public:

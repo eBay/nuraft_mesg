@@ -18,7 +18,6 @@
 #include "nuraft_mesg/mesg_factory.hpp"
 #include "nuraft_mesg/nuraft_mesg.hpp"
 #include "logger.hpp"
-#include "utils.hpp"
 
 constexpr auto leader_change_timeout = std::chrono::milliseconds(3200);
 constexpr auto grpc_client_threads = 1u;
@@ -113,28 +112,29 @@ void ManagerImpl::register_mgr_type(group_type_t const& group_type, group_params
     if (_state_mgr_types.end() == it) { LOGE("Could not register [group_type={}]", group_type); }
 }
 
-nuraft::cb_func::ReturnCode ManagerImpl::callback_handler(group_id_t const& group_id, nuraft::cb_func::Type type,
-                                                          nuraft::cb_func::Param* param) {
+nuraft::cb_func::ReturnCode ManagerImpl::raft_event(group_id_t const& group_id, nuraft::cb_func::Type type,
+                                                    nuraft::cb_func::Param* param) {
     switch (type) {
     case nuraft::cb_func::RemovedFromCluster: {
-        LOGI("Removed from cluster [group={}]", group_id);
+        LOGI("[srv_id={}] evicted from: [group={}]", start_params_.server_uuid_, group_id);
         exit_group(group_id);
     } break;
     case nuraft::cb_func::JoinedCluster: {
         auto const my_id = param->myId;
         auto const leader_id = param->leaderId;
-        LOGI("Joined cluster: [group={}], [l_id:{},my_id:{}]", group_id, leader_id, my_id);
+        LOGI("[srv_id={}] joined: [group={}], [leader_id:{},my_id:{}]", start_params_.server_uuid_, group_id, leader_id,
+             my_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = (leader_id == my_id);
         }
     } break;
     case nuraft::cb_func::NewConfig: {
-        LOGD("Cluster change for: [group={}]", group_id);
+        LOGD("[srv_id={}] saw cluster change: [group={}]", start_params_.server_uuid_, group_id);
         _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeLeader: {
-        LOGD("I'm the leader of: [group={}]!", group_id);
+        LOGI("[srv_id={}] became leader: [group={}]!", start_params_.server_uuid_, group_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = true;
@@ -142,7 +142,7 @@ nuraft::cb_func::ReturnCode ManagerImpl::callback_handler(group_id_t const& grou
         _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeFollower: {
-        LOGI("I'm a follower of: [group={}]!", group_id);
+        LOGI("[srv_id={}] following: [group={}]!", start_params_.server_uuid_, group_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = false;
@@ -205,7 +205,7 @@ nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t
     nuraft::ptr< nuraft::logger > logger = std::make_shared< nuraft_mesg_logger >(group_id, _custom_logger);
     ctx = new nuraft::context(smgr, sm, listener, logger, rpc_cli_factory, _scheduler, params);
     ctx->set_cb_func([this, group_id](nuraft::cb_func::Type type, nuraft::cb_func::Param* param) mutable {
-        return this->callback_handler(group_id, type, param);
+        return this->raft_event(group_id, type, param);
     });
 
     return nuraft::cmd_result_code::OK;

@@ -19,12 +19,16 @@
 #pragma once
 
 #include "nuraft_mesg/mesg_factory.hpp"
-#include "proto/raft_types.pb.h"
+// PROTO
+//#include "proto/raft_types.pb.h"
+#include "fbschemas/raft_types_generated.h"
 
-#include "common_lib.hpp"
+#include "lib/common_lib.hpp"
 
 namespace nuraft_mesg {
 
+// PROTO
+/*
 inline RCMsgBase* fromBaseRequest(nuraft::msg_base const& rcbase) {
     auto base = new RCMsgBase;
     base->set_term(rcbase.get_term());
@@ -60,5 +64,6 @@ inline RCMsgBase* fromBaseRequest(nuraft::msg_base const& rcbase) {
                                                             group_id_t const& group_id) {
     return fmt::format("{}|{}", request_name, group_id);
 }
+*/
 
 } // namespace nuraft_mesg

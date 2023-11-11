@@ -22,9 +22,8 @@
 #include <libnuraft/async.hxx>
 #include <sisl/grpc/rpc_client.hpp>
 
-#include "grpc_client.hpp"
+#include "client.hpp"
 #include "nuraft_mesg/grpc_factory.hpp"
-#include "proto/raft_types.pb.h"
 
 namespace nuraft_mesg {
 
@@ -133,10 +132,10 @@ grpc_factory::grpc_factory(int const cli_thread_count, std::string const& name) 
 }
 
 class grpc_error_client : public grpc_base_client {
-    void send(RaftMessage const&, handle_resp complete) override {
-        auto null_msg = RaftMessage();
-        auto status = ::grpc::Status(::grpc::ABORTED, "Bad connection");
-        complete(null_msg, status);
+    void send(std::shared_ptr< nuraft::req_msg >& req, nuraft::rpc_handler& complete, uint64_t) override {
+        auto resp = std::shared_ptr< nuraft::resp_msg >();
+        auto error = std::make_shared< nuraft::rpc_exception >("Bad connection", req);
+        complete(resp, error);
     }
 };
 
@@ -156,7 +155,7 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(peer_id_t const& c
         if (!happened) {
             LOGD("Re-creating client for {}", client);
             if (auto err = reinit_client(client, it->second); nuraft::OK != err) {
-                LOGE("Failed to re-initialize client {}: {}", client, err);
+                LOGW("Failed to re-initialize client {}: {}", client, err);
                 new_client = std::make_shared< grpc_error_client >();
             } else {
                 new_client = it->second;

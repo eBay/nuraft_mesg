@@ -18,9 +18,9 @@
 // Brief:
 //   grpc_client does the protobuf transformations on nuraft req's
 //
-#include "grpc_client.hpp"
+#include "proto_client.hpp"
 #include "utils.hpp"
-#include "proto/raft_types.pb.h"
+#include "raft_types.pb.h"
 
 namespace nuraft_mesg {
 
@@ -76,18 +76,19 @@ void grpc_base_client::send(std::shared_ptr< nuraft::req_msg >& req, nuraft::rpc
     LOGT("Sending [{}] from: [{}] to: [{}]", nuraft::msg_type_to_string(nuraft::msg_type(grpc_request.base().type())),
          grpc_request.base().src(), grpc_request.base().dest());
 
-    send(grpc_request, [req, complete](RaftMessage& response, ::grpc::Status& status) mutable -> void {
-        std::shared_ptr< nuraft::rpc_exception > err;
-        std::shared_ptr< nuraft::resp_msg > resp;
+    static_cast< grpc_proto_client* >(this)->send(
+        grpc_request, [req, complete](RaftMessage& response, ::grpc::Status& status) mutable -> void {
+            std::shared_ptr< nuraft::rpc_exception > err;
+            std::shared_ptr< nuraft::resp_msg > resp;
 
-        if (status.ok()) {
-            resp = toResponse(response);
-            if (!resp) { err = std::make_shared< nuraft::rpc_exception >("missing response", req); }
-        } else {
-            err = std::make_shared< nuraft::rpc_exception >(status.error_message(), req);
-        }
-        complete(resp, err);
-    });
+            if (status.ok()) {
+                resp = toResponse(response);
+                if (!resp) { err = std::make_shared< nuraft::rpc_exception >("missing response", req); }
+            } else {
+                err = std::make_shared< nuraft::rpc_exception >(status.error_message(), req);
+            }
+            complete(resp, err);
+        });
 }
 
 } // namespace nuraft_mesg
