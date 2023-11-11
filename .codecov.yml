@@ -14,3 +14,4 @@ ignore:
   - "**/*.pb.h"
   - "**/tests/*"
   - "**/jungle_logstore/*"
+  - "**/flatb/*"
