@@ -1,13 +1,12 @@
-#include <boost/uuid/string_generator.hpp>
-#include <folly/Expected.h>
+#include "service.hpp"
+
 #include <grpcpp/impl/codegen/status_code_enum.h>
 #include <libnuraft/async.hxx>
 #include <libnuraft/rpc_listener.hxx>
 #include <sisl/options/options.h>
 
-#include "lib/service.hpp"
-
 #include "nuraft_mesg/mesg_factory.hpp"
+#include "nuraft_mesg/mesg_state_mgr.hpp"
 #include "nuraft_mesg/nuraft_mesg.hpp"
 
 SISL_OPTION_GROUP(nuraft_mesg,
@@ -139,12 +138,14 @@ void msg_service::setDefaultGroupType(std::string const& _type) {
 }
 
 class msg_group_listner : public nuraft::rpc_listener {
-    std::shared_ptr< msg_service > _svc;
+    std::weak_ptr< msg_service > _svc;
     group_id_t _group;
 
 public:
-    msg_group_listner(std::shared_ptr< msg_service > svc, group_id_t const& group) : _svc(svc), _group(group) {}
-    ~msg_group_listner() { _svc->shutdown_for(_group); }
+    msg_group_listner(std::shared_ptr< msg_service > const& svc, group_id_t const& group) : _svc(svc), _group(group) {}
+    ~msg_group_listner() {
+        if (auto svc = _svc.lock(); svc) svc->shutdown_for(_group);
+    }
 
     void listen(nuraft::ptr< nuraft::msg_handler >&) override { LOGI("[group={}]", _group); }
     void stop() override { LOGI("[group={}]", _group); }
@@ -162,7 +163,6 @@ void msg_service::shutdown_for(group_id_t const& group_id) {
             return;
         }
     }
-    _raft_servers_sync.notify_all();
 }
 
 nuraft::cmd_result_code msg_service::joinRaftGroup(int32_t const srv_id, group_id_t const& group_id,
@@ -232,11 +232,6 @@ void msg_service::shutdown() {
     for (auto& server : servers) {
         server->raft_server()->stop_server();
         server->raft_server()->shutdown();
-    }
-
-    {
-        std::unique_lock< lock_type > lck(_raft_servers_lock);
-        _raft_servers_sync.wait(lck, [this]() { return _raft_servers.empty(); });
     }
     LOGI("MessagingService shutdown complete.");
 }

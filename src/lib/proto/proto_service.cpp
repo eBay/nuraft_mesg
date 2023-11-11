@@ -1,5 +1,3 @@
-#include "proto_service.hpp"
-
 #include <boost/uuid/string_generator.hpp>
 #include <folly/Expected.h>
 #include <grpcpp/impl/codegen/status_code_enum.h>
@@ -10,12 +8,22 @@
 #include "nuraft_mesg/mesg_factory.hpp"
 #include "nuraft_mesg/nuraft_mesg.hpp"
 
+#include "lib/service.hpp"
+
 #include "messaging_service.grpc.pb.h"
 #include "utils.hpp"
 
 namespace nuraft_mesg {
 
-using AsyncRaftSvc = Messaging::AsyncService;
+class proto_service : public msg_service {
+public:
+    using msg_service::msg_service;
+    void associate(sisl::GrpcServer* server);
+    void bind(sisl::GrpcServer* server);
+
+    bool raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
+    ::grpc::Status step(nuraft::raft_server& server, const RaftMessage& request, RaftMessage& reply);
+};
 
 void proto_service::associate(::sisl::GrpcServer* server) {
     msg_service::associate(server);
@@ -28,7 +36,7 @@ void proto_service::associate(::sisl::GrpcServer* server) {
 void proto_service::bind(::sisl::GrpcServer* server) {
     msg_service::bind(server);
     if (!server->register_rpc< Messaging, RaftGroupMsg, RaftGroupMsg, false >(
-            "RaftStep", &AsyncRaftSvc::RequestRaftStep,
+            "RaftStep", &Messaging::AsyncService::RequestRaftStep,
             std::bind(&proto_service::raftStep, this, std::placeholders::_1))) {
         LOGE("Could not bind gRPC ::RaftStep to routine!");
         abort();

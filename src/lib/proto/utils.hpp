@@ -13,15 +13,10 @@
  *
  *********************************************************************************/
 
-// Brief:
-//   Common transformations
-//
 #pragma once
 
-#include "nuraft_mesg/mesg_factory.hpp"
+#include <libnuraft/nuraft.hxx>
 #include "raft_types.pb.h"
-
-#include "lib/common_lib.hpp"
 
 namespace nuraft_mesg {
 
@@ -33,7 +28,5 @@ inline RCMsgBase* fromBaseRequest(nuraft::msg_base const& rcbase) {
     base->set_type(rcbase.get_type());
     return base;
 }
-
-::grpc::Status step(nuraft::raft_server& raft_server, const RaftMessage& request, RaftMessage& reply);
 
 } // namespace nuraft_mesg

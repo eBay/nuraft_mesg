@@ -17,13 +17,10 @@
 //   grpc_factory static functions that makes for easy client creation.
 //
 #include <boost/uuid/string_generator.hpp>
-#include <folly/Expected.h>
-#include <folly/futures/Future.h>
 #include <libnuraft/async.hxx>
-#include <sisl/grpc/rpc_client.hpp>
 
 #include "client.hpp"
-#include "nuraft_mesg/grpc_factory.hpp"
+#include "nuraft_mesg/mesg_factory.hpp"
 
 namespace nuraft_mesg {
 

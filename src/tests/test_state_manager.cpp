@@ -15,18 +15,19 @@
 #include "test_state_manager.h"
 
 #include <fstream>
+#include <memory>
+#include <random>
 #include <system_error>
 
-#include "jungle_logstore/jungle_log_store.h"
-#include <memory>
+#include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 #include <libnuraft/state_machine.hxx>
-
-#include "nuraft_mesg/common.hpp"
-#include "test_state_machine.h"
-#include <gtest/gtest.h>
-#include <random>
 #include <sisl/grpc/generic_service.hpp>
+
+#include "nuraft_mesg/nuraft_mesg.hpp"
+#include "jungle_logstore/jungle_log_store.h"
+
+#include "test_state_machine.h"
 
 using json = nlohmann::json;
 

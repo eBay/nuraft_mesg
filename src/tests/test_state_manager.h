@@ -14,14 +14,15 @@
  *********************************************************************************/
 #pragma once
 
-#include "nuraft_mesg/nuraft_mesg.hpp"
+#include "nuraft_mesg/mesg_state_mgr.hpp"
 #include <sisl/logging/logging.h>
 
 class test_state_machine;
 
 namespace nuraft_mesg {
+class Manager;
 class service;
-}
+} // namespace nuraft_mesg
 
 class test_state_mgr : public nuraft_mesg::mesg_state_mgr {
 public:

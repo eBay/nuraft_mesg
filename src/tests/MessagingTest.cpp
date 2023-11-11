@@ -29,7 +29,7 @@
 
 #include "libnuraft/cluster_config.hxx"
 #include "libnuraft/state_machine.hxx"
-#include "nuraft_mesg/common.hpp"
+#include "nuraft_mesg/nuraft_mesg.hpp"
 #include "nuraft_mesg/mesg_factory.hpp"
 
 #include "test_state_manager.h"

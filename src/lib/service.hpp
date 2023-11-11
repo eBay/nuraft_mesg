@@ -1,18 +1,16 @@
 ///
 // Copyright 2018 (c) eBay Corporation
 //
-
 #pragma once
 
-#include <condition_variable>
-#include <libnuraft/async.hxx>
 #include <map>
+
+#include <libnuraft/async.hxx>
 #include <folly/SharedMutex.h>
 #include <sisl/grpc/rpc_server.hpp>
 #include <sisl/metrics/metrics.hpp>
 
 #include "grpc_server.hpp"
-
 #include "manager_impl.hpp"
 #include "data_service_grpc.hpp"
 
@@ -52,9 +50,6 @@ struct grpc_server_wrapper {
 class msg_service : public std::enable_shared_from_this< msg_service >, public nuraft::raft_server_handler {
     bool _data_service_enabled;
     data_service_t _data_service;
-
-    std::mutex _raft_sync_lock;
-    std::condition_variable_any _raft_servers_sync;
 
     std::string _default_group_type;
 

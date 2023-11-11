@@ -2,14 +2,10 @@
 
 #include <memory>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <libnuraft/nuraft.hxx>
 
 #include "common.hpp"
-
-namespace boost {
-template < class T >
-class intrusive_ptr;
-} // namespace boost
 
 namespace sisl {
 class GenericRpcData;
