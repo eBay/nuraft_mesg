@@ -14,23 +14,58 @@
  *********************************************************************************/
 #pragma once
 
-#include <libnuraft/async.hxx>
 #include <memory>
 #include <mutex>
 #include <string>
 
 #include <boost/uuid/uuid_io.hpp>
-
-#include "grpc_factory.hpp"
+#include <folly/SharedMutex.h>
 #include <sisl/logging/logging.h>
 #include <sisl/metrics/metrics.hpp>
-#include "nuraft_mesg.hpp"
+#include <libnuraft/nuraft.hxx>
+
+#include "common.hpp"
 
 namespace sisl {
 struct io_blob;
-}
+class GrpcTokenClient;
+} // namespace sisl
 
 namespace nuraft_mesg {
+
+using client_factory_lock_type = folly::SharedMutex;
+// Brief:
+//   Implements cornerstone's rpc_client_factory providing sisl::GrpcAsyncClient
+//   inherited rpc_client instances sharing a common worker pool.
+class grpc_factory : public nuraft::rpc_client_factory, public std::enable_shared_from_this< grpc_factory > {
+    std::string _worker_name;
+
+protected:
+    client_factory_lock_type _client_lock;
+    std::map< peer_id_t, std::shared_ptr< nuraft::rpc_client > > _clients;
+
+public:
+    grpc_factory(int const cli_thread_count, std::string const& name);
+    ~grpc_factory() override = default;
+
+    std::string const& workerName() const { return _worker_name; }
+
+    nuraft::ptr< nuraft::rpc_client > create_client(const std::string& client) override;
+    nuraft::ptr< nuraft::rpc_client > create_client(peer_id_t const& client);
+
+    virtual nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
+
+    virtual nuraft::cmd_result_code reinit_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
+
+    // Construct and send an AddServer message to the cluster
+    NullAsyncResult add_server(uint32_t const srv_id, peer_id_t const& srv_addr, nuraft::srv_config const& dest_cfg);
+
+    // Send a client request to the cluster
+    NullAsyncResult append_entry(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg);
+
+    // Construct and send a RemoveServer message to the cluster
+    NullAsyncResult rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);
+};
 
 class group_factory : public grpc_factory {
     std::shared_ptr< sisl::GrpcTokenClient > m_token_client;

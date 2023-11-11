@@ -14,19 +14,22 @@
  *********************************************************************************/
 #pragma once
 
-#include "nuraft_mesg/nuraft_mesg.hpp"
+#include "nuraft_mesg/mesg_state_mgr.hpp"
 #include <sisl/logging/logging.h>
 
 class test_state_machine;
 
 namespace nuraft_mesg {
+class Manager;
 class service;
-}
+} // namespace nuraft_mesg
 
 class test_state_mgr : public nuraft_mesg::mesg_state_mgr {
+    bool _will_destroy{false};
+
 public:
     test_state_mgr(int32_t srv_id, nuraft_mesg::peer_id_t const& srv_addr, nuraft_mesg::group_id_t const& group_id);
-    ~test_state_mgr() override = default;
+    ~test_state_mgr() override;
 
     nuraft::ptr< nuraft::cluster_config > load_config() override;
     void save_config(const nuraft::cluster_config& config) override;

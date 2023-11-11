@@ -19,11 +19,10 @@
 #include <string>
 #include <vector>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <libnuraft/nuraft.hxx>
-#include <sisl/logging/logging.h>
 
 #include "common.hpp"
-#include "mesg_state_mgr.hpp"
 
 namespace grpc {
 class ByteBuffer;
@@ -31,12 +30,15 @@ class Status;
 } // namespace grpc
 
 namespace sisl {
+class GenericRpcData;
 class GrpcTokenVerifier;
 class GrpcTokenClient;
 using generic_unary_callback_t = std::function< void(grpc::ByteBuffer&, ::grpc::Status& status) >;
 } // namespace sisl
 
 namespace nuraft_mesg {
+
+class mesg_state_mgr;
 
 // called by the server after it receives the request
 using data_service_request_handler_t =
