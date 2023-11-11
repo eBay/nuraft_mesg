@@ -11,7 +11,7 @@
 #include <sisl/grpc/rpc_server.hpp>
 #include <sisl/metrics/metrics.hpp>
 
-#include "nuraft_mesg/grpc_server.hpp"
+#include "grpc_server.hpp"
 
 #include "manager_impl.hpp"
 #include "data_service_grpc.hpp"
@@ -49,7 +49,7 @@ struct grpc_server_wrapper {
     std::shared_ptr< group_metrics > m_metrics;
 };
 
-class msg_service : public std::enable_shared_from_this< msg_service > {
+class msg_service : public std::enable_shared_from_this< msg_service >, public nuraft::raft_server_handler {
     bool _data_service_enabled;
     data_service_t _data_service;
 

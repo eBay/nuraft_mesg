@@ -9,6 +9,7 @@
 namespace nuraft_mesg {
 
 class RaftGroupMsg;
+class RaftMessage;
 class Messaging;
 
 class proto_service : public msg_service {
@@ -18,6 +19,7 @@ public:
     void bind(sisl::GrpcServer* server);
 
     bool raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
+    ::grpc::Status step(nuraft::raft_server& server, const RaftMessage& request, RaftMessage& reply);
 };
 
 } // namespace nuraft_mesg

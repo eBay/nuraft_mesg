@@ -138,16 +138,6 @@ void msg_service::setDefaultGroupType(std::string const& _type) {
     _default_group_type = _type;
 }
 
-// We've hooked the gRPC server up to our "super-server", so we
-// do not need to bind the grpc_servers to anything...just piggy-backing
-// on their ::step() and transformations.
-class null_service final : public grpc_server {
-public:
-    using grpc_server::grpc_server;
-    void associate(sisl::GrpcServer*) override{};
-    void bind(sisl::GrpcServer*) override{};
-};
-
 class msg_group_listner : public nuraft::rpc_listener {
     std::shared_ptr< msg_service > _svc;
     group_id_t _group;
@@ -197,7 +187,7 @@ nuraft::cmd_result_code msg_service::joinRaftGroup(int32_t const srv_id, group_i
             auto new_listner = std::make_shared< msg_group_listner >(shared_from_this(), group_id);
             ctx->rpc_listener_ = std::static_pointer_cast< nuraft::rpc_listener >(new_listner);
             auto server = std::make_shared< nuraft::raft_server >(ctx);
-            it->second.m_server = std::make_shared< null_service >(server);
+            it->second.m_server = std::make_shared< grpc_server >(server);
             if (_data_service_enabled) {
                 auto smgr = std::dynamic_pointer_cast< mesg_state_mgr >(ctx->state_mgr_);
                 auto cli_factory = std::dynamic_pointer_cast< mesg_factory >(ctx->rpc_cli_factory_);

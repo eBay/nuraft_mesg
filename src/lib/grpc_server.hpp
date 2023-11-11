@@ -9,12 +9,10 @@ class GrpcServer;
 
 namespace nuraft_mesg {
 
-class RaftMessage;
-
 // Brief:
 //   Translates and forwards the gRPC Step() to cornerstone's raft_server::step()
 //
-class grpc_server : public nuraft::raft_server_handler {
+class grpc_server {
     std::shared_ptr< nuraft::raft_server > _raft_server;
 
 public:
@@ -35,12 +33,7 @@ public:
     nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > >
     append_entries(const std::vector< nuraft::ptr< nuraft::buffer > >& logs);
 
-    ::grpc::Status step(const RaftMessage& request, RaftMessage& reply);
     std::shared_ptr< nuraft::raft_server > raft_server() { return _raft_server; }
-
-    // Setup the RPC call backs
-    virtual void associate(sisl::GrpcServer* server) = 0;
-    virtual void bind(sisl::GrpcServer* server) = 0;
 };
 
 } // namespace nuraft_mesg

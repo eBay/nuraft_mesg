@@ -34,4 +34,6 @@ inline RCMsgBase* fromBaseRequest(nuraft::msg_base const& rcbase) {
     return base;
 }
 
+::grpc::Status step(nuraft::raft_server& raft_server, const RaftMessage& request, RaftMessage& reply);
+
 } // namespace nuraft_mesg

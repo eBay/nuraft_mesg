@@ -1,3 +1,5 @@
+#include "proto_service.hpp"
+
 #include <boost/uuid/string_generator.hpp>
 #include <folly/Expected.h>
 #include <grpcpp/impl/codegen/status_code_enum.h>
@@ -5,11 +7,11 @@
 #include <libnuraft/rpc_listener.hxx>
 #include <sisl/options/options.h>
 
-#include "proto_service.hpp"
-
-#include "messaging_service.grpc.pb.h"
 #include "nuraft_mesg/mesg_factory.hpp"
 #include "nuraft_mesg/nuraft_mesg.hpp"
+
+#include "messaging_service.grpc.pb.h"
+#include "utils.hpp"
 
 namespace nuraft_mesg {
 
@@ -85,18 +87,8 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
     // to offload the Raft append operations onto a seperate thread group.
     response.set_group_id(group_id);
     if (server) {
-        /// TODO replace this ugly hack
-        // if (auto offload = _get_process_offload(request.group_type()); nullptr != offload) {
-        //     offload([rpc_data, server]() {
-        //         auto& request = rpc_data->request();
-        //         auto& response = rpc_data->response();
-        //         rpc_data->set_status(server->step(request.msg(), *response.mutable_msg()));
-        //         rpc_data->send_response();
-        //     });
-        //     return false;
-        // }
         try {
-            rpc_data->set_status(server->step(request.msg(), *response.mutable_msg()));
+            rpc_data->set_status(step(*server->raft_server(), request.msg(), *response.mutable_msg()));
             return true;
         } catch (std::runtime_error& rte) { LOGE("Caught exception during step(): {}", rte.what()); }
     } else {
@@ -104,6 +96,49 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
     }
     rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
     return true;
+}
+
+static RCResponse* fromRCResponse(nuraft::resp_msg& rcmsg) {
+    auto req = new RCResponse;
+    req->set_next_index(rcmsg.get_next_idx());
+    req->set_accepted(rcmsg.get_accepted());
+    req->set_result_code((ResultCode)(0 - rcmsg.get_result_code()));
+    auto ctx = rcmsg.get_ctx();
+    if (ctx) { req->set_context(ctx->data(), ctx->container_size()); }
+    return req;
+}
+
+static std::shared_ptr< nuraft::req_msg > toRequest(RaftMessage const& raft_msg) {
+    assert(raft_msg.has_rc_request());
+    auto const& base = raft_msg.base();
+    auto const& req = raft_msg.rc_request();
+    auto message =
+        std::make_shared< nuraft::req_msg >(base.term(), (nuraft::msg_type)base.type(), base.src(), base.dest(),
+                                            req.last_log_term(), req.last_log_index(), req.commit_index());
+    auto& log_entries = message->log_entries();
+    for (auto const& log : req.log_entries()) {
+        auto log_buffer = nuraft::buffer::alloc(log.buffer().size());
+        memcpy(log_buffer->data(), log.buffer().data(), log.buffer().size());
+        log_entries.push_back(std::make_shared< nuraft::log_entry >(log.term(), log_buffer,
+                                                                    (nuraft::log_val_type)log.type(), log.timestamp()));
+    }
+    return message;
+}
+
+::grpc::Status proto_service::step(nuraft::raft_server& server, const RaftMessage& request, RaftMessage& reply) {
+    LOGT("Stepping [{}] from: [{}] to: [{}]", nuraft::msg_type_to_string(nuraft::msg_type(request.base().type())),
+         request.base().src(), request.base().dest());
+    auto rcreq = toRequest(request);
+    auto resp = nuraft::raft_server_handler::process_req(&server, *rcreq);
+    if (!resp) { return ::grpc::Status(::grpc::StatusCode::CANCELLED, "Server rejected request"); }
+    assert(resp);
+    reply.set_allocated_base(fromBaseRequest(*resp));
+    reply.set_allocated_rc_response(fromRCResponse(*resp));
+    if (!resp->get_accepted()) {
+        auto const srv_conf = server.get_srv_config(reply.base().dest());
+        if (srv_conf) { reply.mutable_rc_response()->set_dest_addr(srv_conf->get_endpoint()); }
+    }
+    return ::grpc::Status();
 }
 
 std::shared_ptr< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, group_id_t const& service_address,

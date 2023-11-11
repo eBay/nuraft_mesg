@@ -8,6 +8,7 @@ target_sources(${PROJECT_NAME} PRIVATE
    manager_impl.cpp
    factory.cpp
    service.cpp
+   grpc_server.cpp
 )
 target_link_libraries(${PROJECT_NAME}
     sisl::sisl
