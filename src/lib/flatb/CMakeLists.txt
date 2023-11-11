@@ -13,20 +13,20 @@ flatbuffers_generate_headers(
     FLAGS "--grpc" ${SCHEMA_FLAGS}
 )
 
-add_library(${PROJECT_NAME}-flatb OBJECT)
-target_sources(${PROJECT_NAME}-flatb PRIVATE
+add_library(${PROJECT_NAME}_flatb OBJECT)
+target_sources(${PROJECT_NAME}_flatb PRIVATE
     flatb_client.cpp
     $<TARGET_PROPERTY:fbservice,INTERFACE_SOURCES>
 )
-target_include_directories(${PROJECT_NAME}-flatb PRIVATE
+target_include_directories(${PROJECT_NAME}_flatb PRIVATE
     $<TARGET_PROPERTY:fbschemas,INTERFACE_INCLUDE_DIRECTORIES>
     ${CMAKE_CURRENT_BINARY_DIR}
 )
-target_link_libraries(${PROJECT_NAME}-flatb
+target_link_libraries(${PROJECT_NAME}_flatb
     sisl::sisl
     nuraft::nuraft
     flatbuffers::flatbuffers
     gRPC::grpc++
 )
-add_dependencies(${PROJECT_NAME}-flatb GENERATE_fbservice)
-add_dependencies(${PROJECT_NAME}-flatb GENERATE_fbschemas)
+add_dependencies(${PROJECT_NAME}_flatb GENERATE_fbservice)
+add_dependencies(${PROJECT_NAME}_flatb GENERATE_fbschemas)
