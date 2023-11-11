@@ -6,6 +6,7 @@ add_subdirectory (flatb)
 add_library(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} PRIVATE
    manager_impl.cpp
+   factory.cpp
 )
 target_link_libraries(${PROJECT_NAME}
     sisl::sisl
