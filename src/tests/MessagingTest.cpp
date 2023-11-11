@@ -53,7 +53,6 @@ public:
     std::shared_ptr< Manager > instance_;
     bool data_svc_;
 
-
     std::map< group_id_t, std::shared_ptr< test_state_mgr > > state_mgr_map_;
 
     TestApplication(std::string const& name, uint32_t port) : name_(name), port_(port) {

@@ -11,36 +11,9 @@
 #include "nuraft_mesg/mesg_factory.hpp"
 #include "nuraft_mesg/nuraft_mesg.hpp"
 
-SISL_OPTION_GROUP(nuraft_mesg,
-                  (messaging_metrics, "", "msg_metrics", "Gather metrics from SD Messaging", cxxopts::value< bool >(),
-                   ""))
-
-#define CONTINUE_RESP(resp)                                                                                            \
-    try {                                                                                                              \
-        if (auto r = (resp)->get_result_code(); r != nuraft::RESULT_NOT_EXIST_YET) {                                   \
-            if (nuraft::OK == r) return folly::Unit();                                                                 \
-            return folly::makeUnexpected(r);                                                                           \
-        }                                                                                                              \
-        auto [p, sf] = folly::makePromiseContract< NullResult >();                                                     \
-        (resp)->when_ready(                                                                                            \
-            [p = std::make_shared< decltype(p) >(std::move(p))](                                                       \
-                nuraft::cmd_result< nuraft::ptr< nuraft::buffer >, nuraft::ptr< std::exception > >& result,            \
-                auto&) mutable {                                                                                       \
-                if (nuraft::cmd_result_code::OK != result.get_result_code())                                           \
-                    p->setValue(folly::makeUnexpected(result.get_result_code()));                                      \
-                else                                                                                                   \
-                    p->setValue(folly::Unit());                                                                        \
-            });                                                                                                        \
-        return std::move(sf);                                                                                          \
-    } catch (std::runtime_error & rte) { LOGE("Caught exception: [group={}] {}", group_id, rte.what()); }
-
 namespace nuraft_mesg {
 
 using AsyncRaftSvc = Messaging::AsyncService;
-
-grpc_server_wrapper::grpc_server_wrapper(group_id_t const& group_id) {
-    if (0 < SISL_OPTIONS.count("msg_metrics")) m_metrics = std::make_shared< group_metrics >(group_id);
-}
 
 void proto_service::associate(::sisl::GrpcServer* server) {
     msg_service::associate(server);
@@ -131,6 +104,11 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
     }
     rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
     return true;
+}
+
+std::shared_ptr< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, group_id_t const& service_address,
+                                                   bool const enable_data_service) {
+    return std::make_shared< proto_service >(get_server_ctx, service_address, enable_data_service);
 }
 
 } // namespace nuraft_mesg

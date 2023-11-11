@@ -45,12 +45,6 @@ msg_service::msg_service(get_server_ctx_cb get_server_ctx, group_id_t const& ser
         _get_server_ctx(get_server_ctx),
         _service_address(service_address) {}
 
-std::shared_ptr< msg_service > msg_service::create(get_server_ctx_cb get_server_ctx, group_id_t const& service_address,
-                                                   bool const enable_data_service) {
-    return std::shared_ptr< msg_service >(new msg_service(get_server_ctx, service_address, enable_data_service),
-                                          [](msg_service* p) { delete p; });
-}
-
 msg_service::~msg_service() {
     std::unique_lock< lock_type > lck(_raft_servers_lock);
     DEBUG_ASSERT(_raft_servers.empty(), "RAFT servers not fully terminated!");

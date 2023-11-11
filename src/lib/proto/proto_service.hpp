@@ -12,6 +12,8 @@ class RaftGroupMsg;
 class Messaging;
 
 class proto_service : public msg_service {
+public:
+    using msg_service::msg_service;
     void associate(sisl::GrpcServer* server);
     void bind(sisl::GrpcServer* server);
 

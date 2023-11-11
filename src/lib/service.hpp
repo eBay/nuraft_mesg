@@ -58,8 +58,6 @@ class msg_service : public std::enable_shared_from_this< msg_service > {
 
     std::string _default_group_type;
 
-    msg_service(get_server_ctx_cb get_server_ctx, peer_id_t const& service_address, bool const enable_data_service);
-
 protected:
     get_server_ctx_cb _get_server_ctx;
     lock_type _raft_servers_lock;
@@ -67,6 +65,8 @@ protected:
     peer_id_t const _service_address;
 
 public:
+    msg_service(get_server_ctx_cb get_server_ctx, peer_id_t const& service_address, bool const enable_data_service);
+
     virtual ~msg_service();
     static std::shared_ptr< msg_service > create(get_server_ctx_cb get_server_ctx, peer_id_t const& service_address,
                                                  bool const enable_data_service);
