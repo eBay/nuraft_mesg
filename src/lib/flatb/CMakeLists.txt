@@ -15,12 +15,16 @@ flatbuffers_generate_headers(
 
 add_library(${PROJECT_NAME}-flatb OBJECT)
 target_sources(${PROJECT_NAME}-flatb PRIVATE
+    flatb_client.cpp
     $<TARGET_PROPERTY:fbservice,INTERFACE_SOURCES>
 )
-target_include_directories(${PROJECT_NAME}-flatb PUBLIC
+target_include_directories(${PROJECT_NAME}-flatb PRIVATE
     $<TARGET_PROPERTY:fbschemas,INTERFACE_INCLUDE_DIRECTORIES>
+    ${CMAKE_CURRENT_BINARY_DIR}
 )
 target_link_libraries(${PROJECT_NAME}-flatb
+    sisl::sisl
+    nuraft::nuraft
     flatbuffers::flatbuffers
     gRPC::grpc++
 )

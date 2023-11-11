@@ -27,8 +27,6 @@
 
 namespace nuraft_mesg {
 
-class RaftMessage;
-
 class grpc_resp : public nuraft::resp_msg {
 public:
     using nuraft::resp_msg::resp_msg;
@@ -42,17 +40,13 @@ class grpc_base_client : public nuraft::rpc_client {
     uint64_t _client_id;
 
 public:
-    using handle_resp = std::function< void(RaftMessage&, ::grpc::Status&) >;
-
     grpc_base_client() : nuraft::rpc_client::rpc_client(), _client_id(_client_counter++) {}
     ~grpc_base_client() override = default;
 
     void send(std::shared_ptr< nuraft::req_msg >& req, nuraft::rpc_handler& complete, uint64_t timeout_ms = 0) override;
+
     bool is_abandoned() const override { return false; }
     uint64_t get_id() const override { return _client_id; }
-
-protected:
-    virtual void send(RaftMessage const& message, handle_resp complete) = 0;
 };
 
 template < typename TSERVICE >

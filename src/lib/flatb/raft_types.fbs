@@ -1,22 +1,22 @@
 namespace nuraft_mesg;
 
-enum ResultCode:uint32 {
+enum ResultCode:int32 {
     OK                          = 0,
-    CANCELLED                   = 1,
-    TIMEOUT                     = 2,
-    NOT_LEADER                  = 3,
-    BAD_REQUEST                 = 4,
-    SERVER_ALREADY_EXISTS       = 5,
-    CONFIG_CHANGING             = 6,
-    SERVER_IS_JOINING           = 7,
-    SERVER_NOT_FOUND            = 8,
-    CANNOT_REMOVE_LEADER        = 9,
-    SERVER_IS_LEAVING           = 10,
-    TERM_MISMATCH               = 11,
+    CANCELLED                   = -1,
+    TIMEOUT                     = -2,
+    NOT_LEADER                  = -3,
+    BAD_REQUEST                 = -4,
+    SERVER_ALREADY_EXISTS       = -5,
+    CONFIG_CHANGING             = -6,
+    SERVER_IS_JOINING           = -7,
+    SERVER_NOT_FOUND            = -8,
+    CANNOT_REMOVE_LEADER        = -9,
+    SERVER_IS_LEAVING           = -10,
+    TERM_MISMATCH               = -11,
 
-    RESULT_NOT_EXIST_YET        = 10000,
+    RESULT_NOT_EXIST_YET        = -10000,
 
-    FAILED                      = 32768,
+    FAILED                      = -32768,
 }
 
 enum LogType:int16 {
@@ -36,7 +36,15 @@ table LogEntry {
   timestamp:uint64;
 }
 
+struct MessageBase {
+    term:uint64;
+    type:uint32;
+    src:int32;
+    dest:int32;
+}
+
 table Request {
+  msg_base:MessageBase;
   last_log_term:uint64;
   last_log_index:uint64;
   commit_index:uint64;
@@ -44,6 +52,7 @@ table Request {
 }
 
 table Response {
+  msg_base:MessageBase;
   next_index:uint64;
   accepted:bool;
   dest_addr:string;

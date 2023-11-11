@@ -22,7 +22,7 @@
 #include <libnuraft/async.hxx>
 #include <sisl/grpc/rpc_client.hpp>
 
-#include "lib/client.hpp"
+#include "proto_client.hpp"
 #include "nuraft_mesg/grpc_factory.hpp"
 #include "raft_types.pb.h"
 
@@ -132,7 +132,7 @@ grpc_factory::grpc_factory(int const cli_thread_count, std::string const& name) 
     if (0 < cli_thread_count) { sisl::GrpcAsyncClientWorker::create_worker(_worker_name.data(), cli_thread_count); }
 }
 
-class grpc_error_client : public grpc_base_client {
+class grpc_error_client : public grpc_proto_client {
     void send(RaftMessage const&, handle_resp complete) override {
         auto null_msg = RaftMessage();
         auto status = ::grpc::Status(::grpc::ABORTED, "Bad connection");
