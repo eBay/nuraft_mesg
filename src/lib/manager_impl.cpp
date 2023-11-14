@@ -79,8 +79,8 @@ ManagerImpl::ManagerImpl(Manager::Params const& start_params, std::weak_ptr< Mes
 
 void ManagerImpl::start(bool and_data_svc) {
     if (auto lg = std::lock_guard< std::mutex >(_manager_lock); !_mesg_service) {
-        _mesg_service = msg_service::create(shared_from_this(), start_params_.server_uuid_, and_data_svc);
-        _mesg_service->setDefaultGroupType(start_params_.default_group_type_);
+        _mesg_service = msg_service::create(shared_from_this(), start_params_.server_uuid_,
+                                            start_params_.default_group_type_, and_data_svc);
     }
     restart_server();
 }
@@ -210,7 +210,7 @@ nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t
 
 NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, peer_id_t const& new_id) {
     auto str_id = to_string(new_id);
-    return _mesg_service->add_srv(group_id, nuraft::srv_config(to_server_id(new_id), str_id))
+    return _mesg_service->add_member(group_id, nuraft::srv_config(to_server_id(new_id), str_id))
         .deferValue([this, g_id = group_id, n_id = std::move(str_id)](auto cmd_result) mutable -> NullResult {
             if (!cmd_result) return folly::makeUnexpected(cmd_result.error());
             // TODO This should not block, but attach a new promise!
@@ -231,7 +231,7 @@ NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, peer_id_t co
 }
 
 NullAsyncResult ManagerImpl::rem_member(group_id_t const& group_id, peer_id_t const& old_id) {
-    return _mesg_service->rm_srv(group_id, to_server_id(old_id));
+    return _mesg_service->rem_member(group_id, to_server_id(old_id));
 }
 
 NullAsyncResult ManagerImpl::become_leader(group_id_t const& group_id) {
@@ -242,8 +242,7 @@ NullAsyncResult ManagerImpl::become_leader(group_id_t const& group_id) {
 
     return folly::makeSemiFuture< folly::Unit >(folly::Unit())
         .deferValue([this, g_id = group_id](auto) mutable -> NullResult {
-            if (!_mesg_service->request_leadership(g_id))
-                return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+            if (!_mesg_service->become_leader(g_id)) return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
 
             auto lk = std::unique_lock< std::mutex >(_manager_lock);
             if (!_config_change.wait_for(lk, leader_change_timeout,
@@ -323,7 +322,7 @@ void ManagerImpl::leave_group(group_id_t const& group_id) {
         }
     }
 
-    _mesg_service->partRaftGroup(group_id);
+    _mesg_service->leave_group(group_id);
 
     std::lock_guard< std::mutex > lg(_manager_lock);
     if (auto it = _state_managers.find(group_id); _state_managers.end() != it) {

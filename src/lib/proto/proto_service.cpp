@@ -127,12 +127,9 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
 
     // Find the RaftServer context based on the name of the group.
     std::shared_ptr< grpc_server > server;
-    {
-        std::shared_lock< lock_type > rl(_raft_servers_lock);
-        if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
-            if (it->second.m_metrics) COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
-            server = it->second.m_server;
-        }
+    if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
+        if (it->second.m_metrics) COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
+        server = it->second.m_server;
     }
 
     // Setup our response and process the request. Group types are able to register a Callback that expects a Nullary
@@ -152,8 +149,10 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
 }
 
 std::shared_ptr< msg_service > msg_service::create(std::shared_ptr< ManagerImpl > const& manager,
-                                                   group_id_t const& service_address, bool const enable_data_service) {
-    return std::make_shared< proto_service >(manager, service_address, enable_data_service);
+                                                   group_id_t const& service_address,
+                                                   std::string const& default_group_type,
+                                                   bool const enable_data_service) {
+    return std::make_shared< proto_service >(manager, service_address, default_group_type, enable_data_service);
 }
 
 } // namespace nuraft_mesg
