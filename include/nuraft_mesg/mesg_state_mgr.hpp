@@ -1,11 +1,17 @@
 #pragma once
 
+#include <list>
 #include <memory>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <libnuraft/nuraft.hxx>
+#include <libnuraft/state_mgr.hxx>
 
 #include "common.hpp"
+
+namespace nuraft {
+class raft_server;
+class state_machine;
+}
 
 namespace sisl {
 class GenericRpcData;
