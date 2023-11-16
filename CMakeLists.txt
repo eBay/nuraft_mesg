@@ -31,6 +31,7 @@ if (CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
 endif ()
 
+include_directories(BEFORE "include")
 add_subdirectory (src)
 
 # build info

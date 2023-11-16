@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 3.11)
 
-add_subdirectory (proto)
-add_subdirectory (flatb)
-
 add_library(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} PRIVATE
    manager_impl.cpp
