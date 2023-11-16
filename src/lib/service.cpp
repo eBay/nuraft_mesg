@@ -81,7 +81,6 @@ NullAsyncResult msg_service::rem_member(group_id_t const& group_id, int const me
 }
 
 bool msg_service::become_leader(group_id_t const& group_id) {
-    std::shared_ptr< grpc_server > server;
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         try {
             return it->second.m_server->request_leadership();
@@ -162,7 +161,7 @@ nuraft::cmd_result_code msg_service::joinRaftGroup(int32_t const srv_id, group_i
     auto new_listner = std::make_shared< msg_group_listner >(shared_from_this(), group_id);
     ctx->rpc_listener_ = std::static_pointer_cast< nuraft::rpc_listener >(new_listner);
     auto server = std::make_shared< nuraft::raft_server >(ctx);
-    if (auto [it, happened] = _raft_servers.try_emplace(group_id, metrics, std::make_shared< grpc_server >(server));
+    if (auto [it, happened] = _raft_servers.try_emplace(group_id, metrics, std::make_unique< grpc_server >(server));
         happened) {
         if (_data_service_enabled) {
             auto smgr = std::dynamic_pointer_cast< mesg_state_mgr >(ctx->state_mgr_);
