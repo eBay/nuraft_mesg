@@ -22,6 +22,7 @@
 #include "nuraft_mesg/nuraft_mesg.hpp"
 #include "nuraft_mesg/mesg_factory.hpp"
 #include <sisl/logging/logging.h>
+#include <libnuraft/nuraft.hxx>
 
 #include "common_lib.hpp"
 

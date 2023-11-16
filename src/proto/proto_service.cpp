@@ -125,20 +125,12 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
     // should emplace a corresponding server in the _raft_servers member.
     if (nuraft::join_cluster_request == base.type()) { joinRaftGroup(base.dest(), gid, request.group_type()); }
 
-    // Find the RaftServer context based on the name of the group.
-    std::shared_ptr< grpc_server > server;
+    // Setup our response and process the request.
+    response.set_group_id(group_id);
     if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
         if (it->second.m_metrics) COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
-        server = it->second.m_server;
-    }
-
-    // Setup our response and process the request. Group types are able to register a Callback that expects a Nullary
-    // to process the requests and send back possibly asynchronous responses in a seperate context. This can be used
-    // to offload the Raft append operations onto a seperate thread group.
-    response.set_group_id(group_id);
-    if (server) {
         try {
-            rpc_data->set_status(step(*server->raft_server(), request.msg(), *response.mutable_msg()));
+            rpc_data->set_status(step(*it->second.m_server->raft_server(), request.msg(), *response.mutable_msg()));
             return true;
         } catch (std::runtime_error& rte) { LOGE("Caught exception during step(): {}", rte.what()); }
     } else {

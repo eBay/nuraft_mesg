@@ -15,20 +15,19 @@
 #pragma once
 
 #include <memory>
-#include <mutex>
 #include <string>
 
-#include <boost/uuid/uuid_io.hpp>
 #include <folly/SharedMutex.h>
 #include <sisl/logging/logging.h>
-#include <sisl/metrics/metrics.hpp>
-#include <libnuraft/nuraft.hxx>
+#include <libnuraft/rpc_cli_factory.hxx>
+#include <libnuraft/srv_config.hxx>
 
 #include "common.hpp"
 
 namespace sisl {
 struct io_blob;
 class GrpcTokenClient;
+class MetricsGroup;
 } // namespace sisl
 
 namespace nuraft_mesg {
@@ -87,11 +86,11 @@ class mesg_factory final : public grpc_factory {
     std::shared_ptr< group_factory > _group_factory;
     group_id_t const _group_id;
     group_type_t const _group_type;
-    std::shared_ptr< sisl::MetricsGroupWrapper > _metrics;
+    std::shared_ptr< sisl::MetricsGroup > _metrics;
 
 public:
     mesg_factory(std::shared_ptr< group_factory > g_factory, group_id_t const& grp_id, group_type_t const& grp_type,
-                 std::shared_ptr< sisl::MetricsGroupWrapper > metrics = nullptr) :
+                 std::shared_ptr< sisl::MetricsGroup > metrics = nullptr) :
             grpc_factory(0, to_string(grp_id)),
             _group_factory(g_factory),
             _group_id(grp_id),

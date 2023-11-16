@@ -20,7 +20,7 @@
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <libnuraft/nuraft.hxx>
+#include <libnuraft/raft_params.hxx>
 
 #include "common.hpp"
 
@@ -29,11 +29,15 @@ class ByteBuffer;
 class Status;
 } // namespace grpc
 
+namespace nuraft {
+class buffer;
+class srv_config;
+} // namespace nuraft
+
 namespace sisl {
 class GenericRpcData;
 class GrpcTokenVerifier;
 class GrpcTokenClient;
-using generic_unary_callback_t = std::function< void(grpc::ByteBuffer&, ::grpc::Status& status) >;
 } // namespace sisl
 
 namespace nuraft_mesg {

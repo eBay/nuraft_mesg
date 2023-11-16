@@ -8,7 +8,7 @@ required_conan_version = ">=1.50.0"
 
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "2.0.4"
+    version = "2.0.5"
 
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
@@ -38,6 +38,7 @@ class NuRaftMesgConan(ConanFile):
     exports_sources = (
                         "CMakeLists.txt",
                         "cmake/*",
+                        "include/*",
                         "src/*",
                         )
 
@@ -91,16 +92,13 @@ class NuRaftMesgConan(ConanFile):
     def package(self):
         lib_dir = join(self.package_folder, "lib")
         copy(self, "LICENSE", self.source_folder, join(self.package_folder, "licenses"), keep_path=False)
-        copy(self, "*.h*", join(self.source_folder, "src", "include"), join(self.package_folder, "include"), keep_path=True)
+        copy(self, "*.h*", join(self.source_folder, "include"), join(self.package_folder, "include"), keep_path=True)
         copy(self, "*.lib", self.build_folder, lib_dir, keep_path=False)
         copy(self, "*.a", self.build_folder, lib_dir, keep_path=False)
         copy(self, "*.so*", self.build_folder, lib_dir, keep_path=False)
         copy(self, "*.dylib*", self.build_folder, lib_dir, keep_path=False)
         copy(self, "*.dll*", self.build_folder, join(self.package_folder, "bin"), keep_path=False)
         copy(self, "*.so*", self.build_folder, lib_dir, keep_path=False)
-        copy(self, "*.proto", join(self.source_folder, "src", "proto"), join(self.package_folder, "proto"), keep_path=False)
-        gen_dir = join(self.package_folder, "include", "nuraft_mesg", "proto")
-        copy(self, "*.pb.h", join(self.build_folder, "src"), gen_dir, keep_path=False)
 
     def package_info(self):
         self.cpp_info.names["cmake_find_package"] = "NuraftMesg"

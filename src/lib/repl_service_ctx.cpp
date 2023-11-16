@@ -3,6 +3,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/uuid/string_generator.hpp>
 #include <sisl/grpc/generic_service.hpp>
+#include <libnuraft/cluster_config.hxx>
 
 #include "nuraft_mesg/mesg_factory.hpp"
 #include "grpc_server.hpp"

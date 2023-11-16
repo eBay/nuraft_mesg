@@ -38,7 +38,7 @@ public:
 
 struct grpc_server_wrapper {
     std::shared_ptr< group_metrics > m_metrics;
-    std::shared_ptr< grpc_server > m_server;
+    std::unique_ptr< grpc_server > m_server;
 };
 
 class msg_service : public nuraft::raft_server_handler, public std::enable_shared_from_this< msg_service > {
