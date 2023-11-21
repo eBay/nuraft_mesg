@@ -47,6 +47,14 @@ constexpr auto elect_to_high = elect_to_low * 2;
 
 namespace nuraft_mesg {
 
+std::mutex lookup_lock_;
+std::map< nuraft_mesg::peer_id_t, std::string > _lookup_map;
+
+std::string lookup_peer(peer_id_t const& peer) {
+    auto lg = std::scoped_lock(lookup_lock_);
+    return (_lookup_map.count(peer) > 0) ? _lookup_map[peer] : std::string();
+}
+
 class TestApplication : public MessagingApplication, public std::enable_shared_from_this< TestApplication > {
 public:
     std::string name_;
@@ -64,22 +72,12 @@ public:
 
     void set_id(boost::uuids::uuid const& id) { id_ = id; }
 
-    std::string lookup_peer(peer_id_t const& peer) override {
-        auto lg = std::scoped_lock(lookup_lock_);
-        return (lookup_map_.count(peer) > 0) ? lookup_map_[peer] : std::string();
-    }
-
     std::shared_ptr< mesg_state_mgr > create_state_mgr(int32_t const srv_id, group_id_t const& group_id) override {
         auto [it, happened] =
             state_mgr_map_.try_emplace(group_id, std::make_shared< test_state_mgr >(srv_id, id_, group_id));
         RELEASE_ASSERT(happened, "Failed!");
         if (data_svc_) it->second->register_data_service_apis(instance_.get());
         return std::static_pointer_cast< mesg_state_mgr >(it->second);
-    }
-
-    void map_peers(std::map< nuraft_mesg::peer_id_t, std::string > const& peers) {
-        auto lg = std::scoped_lock(lookup_lock_);
-        lookup_map_ = peers;
     }
 
     void start(bool data_svc_enabled = false) {
@@ -100,27 +98,11 @@ public:
         r_params.return_method_ = nuraft::raft_params::async_handler;
         instance_->register_mgr_type("test_type", r_params);
     }
-
-private:
-    std::mutex lookup_lock_;
-    std::map< nuraft_mesg::peer_id_t, std::string > lookup_map_;
 };
 
 struct custom_factory : public nuraft_mesg::group_factory {
     custom_factory(int const threads, nuraft_mesg::group_id_t const& name) :
             nuraft_mesg::group_factory::group_factory(threads, name, nullptr) {}
-
-    std::string lookupEndpoint(nuraft_mesg::peer_id_t const& peer) override {
-        auto lg = std::scoped_lock(lookup_lock_);
-        return (lookup_map_.count(peer) > 0) ? lookup_map_[peer] : std::string();
-    }
-
-    void map_peers(std::map< nuraft_mesg::peer_id_t, std::string > const& peers) {
-        auto lg = std::scoped_lock(lookup_lock_);
-        lookup_map_ = peers;
-    }
-    std::mutex lookup_lock_;
-    std::map< nuraft_mesg::peer_id_t, std::string > lookup_map_;
 };
 
 extern nuraft::ptr< nuraft::cluster_config > fromClusterConfig(nlohmann::json const& cluster_config);
@@ -138,7 +120,6 @@ protected:
     std::shared_ptr< TestApplication > app_3_;
 
     std::vector< uint32_t > ports;
-    std::map< nuraft_mesg::peer_id_t, std::string > lookup_map;
 
     group_id_t group_id_;
 
@@ -160,13 +141,9 @@ protected:
         app_2_ = std::make_shared< TestApplication >("sm2", ports[1]);
         app_3_ = std::make_shared< TestApplication >("sm3", ports[2]);
 
-        lookup_map.emplace(app_1_->id_, fmt::format("127.0.0.1:{}", ports[0]));
-        lookup_map.emplace(app_2_->id_, fmt::format("127.0.0.1:{}", ports[1]));
-        lookup_map.emplace(app_3_->id_, fmt::format("127.0.0.1:{}", ports[2]));
-
-        app_1_->map_peers(lookup_map);
-        app_2_->map_peers(lookup_map);
-        app_3_->map_peers(lookup_map);
+        _lookup_map.emplace(app_1_->id_, fmt::format("127.0.0.1:{}", ports[0]));
+        _lookup_map.emplace(app_2_->id_, fmt::format("127.0.0.1:{}", ports[1]));
+        _lookup_map.emplace(app_3_->id_, fmt::format("127.0.0.1:{}", ports[2]));
     }
 
     void TearDown() override {
@@ -191,7 +168,6 @@ protected:
         EXPECT_TRUE(std::move(add2).get());
 
         custom_factory_ = std::make_shared< custom_factory >(2, group_id_);
-        custom_factory_->map_peers(lookup_map);
 
         // Use custom factory to add Server 3
         auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");

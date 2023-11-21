@@ -41,12 +41,6 @@ public:
             group_factory::group_factory(threads, start_params.server_uuid_, start_params.token_client_,
                                          start_params.ssl_cert_),
             application_(app) {}
-
-    std::string lookupEndpoint(peer_id_t const& client) override {
-        LOGT("[peer={}]", client);
-        if (auto a = application_.lock(); a) return a->lookup_peer(client);
-        return std::string();
-    }
 };
 
 ManagerImpl::~ManagerImpl() {

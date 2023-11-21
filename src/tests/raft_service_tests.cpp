@@ -42,7 +42,6 @@ TEST_F(MessagingFixture, BasicTests) {
 
     app_3_ = std::make_shared< TestApplication >("sm3", ports[2]);
     app_3_->set_id(our_id);
-    app_3_->map_peers(lookup_map);
     app_3_->start();
     app_3_->instance_->join_group(
         group_id_, "test_type",
@@ -63,11 +62,7 @@ TEST_F(MessagingFixture, BasicTests) {
     // Ensure lookup_works for the new member
     get_random_ports(1u);
     auto app_4 = std::make_shared< TestApplication >("sm4", ports[3]);
-    lookup_map.emplace(app_4->id_, fmt::format("127.0.0.1:{}", ports[3]));
-    app_1_->map_peers(lookup_map);
-    app_2_->map_peers(lookup_map);
-    app_3_->map_peers(lookup_map);
-    app_4->map_peers(lookup_map);
+    _lookup_map.emplace(app_4->id_, fmt::format("127.0.0.1:{}", ports[3]));
     app_4->start();
 
     // Add the member and wait

@@ -57,17 +57,6 @@ public:
     Application(nuraft_mesg::peer_id_t const& name, uint32_t port) : port_(port) { id_ = name; }
     ~Application() override = default;
 
-    std::string lookup_peer(nuraft_mesg::peer_id_t const& peer) override {
-        // Provide a method for the service layer to lookup an IPv4:port address
-        // from a uuid; however the process wants to do that.
-        auto id_str = to_string(peer);
-        for (auto i = 0u; i < 5; ++i) {
-            if (uuids[i] == id_str) { return fmt::format(FMT_STRING("127.0.0.1:{}"), 9000 + i); }
-        }
-        RELEASE_ASSERT(false, "Missing Peer: {}", peer);
-        return std::string();
-    }
-
     std::shared_ptr< nuraft_mesg::mesg_state_mgr > create_state_mgr(int32_t const srv_id,
                                                                     nuraft_mesg::group_id_t const& group_id) override {
         return std::static_pointer_cast< nuraft_mesg::mesg_state_mgr >(

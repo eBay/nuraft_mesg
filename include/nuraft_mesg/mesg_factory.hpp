@@ -78,8 +78,6 @@ public:
     nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) override;
     nuraft::cmd_result_code reinit_client(peer_id_t const& client,
                                           std::shared_ptr< nuraft::rpc_client >& raft_client) override;
-
-    virtual std::string lookupEndpoint(peer_id_t const& client) = 0;
 };
 
 class mesg_factory final : public grpc_factory {

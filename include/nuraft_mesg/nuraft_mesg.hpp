@@ -48,10 +48,11 @@ class mesg_state_mgr;
 using data_service_request_handler_t =
     std::function< void(sisl::io_blob const& incoming_buf, boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) >;
 
+extern std::string lookup_peer(peer_id_t const&);
+
 class MessagingApplication {
 public:
     virtual ~MessagingApplication() = default;
-    virtual std::string lookup_peer(peer_id_t const&) = 0;
     virtual std::shared_ptr< mesg_state_mgr > create_state_mgr(int32_t const srv_id, group_id_t const& group_id) = 0;
 };
 

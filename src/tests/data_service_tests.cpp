@@ -24,23 +24,14 @@ TEST_F(DataServiceFixture, BasicTest1) {
     get_random_ports(2u);
     // create new servers
     auto app_4 = std::make_shared< TestApplication >("sm4", ports[3]);
-    lookup_map.emplace(app_4->id_, fmt::format("127.0.0.1:{}", ports[3]));
-    app_1_->map_peers(lookup_map);
-    app_2_->map_peers(lookup_map);
-    app_3_->map_peers(lookup_map);
-    app_4->map_peers(lookup_map);
+    _lookup_map.emplace(app_4->id_, fmt::format("127.0.0.1:{}", ports[3]));
     app_4->start(true);
     auto add4 = app_1_->instance_->add_member(group_id_, app_4->id_);
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(std::move(add4).get());
 
     auto app_5 = std::make_shared< TestApplication >("sm5", ports[4]);
-    lookup_map.emplace(app_5->id_, fmt::format("127.0.0.1:{}", ports[4]));
-    app_1_->map_peers(lookup_map);
-    app_2_->map_peers(lookup_map);
-    app_3_->map_peers(lookup_map);
-    app_4->map_peers(lookup_map);
-    app_5->map_peers(lookup_map);
+    _lookup_map.emplace(app_5->id_, fmt::format("127.0.0.1:{}", ports[4]));
     app_5->start(true);
     auto add5 = app_1_->instance_->add_member(group_id_, app_5->id_);
     std::this_thread::sleep_for(std::chrono::seconds(1));

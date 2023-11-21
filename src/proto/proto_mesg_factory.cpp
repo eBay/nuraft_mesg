@@ -241,7 +241,7 @@ group_factory::group_factory(int const cli_thread_count, group_id_t const& name,
 nuraft::cmd_result_code group_factory::create_client(peer_id_t const& client,
                                                      nuraft::ptr< nuraft::rpc_client >& raft_client) {
     LOGD("Creating client to {}", client);
-    auto endpoint = lookupEndpoint(client);
+    auto endpoint = lookup_peer(client);
     if (endpoint.empty()) return nuraft::BAD_REQUEST;
 
     LOGD("Creating client for [{}] @ [{}]", client, endpoint);

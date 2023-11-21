@@ -28,22 +28,8 @@ void cleanup(const std::string& prefix) { auto r = system(fmt::format(FMT_STRING
 using nuraft_mesg::mesg_factory;
 using namespace nuraft;
 
-struct example_factory : public nuraft_mesg::group_factory {
-    example_factory(int const threads, nuraft_mesg::group_id_t const& name) :
-            nuraft_mesg::group_factory::group_factory(threads, name, nullptr) {}
-
-    std::string lookupEndpoint(nuraft_mesg::peer_id_t const& client) override {
-        auto id_str = to_string(client);
-        for (auto i = 0u; i < 5; ++i) {
-            if (uuids[i] == id_str) { return fmt::format(FMT_STRING("127.0.0.1:{}"), 9000 + i); }
-        }
-        RELEASE_ASSERT(false, "Missing Peer: {}", client);
-        return std::string();
-    }
-};
-
 int send_message(uint32_t leader_id, nuraft_mesg::group_id_t const& group_id, std::string const& message) {
-    auto g_factory = std::make_shared< example_factory >(2, group_id);
+    auto g_factory = std::make_shared< nuraft_mesg::group_factory >(2, group_id, nullptr);
     auto factory = std::make_shared< mesg_factory >(g_factory, group_id, "test_package");
     auto const dest_cfg = srv_config(leader_id, uuids[leader_id]);
 
@@ -63,7 +49,7 @@ int send_message(uint32_t leader_id, nuraft_mesg::group_id_t const& group_id, st
 }
 
 int add_new_server(uint32_t leader_id, uint32_t srv_id, nuraft_mesg::group_id_t const& group_id) {
-    auto g_factory = std::make_shared< example_factory >(2, group_id);
+    auto g_factory = std::make_shared< nuraft_mesg::group_factory >(2, group_id, nullptr);
     auto factory = std::make_shared< mesg_factory >(g_factory, group_id, "test_package");
     auto const dest_cfg = srv_config(leader_id, uuids[leader_id]);
 
@@ -80,7 +66,7 @@ int add_new_server(uint32_t leader_id, uint32_t srv_id, nuraft_mesg::group_id_t 
 }
 
 int remove_server(uint32_t leader_id, nuraft_mesg::group_id_t const& group_id, uint32_t srv_id) {
-    auto g_factory = std::make_shared< example_factory >(2, group_id);
+    auto g_factory = std::make_shared< nuraft_mesg::group_factory >(2, group_id, nullptr);
     auto factory = std::make_shared< mesg_factory >(g_factory, group_id, "test_package");
     auto const dest_cfg = srv_config(leader_id, uuids[leader_id]);
 
