@@ -193,16 +193,17 @@ test_state_mgr::data_service_request_unidirectional(nuraft_mesg::destination_t c
 bool test_state_mgr::register_data_service_apis(nuraft_mesg::Manager* messaging) {
     return messaging->bind_data_service_request(
                SEND_DATA, _group_id,
-               [this](sisl::io_blob const& incoming_buf, boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
+               [this](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
                    rpc_data->set_comp_cb([this](boost::intrusive_ptr< sisl::GenericRpcData >&) { server_counter++; });
-                   verify_data(incoming_buf);
-                   m_repl_svc_ctx->send_data_service_response(nuraft_mesg::io_blob_list_t{incoming_buf}, rpc_data);
+                   verify_data(rpc_data->request_blob());
+                   m_repl_svc_ctx->send_data_service_response(nuraft_mesg::io_blob_list_t{rpc_data->request_blob()},
+                                                              rpc_data);
                }) &&
         messaging->bind_data_service_request(
-            REQUEST_DATA, _group_id,
-            [this](sisl::io_blob const& incoming_buf, boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
+            REQUEST_DATA, _group_id, [this](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
                 rpc_data->set_comp_cb([this](boost::intrusive_ptr< sisl::GenericRpcData >&) { server_counter++; });
-                m_repl_svc_ctx->send_data_service_response(nuraft_mesg::io_blob_list_t{incoming_buf}, rpc_data);
+                m_repl_svc_ctx->send_data_service_response(nuraft_mesg::io_blob_list_t{rpc_data->request_blob()},
+                                                           rpc_data);
             });
 }
 

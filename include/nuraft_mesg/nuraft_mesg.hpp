@@ -45,8 +45,7 @@ namespace nuraft_mesg {
 class mesg_state_mgr;
 
 // called by the server after it receives the request
-using data_service_request_handler_t =
-    std::function< void(sisl::io_blob const& incoming_buf, boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) >;
+using data_service_request_handler_t = std::function< void(boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) >;
 
 class MessagingApplication {
 public:
