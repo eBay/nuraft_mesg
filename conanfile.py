@@ -53,6 +53,7 @@ class NuRaftGrpcConan(ConanFile):
         self.requires("sisl/8.6.5")
 
         self.requires("lz4/1.9.4", override=True)
+        self.requires("grpc/1.50.1",    override=True)
 
     def build(self):
         cmake = CMake(self)
