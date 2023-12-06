@@ -103,9 +103,21 @@ void service::restart_server() {
     LOGINFO("Starting Messaging Service on http://{}", listen_address);
 
     std::lock_guard< std::mutex > lg(_manager_lock);
+    sisl::GrpcServer* tmp_server = nullptr;
+    try {
+        tmp_server = sisl::GrpcServer::make(listen_address, _start_params.auth_mgr, grpc_server_threads,
+                                            _start_params.ssl_key, _start_params.ssl_cert);
+    } catch (std::runtime_error const& e) {
+        LOGERROR("Failed to create GRPC server for Messaging Service: {}", e.what());
+        return;
+    }
+    if (!tmp_server) {
+        LOGERROR("Failed to create GRPC server: for Messaging Service");
+        return;
+    }
+
     _grpc_server.reset();
-    _grpc_server = std::unique_ptr< sisl::GrpcServer >(sisl::GrpcServer::make(
-        listen_address, _start_params.auth_mgr, grpc_server_threads, _start_params.ssl_key, _start_params.ssl_cert));
+    _grpc_server = std::unique_ptr< sisl::GrpcServer >(tmp_server);
     _mesg_service->associate(_grpc_server.get());
 
     _grpc_server->run();
