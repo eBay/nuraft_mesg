@@ -44,6 +44,7 @@ static RCResponse* fromRCResponse(nuraft::resp_msg& rcmsg) {
 
 class proto_service : public msg_service {
     ::grpc::Status step(nuraft::raft_server& server, const RaftMessage& request, RaftMessage& reply);
+    std::mutex _raft_servers_mutex;
 
 public:
     using msg_service::msg_service;
@@ -127,17 +128,31 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
 
     // Setup our response and process the request.
     response.set_group_id(group_id);
-    if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
-        if (it->second.m_metrics) COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
-        try {
-            rpc_data->set_status(step(*it->second.m_server->raft_server(), request.msg(), *response.mutable_msg()));
-            return true;
-        } catch (std::runtime_error& rte) { LOGE("Caught exception during step(): {}", rte.what()); }
-    } else {
-        LOGD("Missing [group={}]", group_id);
-    }
-    rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
-    return true;
+    folly::getGlobalCPUExecutor()->add([this, rpc_data]() {
+        auto gid = boost::uuids::string_generator()(rpc_data->response().group_id());
+        auto& request = rpc_data->request();
+        auto& response = rpc_data->response();
+        auto const& group_id = request.group_id();
+        {
+            std::lock_guard< std::mutex > lock(_raft_servers_mutex);
+            if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
+                if (it->second.m_metrics) COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
+                try {
+                    rpc_data->set_status(
+                        step(*it->second.m_server->raft_server(), request.msg(), *response.mutable_msg()));
+                } catch (std::runtime_error& rte) {
+                    LOGE("Caught exception during step(): {}", rte.what());
+                    rpc_data->set_status(
+                        ::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
+                }
+            } else {
+                LOGD("Missing [group={}]", group_id);
+                rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
+            }
+        }
+        rpc_data->send_response();
+    });
+    return false;
 }
 
 std::shared_ptr< msg_service > msg_service::create(std::shared_ptr< ManagerImpl > const& manager,
