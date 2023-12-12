@@ -208,8 +208,8 @@ bool test_state_mgr::register_data_service_apis(nuraft_mesg::Manager* messaging)
 }
 
 void test_state_mgr::verify_data(sisl::io_blob const& buf) {
-    for (size_t read_sz{0}; read_sz < buf.size; read_sz += sizeof(uint32_t)) {
-        uint32_t const data{*reinterpret_cast< uint32_t* >(buf.bytes + read_sz)};
+    for (size_t read_sz{0}; read_sz < buf.size(); read_sz += sizeof(uint32_t)) {
+        uint32_t const data{*reinterpret_cast< uint32_t* >(const_cast< uint8_t* >(buf.cbytes()) + read_sz)};
         EXPECT_EQ(data, data_vec[read_sz / sizeof(uint32_t)]);
     }
 }
@@ -218,7 +218,7 @@ void test_state_mgr::fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf) {
     static int const data_size{8};
     for (int i = 0; i < data_size; i++) {
         cli_buf.emplace_back(sizeof(uint32_t));
-        uint32_t* const write_buf{reinterpret_cast< uint32_t* >(cli_buf[i].bytes)};
+        uint32_t* const write_buf{reinterpret_cast< uint32_t* >(cli_buf[i].bytes())};
         data_vec.emplace_back(get_random_num());
         *write_buf = data_vec.back();
     }

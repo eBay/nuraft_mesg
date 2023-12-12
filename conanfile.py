@@ -58,7 +58,7 @@ class NuRaftMesgConan(ConanFile):
             self.build_requires("jungle/cci.20221201")
 
     def requirements(self):
-        self.requires("sisl/[~=10, include_prerelease=True]@oss/master")
+        self.requires("sisl/[~=11, include_prerelease=True]@oss/master")
         self.requires("nuraft/2.3.0")
 
         self.requires("boost/1.82.0")
