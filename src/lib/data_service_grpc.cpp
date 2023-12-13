@@ -33,13 +33,7 @@ bool data_service_grpc::bind(std::string const& request_name, group_id_t const& 
     // This is an async call, hence the "return false". The user should invoke rpc_data->send_response to finish the
     // call
     auto generic_handler_cb = [request_cb](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
-        sisl::io_blob svr_buf;
-        if (auto status = deserialize_from_byte_buffer(rpc_data->request(), svr_buf); !status.ok()) {
-            LOGE(, "ByteBuffer DumpToSingleSlice failed, {}", status.error_message());
-            rpc_data->set_status(status);
-            return true; // respond immediately
-        }
-        request_cb(svr_buf, rpc_data);
+        request_cb(rpc_data);
         return false;
     };
     auto lk = std::unique_lock< data_lock_type >(_req_lock);

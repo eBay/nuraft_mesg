@@ -193,22 +193,23 @@ test_state_mgr::data_service_request_unidirectional(nuraft_mesg::destination_t c
 bool test_state_mgr::register_data_service_apis(nuraft_mesg::Manager* messaging) {
     return messaging->bind_data_service_request(
                SEND_DATA, _group_id,
-               [this](sisl::io_blob const& incoming_buf, boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
+               [this](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
                    rpc_data->set_comp_cb([this](boost::intrusive_ptr< sisl::GenericRpcData >&) { server_counter++; });
-                   verify_data(incoming_buf);
-                   m_repl_svc_ctx->send_data_service_response(nuraft_mesg::io_blob_list_t{incoming_buf}, rpc_data);
+                   verify_data(rpc_data->request_blob());
+                   m_repl_svc_ctx->send_data_service_response(nuraft_mesg::io_blob_list_t{rpc_data->request_blob()},
+                                                              rpc_data);
                }) &&
         messaging->bind_data_service_request(
-            REQUEST_DATA, _group_id,
-            [this](sisl::io_blob const& incoming_buf, boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
+            REQUEST_DATA, _group_id, [this](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
                 rpc_data->set_comp_cb([this](boost::intrusive_ptr< sisl::GenericRpcData >&) { server_counter++; });
-                m_repl_svc_ctx->send_data_service_response(nuraft_mesg::io_blob_list_t{incoming_buf}, rpc_data);
+                m_repl_svc_ctx->send_data_service_response(nuraft_mesg::io_blob_list_t{rpc_data->request_blob()},
+                                                           rpc_data);
             });
 }
 
 void test_state_mgr::verify_data(sisl::io_blob const& buf) {
-    for (size_t read_sz{0}; read_sz < buf.size; read_sz += sizeof(uint32_t)) {
-        uint32_t const data{*reinterpret_cast< uint32_t* >(buf.bytes + read_sz)};
+    for (size_t read_sz{0}; read_sz < buf.size(); read_sz += sizeof(uint32_t)) {
+        uint32_t const data{*reinterpret_cast< uint32_t* >(const_cast< uint8_t* >(buf.cbytes()) + read_sz)};
         EXPECT_EQ(data, data_vec[read_sz / sizeof(uint32_t)]);
     }
 }
@@ -217,7 +218,7 @@ void test_state_mgr::fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf) {
     static int const data_size{8};
     for (int i = 0; i < data_size; i++) {
         cli_buf.emplace_back(sizeof(uint32_t));
-        uint32_t* const write_buf{reinterpret_cast< uint32_t* >(cli_buf[i].bytes)};
+        uint32_t* const write_buf{reinterpret_cast< uint32_t* >(cli_buf[i].bytes())};
         data_vec.emplace_back(get_random_num());
         *write_buf = data_vec.back();
     }
