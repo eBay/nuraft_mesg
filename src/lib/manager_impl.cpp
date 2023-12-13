@@ -26,6 +26,8 @@ constexpr auto leader_change_timeout = std::chrono::milliseconds(3200);
 constexpr auto grpc_client_threads = 1u;
 constexpr auto grpc_server_threads = 1u;
 
+SISL_LOGGING_DEF(nuraft_mesg)
+
 namespace nuraft_mesg {
 
 int32_t to_server_id(peer_id_t const& server_addr) {

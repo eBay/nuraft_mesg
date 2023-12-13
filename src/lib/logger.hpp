@@ -28,10 +28,7 @@ public:
                                 std::shared_ptr< sisl::logging::logger_t > custom_logger) :
             ::nuraft::logger(), _group_id(group_id), _custom_logger(custom_logger) {}
 
-    void set_level(int l) override {
-        LOGD("Updating level to: {}", l);
-        SISL_LOG_LEVEL(nuraft, static_cast< spdlog::level::level_enum >(abs(l - 6)));
-    }
+    void set_level(int) override {}
 
     void put_details(int level, const char* source_file, const char* func_name, size_t line_number,
                      const std::string& log_line) override {
