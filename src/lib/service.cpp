@@ -40,9 +40,10 @@ msg_service::msg_service(std::shared_ptr< ManagerImpl > const& manager, group_id
         _data_service_enabled(enable_data_service),
         _default_group_type(default_group_type),
         _manager(manager),
-        _service_address(service_address) {}
+        _service_address(service_address),
+        handler_thread_pool_{4} {}
 
-msg_service::~msg_service() = default;
+msg_service::~msg_service() { handler_thread_pool_.join(); }
 
 void msg_service::associate(::sisl::GrpcServer* server) {
     RELEASE_ASSERT(server, "NULL server!");

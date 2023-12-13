@@ -10,6 +10,9 @@
 #include <sisl/grpc/rpc_server.hpp>
 #include <sisl/metrics/metrics.hpp>
 
+#include <boost/asio/thread_pool.hpp>
+#include <boost/asio/post.hpp>
+
 #include "grpc_server.hpp"
 #include "manager_impl.hpp"
 #include "data_service_grpc.hpp"
@@ -50,6 +53,7 @@ class msg_service : public nuraft::raft_server_handler, public std::enable_share
 protected:
     folly::ConcurrentHashMap< group_id_t, grpc_server_wrapper > _raft_servers;
     peer_id_t const _service_address;
+    boost::asio::thread_pool handler_thread_pool_;
 
 public:
     // Each serialization implementation must provide this static

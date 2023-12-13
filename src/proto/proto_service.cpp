@@ -128,7 +128,8 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
 
     // Setup our response and process the request.
     response.set_group_id(group_id);
-    folly::getGlobalCPUExecutor()->add([this, rpc_data]() {
+
+    boost::asio::post(handler_thread_pool_, [this, rpc_data]() {
         auto gid = boost::uuids::string_generator()(rpc_data->response().group_id());
         auto& request = rpc_data->request();
         auto& response = rpc_data->response();
