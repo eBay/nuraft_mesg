@@ -44,7 +44,6 @@ static RCResponse* fromRCResponse(nuraft::resp_msg& rcmsg) {
 
 class proto_service : public msg_service {
     ::grpc::Status step(nuraft::raft_server& server, const RaftMessage& request, RaftMessage& reply);
-    std::mutex _raft_servers_mutex;
 
 public:
     using msg_service::msg_service;
@@ -134,7 +133,6 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
         auto& response = rpc_data->response();
         auto const& group_id = request.group_id();
         {
-            std::lock_guard< std::mutex > lock(_raft_servers_mutex);
             if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
                 if (it->second.m_metrics) COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
                 try {
