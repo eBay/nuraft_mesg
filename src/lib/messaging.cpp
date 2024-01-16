@@ -436,6 +436,15 @@ repl_service_ctx::repl_service_ctx(grpc_server* server) : m_server(server) {}
 
 bool repl_service_ctx::is_raft_leader() const { return m_server->raft_server()->is_leader(); }
 
+const std::string& repl_service_ctx::raft_leader_id() const {
+    // when adding member to raft,  the id recorded in raft is a hash
+    // of passed-in id (new_id in add_member()), the new_id was stored
+    // in endpoint field.
+    auto leader_svc_id = m_server->raft_server()->get_leader_id();
+    auto cfg = m_server->raft_server->get_srv_config(leader_svc_id);
+    return cfg->get_endpoint();
+}
+
 repl_service_ctx_grpc::repl_service_ctx_grpc(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory) :
         repl_service_ctx(server), m_mesg_factory(cli_factory) {}
 

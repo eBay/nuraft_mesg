@@ -64,6 +64,7 @@ public:
     // we do not own this pointer. Use this only if the lyfe cycle of the pointer is well known
     grpc_server* m_server;
     bool is_raft_leader() const;
+    const std::string& raft_leader_id() const;
 
     // data service api client call
     virtual std::error_condition data_service_request(std::string const& request_name, io_blob_list_t const& cli_buf,
