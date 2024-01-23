@@ -64,6 +64,19 @@ repl_service_ctx::repl_service_ctx(nuraft::raft_server* server) : _server(server
 
 bool repl_service_ctx::is_raft_leader() const { return _server->is_leader(); }
 
+const std::string& repl_service_ctx::raft_leader_id() const {
+    // when adding member to raft,  the id recorded in raft is a hash
+    // of passed-in id (new_id in add_member()), the new_id was stored
+    // in endpoint field.
+    static std::string const empty;
+    if (!_server) return empty;
+    if (auto leader = _server->get_srv_config(_server->get_leader()); nullptr != leader) {
+        static_assert(std::is_reference< decltype(leader->get_endpoint()) >::value);
+        return leader->get_endpoint();
+    }
+    return empty;
+}
+
 void repl_service_ctx::get_cluster_config(std::list< replica_config >& cluster_config) const {
     auto const& srv_configs = _server->get_config()->get_servers();
     for (auto const& srv_config : srv_configs) {

@@ -36,6 +36,7 @@ public:
     // we do not own this pointer. Use this only if the life cycle of the pointer is well known
     nuraft::raft_server* _server;
     bool is_raft_leader() const;
+    const std::string& raft_leader_id() const;
 
     // return a list of replica configs for the peers of the raft group
     void get_cluster_config(std::list< replica_config >& cluster_config) const;

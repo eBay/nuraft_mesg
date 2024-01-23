@@ -125,6 +125,16 @@ TEST_F(DataServiceFixture, BasicTest2) {
     auto repl_ctx = sm1->get_repl_context();
 
     EXPECT_TRUE(repl_ctx && repl_ctx->is_raft_leader());
+    EXPECT_TRUE(repl_ctx && repl_ctx->raft_leader_id() == to_string(app_1_->id_));
+
+    auto repl_ctx_2 = app_2_->state_mgr_map_[group_id_]->get_repl_context();
+    EXPECT_TRUE(repl_ctx_2 && !repl_ctx_2->is_raft_leader());
+    EXPECT_TRUE(repl_ctx_2 && repl_ctx_2->raft_leader_id() == to_string(app_1_->id_));
+
+    auto repl_ctx_3 = app_3_->state_mgr_map_[group_id_]->get_repl_context();
+    EXPECT_TRUE(repl_ctx_3 && !repl_ctx_3->is_raft_leader());
+    EXPECT_TRUE(repl_ctx_3 && repl_ctx_3->raft_leader_id() == to_string(app_1_->id_));
+
     std::list< nuraft_mesg::replica_config > cluster_config;
     repl_ctx->get_cluster_config(cluster_config);
     EXPECT_EQ(cluster_config.size(), 3u);
