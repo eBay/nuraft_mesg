@@ -135,7 +135,6 @@ TEST_F(DataServiceFixture, BasicTest2) {
     EXPECT_TRUE(repl_ctx_3 && !repl_ctx_3->is_raft_leader());
     EXPECT_TRUE(repl_ctx_3 && repl_ctx_3->raft_leader_id() == to_string(app_1_->id_));
 
-
     std::list< nuraft_mesg::replica_config > cluster_config;
     repl_ctx->get_cluster_config(cluster_config);
     EXPECT_EQ(cluster_config.size(), 3u);
