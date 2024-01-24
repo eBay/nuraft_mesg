@@ -32,9 +32,9 @@ struct peer_info {
     // Peer ID.
     std::string id_;
     // The last log index that the peer has, from this server's point of view.
-    ulong last_log_idx_;
+    uint64_t last_log_idx_;
     // The elapsed time since the last successful response from this peer, set to 0 on leader
-    ulong last_succ_resp_us_;
+    uint64_t last_succ_resp_us_;
 };
 
 class repl_service_ctx {
