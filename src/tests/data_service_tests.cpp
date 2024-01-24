@@ -126,14 +126,30 @@ TEST_F(DataServiceFixture, BasicTest2) {
 
     EXPECT_TRUE(repl_ctx && repl_ctx->is_raft_leader());
     EXPECT_TRUE(repl_ctx && repl_ctx->raft_leader_id() == to_string(app_1_->id_));
+    auto peer_info = repl_ctx->get_raft_status();
+    EXPECT_TRUE(peer_info.size() == 3);
+    for (auto const& peer : peer_info) {
+        std::cout << "Peer ID: " << peer.id_ << " Last Log Idx: " << peer.last_log_idx_
+                  << " Last Succ Resp Us: " << peer.last_succ_resp_us_ << std::endl;
+        EXPECT_TRUE(peer.id_ == to_string(app_1_->id_) || peer.id_ == to_string(app_2_->id_) ||
+                    peer.id_ == to_string(app_3_->id_));
+        EXPECT_TRUE(peer.last_log_idx_ == 3);
+        if (peer.id_ == to_string(app_1_->id_)) {
+            EXPECT_TRUE(peer.last_succ_resp_us_ == 0);
+        } else {
+            EXPECT_TRUE(peer.last_succ_resp_us_ > 0);
+        }
+    }
 
     auto repl_ctx_2 = app_2_->state_mgr_map_[group_id_]->get_repl_context();
     EXPECT_TRUE(repl_ctx_2 && !repl_ctx_2->is_raft_leader());
     EXPECT_TRUE(repl_ctx_2 && repl_ctx_2->raft_leader_id() == to_string(app_1_->id_));
+    EXPECT_TRUE(repl_ctx && repl_ctx_2->get_raft_status().size() == 0);
 
     auto repl_ctx_3 = app_3_->state_mgr_map_[group_id_]->get_repl_context();
     EXPECT_TRUE(repl_ctx_3 && !repl_ctx_3->is_raft_leader());
     EXPECT_TRUE(repl_ctx_3 && repl_ctx_3->raft_leader_id() == to_string(app_1_->id_));
+    EXPECT_TRUE(repl_ctx && repl_ctx_3->get_raft_status().size() == 0);
 
     std::list< nuraft_mesg::replica_config > cluster_config;
     repl_ctx->get_cluster_config(cluster_config);
