@@ -28,6 +28,15 @@ struct replica_config {
     std::string aux;
 };
 
+struct peer_info {
+    // Peer ID.
+    std::string id_;
+    // The last log index that the peer has, from this server's point of view.
+    uint64_t last_log_idx_;
+    // The elapsed time since the last successful response from this peer, set to 0 on leader
+    uint64_t last_succ_resp_us_;
+};
+
 class repl_service_ctx {
 public:
     repl_service_ctx(nuraft::raft_server* server);
@@ -37,6 +46,7 @@ public:
     nuraft::raft_server* _server;
     bool is_raft_leader() const;
     const std::string& raft_leader_id() const;
+    std::vector< peer_info >get_raft_status() const;
 
     // return a list of replica configs for the peers of the raft group
     void get_cluster_config(std::list< replica_config >& cluster_config) const;

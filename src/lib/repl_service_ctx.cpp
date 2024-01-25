@@ -77,6 +77,29 @@ const std::string& repl_service_ctx::raft_leader_id() const {
     return empty;
 }
 
+std::vector< peer_info > repl_service_ctx::get_raft_status() const {
+    std::vector< peer_info > peers;
+    if (!is_raft_leader()) return peers;
+    if (!_server) return peers;
+
+    auto pinfo_all = _server->get_peer_info_all();
+    // add leader to the list
+    nuraft::raft_server::peer_info pi_leader;
+    pi_leader.id_ = _server->get_id();
+    pi_leader.last_log_idx_ = _server->get_last_log_idx();
+    pinfo_all.emplace_back(pi_leader);
+
+    for (auto const& pinfo : pinfo_all) {
+        std::string_view peer_id;
+        if (auto srv_config = _server->get_srv_config(pinfo.id_); nullptr != srv_config) {
+            peer_id = srv_config->get_endpoint();
+        }
+        DEBUG_ASSERT(!peer_id.empty(), "Unknown peer in config");
+        peers.emplace_back(peer_info{std::string(peer_id), pinfo.last_log_idx_, pinfo.last_succ_resp_us_});
+    }
+    return peers;
+}
+
 void repl_service_ctx::get_cluster_config(std::list< replica_config >& cluster_config) const {
     auto const& srv_configs = _server->get_config()->get_servers();
     for (auto const& srv_config : srv_configs) {
