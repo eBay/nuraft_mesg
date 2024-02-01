@@ -140,7 +140,6 @@ jobs:
         conan install \
             -o sisl:prerelease=${{ inputs.prerelease }} \
             -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
-            -o sisl:testing=False \
             -o testing=False \
             -s build_type=${{ inputs.build-type }} \
             --build missing \
@@ -168,7 +167,6 @@ jobs:
         conan create \
             -o sisl:prerelease=${{ inputs.prerelease }} \
             -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
-            -o sisl:testing=False \
             -o nuraft_mesg:sanitize=${sanitize} \
             -s build_type=${{ inputs.build-type }} \
             --build missing \
@@ -180,7 +178,6 @@ jobs:
         conan install \
             -o sisl:prerelease=${{ inputs.prerelease }} \
             -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
-            -o sisl:testing=False \
             -o coverage=True \
             -s build_type=${{ inputs.build-type }} \
             --build missing \
