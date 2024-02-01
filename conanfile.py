@@ -61,10 +61,9 @@ class NuRaftMesgConan(ConanFile):
         self.requires("sisl/[~=11, include_prerelease=True]@oss/master")
         self.requires("nuraft/2.3.0")
 
-        self.requires("boost/1.82.0")
+        self.requires("boost/[>=1.80]")
         self.requires("flatbuffers/23.5.26")
         self.requires("openssl/3.1.3")
-        self.requires("lz4/1.9.3")
 
     def validate(self):
         if self.info.settings.compiler.cppstd:
