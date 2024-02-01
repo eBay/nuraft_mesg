@@ -21,7 +21,7 @@ SISL_OPTION_GROUP(client, (add, "a", "add", "Add a server to the cluster", cxxop
                   (remove, "r", "remove", "Remove server from cluster", cxxopts::value< uint32_t >(), "id"))
 
 SISL_OPTIONS_ENABLE(logging, client)
-SISL_LOGGING_INIT(nuraft, nuraft_mesg, httpserver_lmod, grpc_server)
+SISL_LOGGING_INIT(nuraft_mesg, httpserver_lmod, grpc_server)
 
 void cleanup(const std::string& prefix) { auto r = system(fmt::format(FMT_STRING("rm -rf {}"), prefix).data()); }
 

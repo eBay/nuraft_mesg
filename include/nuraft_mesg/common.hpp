@@ -12,10 +12,9 @@
 #include <sisl/fds/buffer.hpp>
 #include <sisl/logging/logging.h>
 
-SISL_LOGGING_DECL(nuraft)
 SISL_LOGGING_DECL(nuraft_mesg)
 
-#define NURAFTMESG_LOG_MODS nuraft, nuraft_mesg, grpc_server
+#define NURAFTMESG_LOG_MODS nuraft_mesg, grpc_server
 
 namespace nuraft_mesg {
 
