@@ -18,7 +18,7 @@ SISL_OPTION_GROUP(server,
                   (start_group, "", "create", "Group to create", cxxopts::value< uint32_t >(), ""))
 
 SISL_OPTIONS_ENABLE(logging, server, nuraft_mesg)
-SISL_LOGGING_INIT(nuraft, nuraft_mesg, grpc_server, flip)
+SISL_LOGGING_INIT(nuraft_mesg, grpc_server, flip)
 
 constexpr auto rpc_backoff = 50;
 constexpr auto heartbeat_period = 100;
