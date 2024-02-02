@@ -1,16 +1,15 @@
-cmake_minimum_required(VERSION 3.10)
-project(nuraft_mesg)
+cmake_minimum_required(VERSION 3.15)
+project(nuraft_mesg CXX)
 enable_testing()
 
 include (cmake/Flags.cmake)
 
 set(CMAKE_CXX_STANDARD 20)
 
-if(EXISTS ${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-    include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-    conan_basic_setup(TARGETS)
-else()
-    message(WARNING "Conan Build file does not exist, trying to build without!")
+if (NOT BUILD_TESTING STREQUAL OFF)
+  set(ENABLE_TESTING ON)
+  enable_testing()
+  find_package(GTest QUIET REQUIRED)
 endif()
 
 if (DEFINED CONAN_BUILD_COVERAGE)
@@ -21,9 +20,11 @@ if (DEFINED CONAN_BUILD_COVERAGE)
   endif ()
 endif ()
 
-if  (${MEMORY_SANITIZER_ON})
-  include (cmake/mem_sanitizer.cmake)
-endif ()
+if (DEFINED MEMORY_SANITIZER_ON)
+  if  (${MEMORY_SANITIZER_ON})
+    include (cmake/mem_sanitizer.cmake)
+  endif ()
+endif()
 
 find_program(CCACHE_FOUND ccache)
 if (CCACHE_FOUND)
