@@ -1,4 +1,5 @@
 #include "test_fixture.ipp"
+#include <libnuraft/raft_server_handler.hxx>
 
 class DataServiceFixture : public MessagingFixtureBase {
 protected:
@@ -93,13 +94,23 @@ TEST_F(DataServiceFixture, BasicTest1) {
             return folly::Unit();
         }));
 
+    auto repl_ctx1 = sm1->get_repl_context();
+    for (auto svr : repl_ctx1->_server->get_config()->get_servers()) {
+        if (svr->get_endpoint() == to_string(app_1_->id_)) continue;
+        LOGINFO("Sending request to server [{}]", svr->get_id())
+        results.push_back(sm1->data_service_request_bidirectional(svr->get_id(), REQUEST_DATA, cli_buf)
+                              .deferValue([](auto e) -> NullResult {
+                                  EXPECT_TRUE(e.hasValue());
+                                  return folly::Unit();
+                              }));
+    }
+
     folly::collectAll(results).via(folly::getGlobalCPUExecutor()).get();
 
     // add a new member to data_service_test_group and check if repl_ctx4 sends data to newly added member
     auto add_3 = app_4->instance_->add_member(data_group, app_3_->id_);
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(std::move(add_3).get());
-    auto sm3 = app_3_->state_mgr_map_[data_group];
     sm4->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, cli_buf)
         .deferValue([](auto e) -> folly::Unit {
             EXPECT_TRUE(e.hasValue());
@@ -108,9 +119,9 @@ TEST_F(DataServiceFixture, BasicTest1) {
         .get();
 
     // TODO REVIEW THIS
-    // test_group: 4 (1 SEND_DATA) + 1 (1 REQUEST_DATA) + 1 (SEND_DATA to a peer) = 6
+    // test_group: 4 (1 SEND_DATA) + 5 (1 REQUEST_DATA) + 1 (SEND_DATA to a peer) = 10
     // data_service_test_group: 1 (1 REQUEST_DATA) + 4 (1 SEND_DATA) = 5
-    EXPECT_EQ(test_state_mgr::get_server_counter(), 11);
+    EXPECT_EQ(test_state_mgr::get_server_counter(), 15);
     app_5->instance_->leave_group(data_group);
     app_5->instance_->leave_group(group_id_);
     app_4->instance_->leave_group(data_group);
@@ -214,6 +225,14 @@ TEST_F(DataServiceFixture, NegativeTests) {
                               EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, e.error());
                               return folly::Unit();
                           }));
+
+    // invalid svr id
+    results.push_back(
+        sm1->data_service_request_unidirectional(-1, REQUEST_DATA, cli_buf).deferValue([](auto e) -> NullResult {
+            EXPECT_TRUE(e.hasError());
+            EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, e.error());
+            return folly::Unit();
+        }));
 
     // unimplemented methods
     results.push_back(sm1->data_service_request_bidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf)

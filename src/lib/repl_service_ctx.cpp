@@ -19,11 +19,20 @@ const std::string repl_service_ctx_grpc::id_to_str(int32_t const id) const {
 
 const std::optional< Result< peer_id_t > > repl_service_ctx_grpc::get_peer_id(destination_t const& dest) const {
     if (std::holds_alternative< peer_id_t >(dest)) return std::get< peer_id_t >(dest);
-    if (std::holds_alternative< role_regex >(dest)) {
-        if (!_server) {
-            LOGW("server not initialized");
-            return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+
+    if (!_server) {
+        LOGW("server not initialized");
+        return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+    }
+
+    if (std::holds_alternative< svr_id_t >(dest)) {
+        if (auto const id_str = id_to_str(std::get< svr_id_t >(dest)); !id_str.empty()) {
+            return boost::uuids::string_generator()(id_str);
         }
+        return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+    }
+
+    if (std::holds_alternative< role_regex >(dest)) {
         switch (std::get< role_regex >(dest)) {
         case role_regex::LEADER: {
             if (is_raft_leader()) return folly::makeUnexpected(nuraft::cmd_result_code::BAD_REQUEST);
