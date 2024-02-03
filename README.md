@@ -44,6 +44,8 @@ This project depends on the [Symbiosis Library](https://github.com/eBay/sisl) wh
 in conan-center. If using conan-center one must first export this recipe to their local conan cache, example:
 ```
 $ git clone https://github.com/eBay/sisl sisl
+$ pip install --user conan
+$ conan profile detect --name default
 $ conan export sisl/ oss/master
 ```
 
@@ -51,7 +53,6 @@ $ conan export sisl/ oss/master
 
 This project is typically built from a combination of conan.io and CMake (which must be installed on the host).
 ```
-$ pip install -U conan
 $ conan create --build missing . <user>/<channel>
 ```
 

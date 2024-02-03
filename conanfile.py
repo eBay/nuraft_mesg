@@ -112,13 +112,23 @@ class NuRaftMesgConan(ConanFile):
         copy(self, "*.so*", self.build_folder, lib_dir, keep_path=False)
 
     def package_info(self):
-        self.cpp_info.names["cmake_find_package"] = "NuraftMesg"
-        self.cpp_info.names["cmake_find_package_multi"] = "NuraftMesg"
+        self.cpp_info.set_property("cmake_file_name", "NuraftMesg")
+        self.cpp_info.set_property("cmake_target_name", "NuraftMesg::NuraftMesg")
+        self.cpp_info.set_property("pkg_config_name", "nuraft_mesg")
         self.cpp_info.components["proto"].libs = ["nuraft_mesg", "nuraft_mesg_proto"]
         self.cpp_info.components["proto"].requires = ["boost::boost", "nuraft::nuraft", "sisl::sisl"]
+        self.cpp_info.components["flatb"].libs = ["nuraft_mesg", "nuraft_mesg_flatb"]
+        self.cpp_info.components["flatb"].requires = ["boost::boost", "nuraft::nuraft", "sisl::sisl", "flatbuffers::flatbuffers"]
 
         if self.settings.build_type == "Debug" and self.options.sanitize:
             self.cpp_info.components["proto"].sharedlinkflags.append("-fsanitize=address")
             self.cpp_info.components["proto"].exelinkflags.append("-fsanitize=address")
             self.cpp_info.components["proto"].sharedlinkflags.append("-fsanitize=undefined")
             self.cpp_info.components["proto"].exelinkflags.append("-fsanitize=undefined")
+            self.cpp_info.components["flatb"].sharedlinkflags.append("-fsanitize=address")
+            self.cpp_info.components["flatb"].exelinkflags.append("-fsanitize=address")
+            self.cpp_info.components["flatb"].sharedlinkflags.append("-fsanitize=undefined")
+            self.cpp_info.components["flatb"].exelinkflags.append("-fsanitize=undefined")
+
+        self.cpp_info.names["cmake_find_package"] = "NuraftMesg"
+        self.cpp_info.names["cmake_find_package_multi"] = "NuraftMesg"
