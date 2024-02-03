@@ -21,7 +21,7 @@ namespace nuraft_mesg {
 using peer_id_t = boost::uuids::uuid;
 using group_id_t = boost::uuids::uuid;
 using group_type_t = std::string;
-
+using svr_id_t = int32_t;
 using io_blob_list_t = folly::small_vector< sisl::io_blob, 4 >;
 
 template < typename T >
@@ -33,7 +33,7 @@ using NullResult = Result< folly::Unit >;
 using NullAsyncResult = AsyncResult< folly::Unit >;
 
 ENUM(role_regex, uint8_t, LEADER, FOLLOWER, ALL, ANY);
-using destination_t = std::variant< peer_id_t, role_regex >;
+using destination_t = std::variant< peer_id_t, role_regex, svr_id_t >;
 
 } // namespace nuraft_mesg
 
