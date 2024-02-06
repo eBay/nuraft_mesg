@@ -11,11 +11,11 @@
 namespace nuraft {
 class raft_server;
 class state_machine;
-}
+} // namespace nuraft
 
 namespace sisl {
 class GenericRpcData;
-}
+} // namespace sisl
 
 namespace nuraft_mesg {
 
@@ -46,7 +46,7 @@ public:
     nuraft::raft_server* _server;
     bool is_raft_leader() const;
     const std::string& raft_leader_id() const;
-    std::vector< peer_info >get_raft_status() const;
+    std::vector< peer_info > get_raft_status() const;
 
     // return a list of replica configs for the peers of the raft group
     void get_cluster_config(std::list< replica_config >& cluster_config) const;
@@ -55,9 +55,9 @@ public:
     virtual NullAsyncResult data_service_request_unidirectional(destination_t const& dest,
                                                                 std::string const& request_name,
                                                                 io_blob_list_t const& cli_buf) = 0;
-    virtual AsyncResult< sisl::io_blob > data_service_request_bidirectional(destination_t const& dest,
-                                                                            std::string const& request_name,
-                                                                            io_blob_list_t const& cli_buf) = 0;
+    virtual AsyncResult< sisl::GenericClientResponse >
+    data_service_request_bidirectional(destination_t const& dest, std::string const& request_name,
+                                       io_blob_list_t const& cli_buf) = 0;
 
     // Send response to a data service request and finish the async call.
     virtual void send_data_service_response(io_blob_list_t const& outgoing_buf,

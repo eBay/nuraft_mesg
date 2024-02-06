@@ -93,21 +93,16 @@ public:
             });
     }
 
-    AsyncResult< sisl::io_blob > data_service_request_bidirectional(std::string const& request_name,
-                                                                    io_blob_list_t const& cli_buf) {
-        grpc::ByteBuffer cli_byte_buf;
-        serialize_to_byte_buffer(cli_byte_buf, cli_buf);
+    AsyncResult< sisl::GenericClientResponse > data_service_request_bidirectional(std::string const& request_name,
+                                                                                  io_blob_list_t const& cli_buf) {
         return _generic_stub
-            ->call_unary(cli_byte_buf, request_name,
-                         NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs))
-            .deferValue([](auto&& response) -> Result< sisl::io_blob > {
+            ->call_unary(cli_buf, request_name, NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs))
+            .deferValue([](auto&& response) -> Result< sisl::GenericClientResponse > {
                 if (response.hasError()) {
                     LOGE("Failed to send data_service_request, error: {}", response.error().error_message());
                     return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
                 }
-                sisl::io_blob svr_buf;
-                deserialize_from_byte_buffer(response.value(), svr_buf);
-                return svr_buf;
+                return std::move(response.value());
             });
     }
 
@@ -157,8 +152,8 @@ public:
         return _client->data_service_request_unidirectional(request_name, cli_buf);
     }
 
-    AsyncResult< sisl::io_blob > data_service_request_bidirectional(std::string const& request_name,
-                                                                    io_blob_list_t const& cli_buf) {
+    AsyncResult< sisl::GenericClientResponse > data_service_request_bidirectional(std::string const& request_name,
+                                                                                  io_blob_list_t const& cli_buf) {
         return _client->data_service_request_bidirectional(request_name, cli_buf);
     }
 };
@@ -208,10 +203,10 @@ NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional<
     // We ignore the vector of future response from collect all and st the value as folly::unit.
     // This is because we do not have a use case to handle the errors that happen during the unidirectional call to all
     // the peers.
-    return folly::collectAll(calls).deferValue([](auto&&) -> NullResult { return folly::unit; });
+    return folly::collectAll(calls).deferValue([](auto &&) -> NullResult { return folly::unit; });
 }
 
-AsyncResult< sisl::io_blob >
+AsyncResult< sisl::GenericClientResponse >
 mesg_factory::data_service_request_bidirectional(std::optional< Result< peer_id_t > > const& dest,
                                                  std::string const& request_name, io_blob_list_t const& cli_buf) {
     std::shared_lock< client_factory_lock_type > rl(_client_lock);

@@ -84,7 +84,7 @@ TEST_F(DataServiceFixture, BasicTest1) {
 
     results.push_back(sm4_1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, cli_buf)
                           .deferValue([](auto e) -> NullResult {
-                              test_state_mgr::verify_data(e.value());
+                              test_state_mgr::verify_data(e.value().response_blob());
                               return folly::Unit();
                           }));
 
