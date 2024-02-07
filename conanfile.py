@@ -3,7 +3,7 @@ from conans import ConanFile, CMake, tools
 
 class NuRaftGrpcConan(ConanFile):
     name = "nuraft_grpc"
-    version = "6.0.4"
+    version = "6.0.5"
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
     topics = ("ebay", "nublox", "raft")
@@ -50,7 +50,7 @@ class NuRaftGrpcConan(ConanFile):
         self.requires("boost/1.79.0")
         self.requires("nuraft/nbi.2.2.0")
         self.requires("openssl/1.1.1s")
-        self.requires("sisl/8.6.5")
+        self.requires("sisl/8.6.8")
 
         self.requires("lz4/1.9.4", override=True)
         self.requires("grpc/1.50.1",    override=True)
