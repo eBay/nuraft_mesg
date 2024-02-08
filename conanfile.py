@@ -33,8 +33,8 @@ class NuRaftMesgConan(ConanFile):
                 'sanitize': False,
             }
 
-    exports = ["LICENSE"]
     exports_sources = (
+                        "LICENSE",
                         "CMakeLists.txt",
                         "cmake/*",
                         "include/*",
@@ -43,6 +43,10 @@ class NuRaftMesgConan(ConanFile):
 
     def _min_cppstd(self):
         return 20
+
+    def validate(self):
+        if self.settings.compiler.get_safe("cppstd"):
+            check_min_cppstd(self, self._min_cppstd())
 
     def configure(self):
         if self.options.shared:
@@ -54,11 +58,6 @@ class NuRaftMesgConan(ConanFile):
                 if self.options.coverage or self.options.sanitize:
                     raise ConanInvalidConfiguration("Coverage/Sanitizer requires Testing!")
 
-    def validate(self):
-        if self.settings.compiler.get_safe("cppstd"):
-            check_min_cppstd(self, self._min_cppstd())
-
-
     def build_requirements(self):
         if not self.conf.get("tools.build:skip_test", default=False):
             self.test_requires("lz4/[>=1.9]")
@@ -67,10 +66,8 @@ class NuRaftMesgConan(ConanFile):
 
     def requirements(self):
         self.requires("boost/[>=1.80]", transitive_headers=True)
-        self.requires("sisl/[>=11.1]@oss/master", transitive_headers=True)
+        self.requires("sisl/[>=11.1, include_prerelease]@oss/master", transitive_headers=True)
         self.requires("nuraft/2.3.0", transitive_headers=True)
-
-        self.requires("flatbuffers/23.5.26")
 
     def layout(self):
         cmake_layout(self)
@@ -112,23 +109,22 @@ class NuRaftMesgConan(ConanFile):
         copy(self, "*.so*", self.build_folder, lib_dir, keep_path=False)
 
     def package_info(self):
+        self.cpp_info.components["proto"].libs = ["nuraft_mesg", "nuraft_mesg_proto"]
+        self.cpp_info.components["proto"].set_property("pkg_config_name", "libnuraft_mesg_proto")
+        self.cpp_info.components["proto"].requires.extend([
+            "nuraft::nuraft",
+            "boost::boost",
+            "sisl::sisl"
+            ])
+
+        for component in self.cpp_info.components.values():
+            if  self.options.get_safe("sanitize"):
+                component.sharedlinkflags.append("-fsanitize=address")
+                component.exelinkflags.append("-fsanitize=address")
+                component.sharedlinkflags.append("-fsanitize=undefined")
+                component.exelinkflags.append("-fsanitize=undefined")
+
         self.cpp_info.set_property("cmake_file_name", "NuraftMesg")
         self.cpp_info.set_property("cmake_target_name", "NuraftMesg::NuraftMesg")
-        self.cpp_info.set_property("pkg_config_name", "nuraft_mesg")
-        self.cpp_info.components["proto"].libs = ["nuraft_mesg", "nuraft_mesg_proto"]
-        self.cpp_info.components["proto"].requires = ["boost::boost", "nuraft::nuraft", "sisl::sisl"]
-        self.cpp_info.components["flatb"].libs = ["nuraft_mesg", "nuraft_mesg_flatb"]
-        self.cpp_info.components["flatb"].requires = ["boost::boost", "nuraft::nuraft", "sisl::sisl", "flatbuffers::flatbuffers"]
-
-        if self.settings.build_type == "Debug" and self.options.sanitize:
-            self.cpp_info.components["proto"].sharedlinkflags.append("-fsanitize=address")
-            self.cpp_info.components["proto"].exelinkflags.append("-fsanitize=address")
-            self.cpp_info.components["proto"].sharedlinkflags.append("-fsanitize=undefined")
-            self.cpp_info.components["proto"].exelinkflags.append("-fsanitize=undefined")
-            self.cpp_info.components["flatb"].sharedlinkflags.append("-fsanitize=address")
-            self.cpp_info.components["flatb"].exelinkflags.append("-fsanitize=address")
-            self.cpp_info.components["flatb"].sharedlinkflags.append("-fsanitize=undefined")
-            self.cpp_info.components["flatb"].exelinkflags.append("-fsanitize=undefined")
-
         self.cpp_info.names["cmake_find_package"] = "NuraftMesg"
         self.cpp_info.names["cmake_find_package_multi"] = "NuraftMesg"
