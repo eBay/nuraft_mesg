@@ -8,3 +8,4 @@ compile_commands*
 .clangd/
 .vscode/
 .cache/
+CMakeUserPresets.json

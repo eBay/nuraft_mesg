@@ -1,5 +1,7 @@
 cmake_minimum_required (VERSION 3.11)
 
+find_package(lz4)
+
 file (GLOB LIBRARY_SOURCES *.cc)
 
 add_flags("-w")

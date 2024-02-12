@@ -1,14 +1,16 @@
-from os.path import join
 from conan import ConanFile
-from conan.tools.files import copy
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import check_min_cppstd
-from conans import CMake
+from conan.tools.cmake import CMakeToolchain, CMakeDeps, CMake, cmake_layout
+from conan.tools.files import copy
+from conan.tools.files import copy
+from os.path import join
 
-required_conan_version = ">=1.50.0"
+required_conan_version = ">=1.60.0"
 
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "2.3.3"
+    version = "2.4.1"
 
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
@@ -23,70 +25,77 @@ class NuRaftMesgConan(ConanFile):
                 "fPIC": ['True', 'False'],
                 "coverage": ['True', 'False'],
                 "sanitize": ['True', 'False'],
-                "testing": ['True', 'False'],
                 }
     default_options = {
                 'shared': False,
                 'fPIC': True,
                 'coverage': False,
                 'sanitize': False,
-                'testing': True,
             }
 
-    generators = "cmake", "cmake_find_package"
-    exports = ["LICENSE"]
     exports_sources = (
+                        "LICENSE",
                         "CMakeLists.txt",
                         "cmake/*",
                         "include/*",
                         "src/*",
                         )
 
+    def _min_cppstd(self):
+        return 20
+
+    def validate(self):
+        if self.settings.compiler.get_safe("cppstd"):
+            check_min_cppstd(self, self._min_cppstd())
+
     def configure(self):
         if self.options.shared:
-            del self.options.fPIC
+            self.options.rm_safe("fPIC")
         if self.settings.build_type == "Debug":
             if self.options.coverage and self.options.sanitize:
                 raise ConanInvalidConfiguration("Sanitizer does not work with Code Coverage!")
-            if not self.options.testing:
+            if self.conf.get("tools.build:skip_test", default=False):
                 if self.options.coverage or self.options.sanitize:
                     raise ConanInvalidConfiguration("Coverage/Sanitizer requires Testing!")
 
     def build_requirements(self):
-        self.build_requires("gtest/1.14.0")
-        if (self.options.testing):
-            self.build_requires("jungle/cci.20221201")
+        if not self.conf.get("tools.build:skip_test", default=False):
+            self.test_requires("lz4/[>=1.9]")
+            self.test_requires("gtest/1.14.0")
+            self.test_requires("jungle/cci.20221201")
 
     def requirements(self):
-        self.requires("sisl/[~=11, include_prerelease=True]@oss/master")
-        self.requires("nuraft/2.3.0")
+        self.requires("boost/1.83.0", transitive_headers=True)
+        self.requires("sisl/[>=11.1, include_prerelease=True]@oss/master", transitive_headers=True)
+        self.requires("nuraft/2.3.0", transitive_headers=True)
 
-        self.requires("boost/[>=1.80]")
-        self.requires("flatbuffers/23.5.26")
-        self.requires("openssl/3.1.3")
+    def layout(self):
+        cmake_layout(self)
 
-    def validate(self):
-        if self.info.settings.compiler.cppstd:
-            check_min_cppstd(self, 17)
+    def generate(self):
+        # This generates "conan_toolchain.cmake" in self.generators_folder
+        tc = CMakeToolchain(self)
+        tc.variables["CMAKE_EXPORT_COMPILE_COMMANDS"] = "ON"
+        tc.variables["CONAN_CMAKE_SILENT_OUTPUT"] = "ON"
+        tc.variables["CTEST_OUTPUT_ON_FAILURE"] = "ON"
+        tc.variables["PACKAGE_VERSION"] = self.version
+        if self.settings.build_type == "Debug":
+            if self.options.get_safe("coverage"):
+                tc.variables['BUILD_COVERAGE'] = 'ON'
+            elif self.options.get_safe("sanitize"):
+                tc.variables['MEMORY_SANITIZER_ON'] = 'ON'
+        tc.generate()
+
+        # This generates "boost-config.cmake" and "grpc-config.cmake" etc in self.generators_folder
+        deps = CMakeDeps(self)
+        deps.generate()
 
     def build(self):
         cmake = CMake(self)
-
-        definitions = {'CONAN_BUILD_COVERAGE': 'OFF',
-                       'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON',
-                       'CONAN_CMAKE_SILENT_OUTPUT': 'ON',
-                       'MEMORY_SANITIZER_ON': 'OFF'}
-
-        if self.settings.build_type == "Debug":
-            if self.options.sanitize:
-                definitions['MEMORY_SANITIZER_ON'] = 'ON'
-            elif self.options.coverage:
-                definitions['CONAN_BUILD_COVERAGE'] = 'ON'
-
-        cmake.configure(defs=definitions)
+        cmake.configure()
         cmake.build()
-        if (self.options.testing):
-            cmake.test(output_on_failure=True)
+        if not self.conf.get("tools.build:skip_test", default=False):
+            cmake.test()
 
     def package(self):
         lib_dir = join(self.package_folder, "lib")
@@ -100,13 +109,22 @@ class NuRaftMesgConan(ConanFile):
         copy(self, "*.so*", self.build_folder, lib_dir, keep_path=False)
 
     def package_info(self):
+        self.cpp_info.components["proto"].libs = ["nuraft_mesg", "nuraft_mesg_proto"]
+        self.cpp_info.components["proto"].set_property("pkg_config_name", "libnuraft_mesg_proto")
+        self.cpp_info.components["proto"].requires.extend([
+            "nuraft::nuraft",
+            "boost::boost",
+            "sisl::sisl"
+            ])
+
+        for component in self.cpp_info.components.values():
+            if  self.options.get_safe("sanitize"):
+                component.sharedlinkflags.append("-fsanitize=address")
+                component.exelinkflags.append("-fsanitize=address")
+                component.sharedlinkflags.append("-fsanitize=undefined")
+                component.exelinkflags.append("-fsanitize=undefined")
+
+        self.cpp_info.set_property("cmake_file_name", "NuraftMesg")
+        self.cpp_info.set_property("cmake_target_name", "NuraftMesg::NuraftMesg")
         self.cpp_info.names["cmake_find_package"] = "NuraftMesg"
         self.cpp_info.names["cmake_find_package_multi"] = "NuraftMesg"
-        self.cpp_info.components["proto"].libs = ["nuraft_mesg", "nuraft_mesg_proto"]
-        self.cpp_info.components["proto"].requires = ["nuraft::nuraft", "sisl::sisl"]
-
-        if self.settings.build_type == "Debug" and self.options.sanitize:
-            self.cpp_info.components["proto"].sharedlinkflags.append("-fsanitize=address")
-            self.cpp_info.components["proto"].exelinkflags.append("-fsanitize=address")
-            self.cpp_info.components["proto"].sharedlinkflags.append("-fsanitize=undefined")
-            self.cpp_info.components["proto"].exelinkflags.append("-fsanitize=undefined")

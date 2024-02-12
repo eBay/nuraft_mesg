@@ -13,7 +13,7 @@ flatbuffers_generate_headers(
     FLAGS "--grpc" ${SCHEMA_FLAGS}
 )
 
-add_library(${PROJECT_NAME}_flatb OBJECT)
+add_library(${PROJECT_NAME}_flatb)
 target_sources(${PROJECT_NAME}_flatb PRIVATE
     flatb_client.cpp
     $<TARGET_PROPERTY:fbservice,INTERFACE_SOURCES>
