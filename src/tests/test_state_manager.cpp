@@ -24,6 +24,7 @@
 #include <nlohmann/json.hpp>
 #include <libnuraft/state_machine.hxx>
 #include <sisl/grpc/generic_service.hpp>
+#include <sisl/grpc/rpc_client.hpp>
 
 #include "nuraft_mesg/nuraft_mesg.hpp"
 #include "jungle_logstore/jungle_log_store.h"
@@ -176,7 +177,7 @@ void test_state_mgr::leave() {}
 
 ///// data service api helpers
 
-nuraft_mesg::AsyncResult< sisl::io_blob >
+nuraft_mesg::AsyncResult< sisl::GenericClientResponse >
 test_state_mgr::data_service_request_bidirectional(nuraft_mesg::destination_t const& dest,
                                                    std::string const& request_name,
                                                    nuraft_mesg::io_blob_list_t const& cli_buf) {

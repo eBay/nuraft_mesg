@@ -3,6 +3,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/uuid/string_generator.hpp>
 #include <sisl/grpc/generic_service.hpp>
+#include <sisl/grpc/rpc_client.hpp>
 #include <libnuraft/cluster_config.hxx>
 
 #include "nuraft_mesg/mesg_factory.hpp"
@@ -61,9 +62,9 @@ NullAsyncResult repl_service_ctx_grpc::data_service_request_unidirectional(desti
         : m_mesg_factory->data_service_request_unidirectional(get_peer_id(dest), request_name, cli_buf);
 }
 
-AsyncResult< sisl::io_blob > repl_service_ctx_grpc::data_service_request_bidirectional(destination_t const& dest,
-                                                                                       std::string const& request_name,
-                                                                                       io_blob_list_t const& cli_buf) {
+AsyncResult< sisl::GenericClientResponse >
+repl_service_ctx_grpc::data_service_request_bidirectional(destination_t const& dest, std::string const& request_name,
+                                                          io_blob_list_t const& cli_buf) {
     return (!m_mesg_factory)
         ? folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND)
         : m_mesg_factory->data_service_request_bidirectional(get_peer_id(dest), request_name, cli_buf);
@@ -121,8 +122,7 @@ repl_service_ctx_grpc::repl_service_ctx_grpc(grpc_server* server, std::shared_pt
 
 void repl_service_ctx_grpc::send_data_service_response(io_blob_list_t const& outgoing_buf,
                                                        boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
-    serialize_to_byte_buffer(rpc_data->response(), outgoing_buf);
-    rpc_data->send_response();
+    rpc_data->send_response(outgoing_buf);
 }
 
 } // namespace nuraft_mesg
