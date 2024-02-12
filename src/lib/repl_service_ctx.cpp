@@ -122,8 +122,7 @@ repl_service_ctx_grpc::repl_service_ctx_grpc(grpc_server* server, std::shared_pt
 
 void repl_service_ctx_grpc::send_data_service_response(io_blob_list_t const& outgoing_buf,
                                                        boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
-    serialize_to_byte_buffer(rpc_data->response(), outgoing_buf);
-    rpc_data->send_response();
+    rpc_data->send_response(outgoing_buf);
 }
 
 } // namespace nuraft_mesg

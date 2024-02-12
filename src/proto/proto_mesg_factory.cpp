@@ -79,11 +79,8 @@ public:
 
     NullAsyncResult data_service_request_unidirectional(std::string const& request_name,
                                                         io_blob_list_t const& cli_buf) {
-        grpc::ByteBuffer cli_byte_buf;
-        serialize_to_byte_buffer(cli_byte_buf, cli_buf);
         return _generic_stub
-            ->call_unary(cli_byte_buf, request_name,
-                         NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs))
+            ->call_unary(cli_buf, request_name, NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs))
             .deferValue([](auto&& response) -> NullResult {
                 if (response.hasError()) {
                     LOGE("Failed to send data_service_request, error: {}", response.error().error_message());
