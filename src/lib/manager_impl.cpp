@@ -111,7 +111,9 @@ void ManagerImpl::register_mgr_type(group_type_t const& group_type, group_params
     if (_state_mgr_types.end() == it) { LOGE("Could not register [group_type={}]", group_type); }
 }
 
-void ManagerImpl::raft_event(group_id_t const& group_id, nuraft::cb_func::Type type, nuraft::cb_func::Param* param) {
+nuraft::cb_func::ReturnCode ManagerImpl::generic_raft_event_handler(group_id_t const& group_id,
+                                                                    nuraft::cb_func::Type type,
+                                                                    nuraft::cb_func::Param* param) {
     switch (type) {
     case nuraft::cb_func::RemovedFromCluster: {
         LOGI("[srv_id={}] evicted from: [group={}]", start_params_.server_uuid_, group_id);
@@ -149,6 +151,7 @@ void ManagerImpl::raft_event(group_id_t const& group_id, nuraft::cb_func::Type t
     default:
         break;
     };
+    return nuraft::cb_func::ReturnCode::Ok;
 }
 
 void ManagerImpl::exit_group(group_id_t const& group_id) {
@@ -166,7 +169,7 @@ nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t
     LOGD("Creating context for: [group_id={}] as Member: {}", group_id, srv_id);
 
     // State manager (RAFT log store, config)
-    std::shared_ptr< nuraft::state_mgr > smgr;
+    std::shared_ptr< mesg_state_mgr > smgr;
     std::shared_ptr< nuraft::state_machine > sm;
     nuraft::raft_params params;
     {
@@ -184,9 +187,10 @@ nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t
                 LOGD("Creating new State Manager for: [group={}], type: {}", group_id, group_type);
                 it->second = application_.lock()->create_state_mgr(srv_id, group_id);
             }
-            it->second->become_ready();
-            sm = it->second->get_state_machine();
             smgr = it->second;
+            smgr->become_ready();
+            sm = smgr->get_state_machine();
+            smgr->set_manager_impl(shared_from_this());
         } else {
             return nuraft::cmd_result_code::CANCELLED;
         }
@@ -200,10 +204,11 @@ nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t
     std::shared_ptr< nuraft::rpc_listener > listener;
 
     nuraft::ptr< nuraft::logger > logger = std::make_shared< nuraft_mesg_logger >(group_id, _custom_logger);
-    ctx = new nuraft::context(smgr, sm, listener, logger, rpc_cli_factory, _scheduler, params);
-    ctx->set_cb_func([wp = std::weak_ptr< ManagerImpl >(shared_from_this()), group_id](nuraft::cb_func::Type type,
-                                                                                       nuraft::cb_func::Param* param) {
-        if (auto sp = wp.lock(); sp) sp->raft_event(group_id, type, param);
+    auto base_smgr = std::static_pointer_cast< nuraft::state_mgr >(smgr);
+    ctx = new nuraft::context(base_smgr, sm, listener, logger, rpc_cli_factory, _scheduler, params);
+    ctx->set_cb_func([wp = std::weak_ptr< mesg_state_mgr >(smgr), group_id](nuraft::cb_func::Type type,
+                                                                            nuraft::cb_func::Param* param) {
+        if (auto sp = wp.lock(); sp) { return sp->internal_raft_event_handler(group_id, type, param); }
         return nuraft::cb_func::Ok;
     });
 
@@ -355,6 +360,13 @@ bool ManagerImpl::bind_data_service_request(std::string const& request_name, gro
 
 void mesg_state_mgr::make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory) {
     m_repl_svc_ctx = std::make_unique< repl_service_ctx_grpc >(server, cli_factory);
+}
+
+nuraft::cb_func::ReturnCode mesg_state_mgr::internal_raft_event_handler(group_id_t const& group_id,
+                                                                        nuraft::cb_func::Type type,
+                                                                        nuraft::cb_func::Param* param) {
+    if (auto const [handled, ret] = handle_raft_event(type, param); handled) { return ret; }
+    return m_manager.lock()->generic_raft_event_handler(group_id, type, param);
 }
 
 std::shared_ptr< Manager > init_messaging(Manager::Params const& p, std::weak_ptr< MessagingApplication > w,

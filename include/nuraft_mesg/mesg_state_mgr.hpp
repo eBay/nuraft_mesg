@@ -5,6 +5,7 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <libnuraft/state_mgr.hxx>
+#include <libnuraft/callback.hxx>
 
 #include "common.hpp"
 
@@ -21,6 +22,7 @@ namespace nuraft_mesg {
 
 class mesg_factory;
 class grpc_server;
+class ManagerImpl;
 
 // config for a replica with after the int32_t id is transformed to a peer_id_t
 struct replica_config {
@@ -70,14 +72,24 @@ public:
     virtual ~mesg_state_mgr() = default;
     void make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory);
 
+    virtual void set_manager_impl(std::weak_ptr< ManagerImpl > manager) { m_manager = manager; }
     virtual void become_ready() {}
     virtual uint32_t get_logstore_id() const = 0;
     virtual std::shared_ptr< nuraft::state_machine > get_state_machine() = 0;
     virtual void permanent_destroy() = 0;
     virtual void leave() = 0;
 
+    virtual std::pair< bool, nuraft::cb_func::ReturnCode > handle_raft_event(nuraft::cb_func::Type,
+                                                                             nuraft::cb_func::Param*) {
+        return std::pair(false, nuraft::cb_func::ReturnCode::Ok);
+    }
+
+    nuraft::cb_func::ReturnCode internal_raft_event_handler(group_id_t const& group_id, nuraft::cb_func::Type type,
+                                                            nuraft::cb_func::Param* param);
+
 protected:
     std::unique_ptr< repl_service_ctx > m_repl_svc_ctx;
+    std::weak_ptr< ManagerImpl > m_manager;
 };
 
 } // namespace nuraft_mesg

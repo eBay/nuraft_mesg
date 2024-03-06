@@ -56,7 +56,6 @@ class ManagerImpl : public Manager, public std::enable_shared_from_this< Manager
     nuraft::ptr< nuraft::delayed_task_scheduler > _scheduler;
     std::shared_ptr< sisl::logging::logger_t > _custom_logger;
 
-    void raft_event(group_id_t const& group_id, nuraft::cb_func::Type type, nuraft::cb_func::Param* param);
     void exit_group(group_id_t const& group_id);
 
 public:
@@ -93,6 +92,9 @@ public:
     nuraft::cmd_result_code group_init(int32_t const srv_id, group_id_t const& group_id, group_type_t const& group_type,
                                        nuraft::context*& ctx, std::shared_ptr< group_metrics > metrics);
     void start(bool and_data_svc);
+    nuraft::cb_func::ReturnCode generic_raft_event_handler(group_id_t const& group_id, nuraft::cb_func::Type type,
+                                                           nuraft::cb_func::Param* param);
+
     //
 };
 
