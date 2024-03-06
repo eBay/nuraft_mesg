@@ -366,7 +366,8 @@ nuraft::cb_func::ReturnCode mesg_state_mgr::internal_raft_event_handler(group_id
                                                                         nuraft::cb_func::Type type,
                                                                         nuraft::cb_func::Param* param) {
     if (auto const [handled, ret] = handle_raft_event(type, param); handled) { return ret; }
-    return m_manager.lock()->generic_raft_event_handler(group_id, type, param);
+    if (auto sp = m_manager.lock(); sp) { return sp->generic_raft_event_handler(group_id, type, param); }
+    return nuraft::cb_func::Ok;
 }
 
 std::shared_ptr< Manager > init_messaging(Manager::Params const& p, std::weak_ptr< MessagingApplication > w,
