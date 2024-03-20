@@ -38,7 +38,7 @@ static RCResponse* fromRCResponse(nuraft::resp_msg& rcmsg) {
     req->set_accepted(rcmsg.get_accepted());
     req->set_result_code((ResultCode)(0 - rcmsg.get_result_code()));
     auto ctx = rcmsg.get_ctx();
-    if (ctx) { req->set_context(ctx->data(), ctx->container_size()); }
+    if (ctx) { req->set_context(ctx->data(), ctx->size()); }
     return req;
 }
 

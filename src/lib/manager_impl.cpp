@@ -80,7 +80,7 @@ ManagerImpl::ManagerImpl(Manager::Params const& start_params, std::weak_ptr< Mes
 
     // RAFT request scheduler
     nuraft::asio_service::options service_options;
-    service_options.thread_pool_size_ = 1;
+    service_options.thread_pool_size_ = NURAFT_MESG_CONFIG(raft_scheduler_thread_cnt);
     _scheduler = std::make_shared< nuraft::asio_service >(service_options, logger);
 }
 
