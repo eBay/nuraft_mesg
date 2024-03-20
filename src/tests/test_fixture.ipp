@@ -107,8 +107,8 @@ private:
 };
 
 struct custom_factory : public nuraft_mesg::group_factory {
-    custom_factory(int const threads, nuraft_mesg::group_id_t const& name) :
-            nuraft_mesg::group_factory::group_factory(threads, name, nullptr) {}
+    custom_factory(int const raft_threads, int const data_threads, nuraft_mesg::group_id_t const& name) :
+            nuraft_mesg::group_factory::group_factory(raft_threads, data_threads, name, nullptr) {}
 
     std::string lookupEndpoint(nuraft_mesg::peer_id_t const& peer) override {
         auto lg = std::scoped_lock(lookup_lock_);
@@ -190,7 +190,7 @@ protected:
         std::this_thread::sleep_for(std::chrono::seconds(1));
         EXPECT_TRUE(std::move(add2).get());
 
-        custom_factory_ = std::make_shared< custom_factory >(2, group_id_);
+        custom_factory_ = std::make_shared< custom_factory >(2, 2, group_id_);
         custom_factory_->map_peers(lookup_map);
 
         // Use custom factory to add Server 3
