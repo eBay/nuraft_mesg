@@ -38,8 +38,6 @@ using client_factory_lock_type = folly::SharedMutex;
 //   inherited rpc_client instances sharing a common worker pool.
 class grpc_factory : public nuraft::rpc_client_factory, public std::enable_shared_from_this< grpc_factory > {
     std::string _worker_name;
-    std::string _raft_worker_name;
-    std::string _data_worker_name;
 
 protected:
     client_factory_lock_type _client_lock;
@@ -50,9 +48,8 @@ public:
     grpc_factory(int const raft_cli_thread_count, int const data_cli_thread_count, std::string const& name);
     ~grpc_factory() override = default;
 
-    std::string const& workerName() const { return _worker_name; }
-    std::string const& raftWorkerName() const { return _raft_worker_name; }
-    std::string const& dataWorkerName() const { return _data_worker_name; }
+    std::string const raftWorkerName() const;
+    std::string const dataWorkerName() const;
 
     nuraft::ptr< nuraft::rpc_client > create_client(const std::string& client) override;
     nuraft::ptr< nuraft::rpc_client > create_client(peer_id_t const& client);

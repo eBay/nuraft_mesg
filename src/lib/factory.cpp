@@ -124,21 +124,20 @@ void respHandler(std::shared_ptr< ContextType > ctx, std::shared_ptr< nuraft::re
 }
 
 grpc_factory::grpc_factory(int const cli_thread_count, std::string const& name) :
-        rpc_client_factory(), _worker_name(name) {
-    if (0 < cli_thread_count) { sisl::GrpcAsyncClientWorker::create_worker(_worker_name, cli_thread_count); }
-}
+        grpc_factory(cli_thread_count, 0, name) {}
 
 grpc_factory::grpc_factory(int const raft_cli_thread_count, int const data_cli_thread_count, std::string const& name) :
-        rpc_client_factory(),
-        _raft_worker_name(fmt::format("raft_{}", name)),
-        _data_worker_name(fmt::format("data_{}", name)) {
+        rpc_client_factory(), _worker_name(name) {
     if (0 < raft_cli_thread_count) {
-        sisl::GrpcAsyncClientWorker::create_worker(_raft_worker_name, raft_cli_thread_count);
+        sisl::GrpcAsyncClientWorker::create_worker(raftWorkerName(), raft_cli_thread_count);
     }
     if (0 < data_cli_thread_count) {
-        sisl::GrpcAsyncClientWorker::create_worker(_data_worker_name, data_cli_thread_count);
+        sisl::GrpcAsyncClientWorker::create_worker(dataWorkerName(), data_cli_thread_count);
     }
 }
+
+std::string const grpc_factory::raftWorkerName() const { return fmt::format("raft_{}", _worker_name); }
+std::string const grpc_factory::dataWorkerName() const { return fmt::format("data_{}", _worker_name); }
 
 class grpc_error_client : public grpc_base_client {
     void send(std::shared_ptr< nuraft::req_msg >& req, nuraft::rpc_handler& complete, uint64_t) override {
