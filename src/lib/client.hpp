@@ -58,7 +58,7 @@ public:
             grpc_base_client(),
             sisl::GrpcAsyncClient(addr, token_client, target_domain, ssl_cert),
             _addr(addr),
-            _worker_name(worker_name.data()) {
+            _worker_name(worker_name) {
         init();
     }
 
@@ -81,7 +81,7 @@ public:
 
 protected:
     std::string const _addr;
-    char const* _worker_name;
+    std::string _worker_name;
     typename ::sisl::GrpcAsyncClient::AsyncStub< TSERVICE >::UPtr _stub;
 };
 

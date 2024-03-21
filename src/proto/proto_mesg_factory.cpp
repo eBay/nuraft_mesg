@@ -16,23 +16,14 @@
 #include <string>
 
 #include <folly/futures/Future.h>
-#include <sisl/settings/settings.hpp>
 
 #include "nuraft_mesg/mesg_factory.hpp"
 #include "lib/client.hpp"
 #include "lib/service.hpp"
-#include "lib/generated/nuraft_mesg_config_generated.h"
+#include "lib/nuraft_mesg_config.hpp"
 
 #include "messaging_service.grpc.pb.h"
 #include "utils.hpp"
-
-SETTINGS_INIT(nuraftmesgcfg::NuraftMesgConfig, nuraft_mesg_config);
-
-#define NURAFT_MESG_CONFIG_WITH(...) SETTINGS(nuraft_mesg_config, __VA_ARGS__)
-#define NURAFT_MESG_CONFIG_THIS(...) SETTINGS_THIS(nuraft_mesg_config, __VA_ARGS__)
-#define NURAFT_MESG_CONFIG(...) SETTINGS_VALUE(nuraft_mesg_config, __VA_ARGS__)
-
-#define NURAFT_MESG_SETTINGS_FACTORY() SETTINGS_FACTORY(nuraft_mesg_config)
 
 namespace nuraft_mesg {
 
@@ -44,9 +35,14 @@ public:
     messaging_client(std::string const& worker_name, std::string const& addr,
                      const std::shared_ptr< sisl::GrpcTokenClient > token_client, std::string const& target_domain = "",
                      std::string const& ssl_cert = "") :
-            nuraft_mesg::grpc_client< Messaging >::grpc_client(worker_name, addr, token_client, target_domain,
+            messaging_client(worker_name, worker_name, addr, token_client, target_domain, ssl_cert) {}
+
+    messaging_client(std::string const& raft_worker_name, std::string const& data_worker_name, std::string const& addr,
+                     const std::shared_ptr< sisl::GrpcTokenClient > token_client, std::string const& target_domain = "",
+                     std::string const& ssl_cert = "") :
+            nuraft_mesg::grpc_client< Messaging >::grpc_client(raft_worker_name, addr, token_client, target_domain,
                                                                ssl_cert) {
-        _generic_stub = sisl::GrpcAsyncClient::make_generic_stub(_worker_name);
+        _generic_stub = sisl::GrpcAsyncClient::make_generic_stub(data_worker_name);
     }
     ~messaging_client() override = default;
 
@@ -226,7 +222,11 @@ mesg_factory::data_service_request_bidirectional(std::optional< Result< peer_id_
 
 group_factory::group_factory(int const cli_thread_count, group_id_t const& name,
                              std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert) :
-        grpc_factory(cli_thread_count, to_string(name)), m_token_client(token_client) {
+        group_factory(cli_thread_count, 0, name, token_client, ssl_cert) {}
+
+group_factory::group_factory(int const raft_cli_thread_count, int const data_cli_thread_count, group_id_t const& name,
+                             std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert) :
+        grpc_factory(raft_cli_thread_count, data_cli_thread_count, to_string(name)), m_token_client(token_client) {
     m_ssl_cert = ssl_cert;
 }
 
@@ -237,8 +237,8 @@ nuraft::cmd_result_code group_factory::create_client(peer_id_t const& client,
     if (endpoint.empty()) return nuraft::BAD_REQUEST;
 
     LOGD("Creating client for [{}] @ [{}]", client, endpoint);
-    raft_client =
-        sisl::GrpcAsyncClient::make< messaging_client >(workerName(), endpoint, m_token_client, "", m_ssl_cert);
+    raft_client = sisl::GrpcAsyncClient::make< messaging_client >(raftWorkerName(), dataWorkerName(), endpoint,
+                                                                  m_token_client, "", m_ssl_cert);
     return (!raft_client) ? nuraft::CANCELLED : nuraft::OK;
 }
 

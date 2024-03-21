@@ -15,6 +15,16 @@ table MesgFactoryConfig {
 
 table NuraftMesgConfig {
     mesg_factory_config: MesgFactoryConfig;
+
+    grpc_raft_client_thread_cnt: uint16 = 1;
+
+    grpc_data_client_thread_cnt: uint16 = 1;
+    
+    grpc_server_thread_cnt: uint16 = 2;
+
+    raft_leader_change_timeout_ms: uint32 = 3200;
+
+    raft_scheduler_thread_cnt: uint16 = 2;
 }
 
 root_type NuraftMesgConfig;

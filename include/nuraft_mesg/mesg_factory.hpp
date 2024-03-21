@@ -45,9 +45,11 @@ protected:
 
 public:
     grpc_factory(int const cli_thread_count, std::string const& name);
+    grpc_factory(int const raft_cli_thread_count, int const data_cli_thread_count, std::string const& name);
     ~grpc_factory() override = default;
 
-    std::string const& workerName() const { return _worker_name; }
+    std::string const raftWorkerName() const;
+    std::string const dataWorkerName() const;
 
     nuraft::ptr< nuraft::rpc_client > create_client(const std::string& client) override;
     nuraft::ptr< nuraft::rpc_client > create_client(peer_id_t const& client);
@@ -72,6 +74,9 @@ class group_factory : public grpc_factory {
 
 public:
     group_factory(int const cli_thread_count, group_id_t const& name,
+                  std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert = "");
+
+    group_factory(int const raft_cli_thread_count, int const data_cli_thread_count, group_id_t const& name,
                   std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert = "");
 
     using grpc_factory::create_client;

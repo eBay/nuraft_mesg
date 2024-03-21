@@ -21,10 +21,7 @@
 #include "repl_service_ctx.hpp"
 #include "service.hpp"
 #include "logger.hpp"
-
-constexpr auto leader_change_timeout = std::chrono::milliseconds(3200);
-constexpr auto grpc_client_threads = 1u;
-constexpr auto grpc_server_threads = 1u;
+#include "nuraft_mesg_config.hpp"
 
 SISL_LOGGING_DEF(nuraft_mesg)
 
@@ -39,9 +36,10 @@ class engine_factory : public group_factory {
 public:
     std::weak_ptr< MessagingApplication > application_;
 
-    engine_factory(int const threads, Manager::Params const& start_params, std::weak_ptr< MessagingApplication > app) :
-            group_factory::group_factory(threads, start_params.server_uuid_, start_params.token_client_,
-                                         start_params.ssl_cert_),
+    engine_factory(int const raft_threads, int const data_threads, Manager::Params const& start_params,
+                   std::weak_ptr< MessagingApplication > app) :
+            group_factory::group_factory(raft_threads, data_threads, start_params.server_uuid_,
+                                         start_params.token_client_, start_params.ssl_cert_),
             application_(app) {}
 
     std::string lookupEndpoint(peer_id_t const& client) override {
@@ -60,7 +58,9 @@ ManagerImpl::~ManagerImpl() {
 
 ManagerImpl::ManagerImpl(Manager::Params const& start_params, std::weak_ptr< MessagingApplication > app) :
         start_params_(start_params), _srv_id(to_server_id(start_params_.server_uuid_)), application_(app) {
-    _g_factory = std::make_shared< engine_factory >(grpc_client_threads, start_params_, app);
+    _g_factory =
+        std::make_shared< engine_factory >(NURAFT_MESG_CONFIG(grpc_raft_client_thread_cnt),
+                                           NURAFT_MESG_CONFIG(grpc_data_client_thread_cnt), start_params_, app);
     auto logger_name = fmt::format("nuraft_{}", start_params_.server_uuid_);
     //
     // NOTE: The Unit tests require this instance to be recreated with the same parameters.
@@ -75,7 +75,7 @@ ManagerImpl::ManagerImpl(Manager::Params const& start_params, std::weak_ptr< Mes
 
     // RAFT request scheduler
     nuraft::asio_service::options service_options;
-    service_options.thread_pool_size_ = 1;
+    service_options.thread_pool_size_ = NURAFT_MESG_CONFIG(raft_scheduler_thread_cnt);
     _scheduler = std::make_shared< nuraft::asio_service >(service_options, logger);
 }
 
@@ -94,9 +94,9 @@ void ManagerImpl::restart_server() {
     std::lock_guard< std::mutex > lg(_manager_lock);
     RELEASE_ASSERT(_mesg_service, "Need to call ::start() first!");
     _grpc_server.reset();
-    _grpc_server = std::unique_ptr< sisl::GrpcServer >(
-        sisl::GrpcServer::make(listen_address, start_params_.token_verifier_, grpc_server_threads,
-                               start_params_.ssl_key_, start_params_.ssl_cert_));
+    _grpc_server = std::unique_ptr< sisl::GrpcServer >(sisl::GrpcServer::make(
+        listen_address, start_params_.token_verifier_, NURAFT_MESG_CONFIG(grpc_server_thread_cnt),
+        start_params_.ssl_key_, start_params_.ssl_cert_));
     _mesg_service->associate(_grpc_server.get());
 
     _grpc_server->run();
@@ -223,7 +223,8 @@ NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, peer_id_t co
             // TODO This should not block, but attach a new promise!
             auto lk = std::unique_lock< std::mutex >(_manager_lock);
             if (!_config_change.wait_for(
-                    lk, leader_change_timeout, [this, g_id = std::move(g_id), n_id = std::move(n_id)]() {
+                    lk, std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms)),
+                    [this, g_id = std::move(g_id), n_id = std::move(n_id)]() {
                         std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
                         _mesg_service->get_srv_config_all(g_id, srv_list);
                         return std::find_if(srv_list.begin(), srv_list.end(),
@@ -252,7 +253,8 @@ NullAsyncResult ManagerImpl::become_leader(group_id_t const& group_id) {
             if (!_mesg_service->become_leader(g_id)) return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
 
             auto lk = std::unique_lock< std::mutex >(_manager_lock);
-            if (!_config_change.wait_for(lk, leader_change_timeout,
+            if (!_config_change.wait_for(lk,
+                                         std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms)),
                                          [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; }))
                 return folly::makeUnexpected(nuraft::cmd_result_code::TIMEOUT);
             return folly::Unit();
@@ -283,7 +285,8 @@ NullAsyncResult ManagerImpl::create_group(group_id_t const& group_id, std::strin
     return folly::makeSemiFuture< folly::Unit >(folly::Unit())
         .deferValue([this, g_id = group_id](auto) mutable -> NullResult {
             auto lk = std::unique_lock< std::mutex >(_manager_lock);
-            if (!_config_change.wait_for(lk, leader_change_timeout,
+            if (!_config_change.wait_for(lk,
+                                         std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms)),
                                          [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; })) {
                 return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
             }
