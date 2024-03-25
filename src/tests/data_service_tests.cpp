@@ -191,7 +191,7 @@ TEST_F(DataServiceFixture, NegativeTests) {
         sm2->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, "invalid_request", cli_buf)
             .deferValue([](auto e) -> NullResult {
                 EXPECT_TRUE(e.hasError());
-                EXPECT_EQ(nuraft::cmd_result_code::CANCELLED, e.error());
+                EXPECT_EQ(nuraft::cmd_result_code::BAD_REQUEST, e.error());
                 return folly::Unit();
             }));
 
