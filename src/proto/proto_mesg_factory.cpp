@@ -61,27 +61,27 @@ static nuraft::cmd_result_code grpc_status_to_nuraft_code(::grpc::Status const& 
 
 static constexpr bool is_powerof2(uint64_t v) { return v && ((v & (v - 1)) == 0); }
 
-static void log_every_nth(std::string const& addr, ::grpc::Status const& status, bool uni_directional) {
+static void log_every_nth(std::string const& addr, ::grpc::Status const& status, std::string const& msg_type) {
     static thread_local std::unordered_map< std::string, std::pair< uint64_t, Clock::time_point > > t_errors;
+    static constexpr uint64_t every_nth_sec = 60;
     std::string msg = addr + "-" + status.error_message();
 
-    int failed_count = 0;
+    uint64_t failed_count = 0;
     if (auto const it = t_errors.find(msg); it != t_errors.end()) {
-        ++(it->second.first);
-        if (get_elapsed_time_sec(it->second.second) > 60) {
-            it->second = std::pair(1u, Clock::now()); // Reset
+        if (get_elapsed_time_sec(it->second.second) > every_nth_sec) {
             failed_count = 1;
-        } else if (is_powerof2(it->second.first)) {
-            failed_count = it->second.first;
+            it->second = std::pair(1ul, Clock::now()); // Reset
+        } else {
+            failed_count = ++(it->second.first);
         }
     } else {
-        t_errors[msg] = std::pair(1u, Clock::now());
         failed_count = 1;
+        t_errors[msg] = std::pair(1ul, Clock::now());
     }
 
-    if (failed_count) {
-        LOGE("Failed {} time(s) in the last minute to send {} data_service_request to {}, error: {}", failed_count,
-             uni_directional ? "unidirectional" : "bidirectional", addr, status.error_message());
+    if (is_powerof2(failed_count)) {
+        LOGE("Failed {} time(s) in the last {} seconds to send {} data_service_request to {}, error: {}", failed_count,
+             every_nth_sec, msg_type, addr, status.error_message());
     }
 }
 
@@ -135,7 +135,7 @@ public:
                     if (response.hasError()) {
                         auto mc = weak_this.lock();
                         std::string addr = mc ? mc->_addr : "unknown";
-                        log_every_nth(addr, response.error(), true /* unidirectional */);
+                        log_every_nth(addr, response.error(), "unidirectional");
                         return folly::makeUnexpected(grpc_status_to_nuraft_code(response.error()));
                     }
                     return folly::unit;
@@ -151,7 +151,7 @@ public:
                 if (response.hasError()) {
                     auto mc = weak_this.lock();
                     std::string addr = mc ? mc->_addr : "unknown";
-                    log_every_nth(addr, response.error(), false /* unidirectional */);
+                    log_every_nth(addr, response.error(), "bidirectional");
                     return folly::makeUnexpected(grpc_status_to_nuraft_code(response.error()));
                 }
                 return std::move(response.value());
