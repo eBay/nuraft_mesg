@@ -66,16 +66,14 @@ static void log_every_nth(std::string const& addr, ::grpc::Status const& status,
     static constexpr uint64_t every_nth_sec = 60;
     std::string msg = addr + "-" + status.error_message();
 
-    uint64_t failed_count = 0;
+    uint64_t failed_count{1ul};
     if (auto const it = t_errors.find(msg); it != t_errors.end()) {
         if (get_elapsed_time_sec(it->second.second) > every_nth_sec) {
-            failed_count = 1;
             it->second = std::pair(1ul, Clock::now()); // Reset
         } else {
             failed_count = ++(it->second.first);
         }
     } else {
-        failed_count = 1;
         t_errors[msg] = std::pair(1ul, Clock::now());
     }
 
