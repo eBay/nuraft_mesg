@@ -64,6 +64,7 @@ public:
         std::string ssl_cert_;
         std::shared_ptr< sisl::GrpcTokenVerifier > token_verifier_{nullptr};
         std::shared_ptr< sisl::GrpcTokenClient > token_client_{nullptr};
+        uint32_t max_message_size_{0};
     };
     using group_params = nuraft::raft_params;
     virtual ~Manager() = default;

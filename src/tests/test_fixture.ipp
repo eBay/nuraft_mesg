@@ -88,6 +88,7 @@ public:
         params.server_uuid_ = id_;
         params.mesg_port_ = port_;
         params.default_group_type_ = "test_type";
+        params.max_message_size_ = 65 * 1024 * 1024;
         instance_ = init_messaging(params, weak_from_this(), data_svc_enabled);
         auto r_params = nuraft::raft_params()
                             .with_election_timeout_lower(elect_to_low)

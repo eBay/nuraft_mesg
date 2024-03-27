@@ -96,7 +96,7 @@ void ManagerImpl::restart_server() {
     _grpc_server.reset();
     _grpc_server = std::unique_ptr< sisl::GrpcServer >(sisl::GrpcServer::make(
         listen_address, start_params_.token_verifier_, NURAFT_MESG_CONFIG(grpc_server_thread_cnt),
-        start_params_.ssl_key_, start_params_.ssl_cert_));
+        start_params_.ssl_key_, start_params_.ssl_cert_, start_params_.max_message_size_));
     _mesg_service->associate(_grpc_server.get());
 
     _grpc_server->run();

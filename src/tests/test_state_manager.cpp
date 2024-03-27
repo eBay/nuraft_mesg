@@ -215,12 +215,25 @@ void test_state_mgr::verify_data(sisl::io_blob const& buf) {
     }
 }
 
-void test_state_mgr::fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf) {
-    static int const data_size{8};
-    for (int i = 0; i < data_size; i++) {
+void test_state_mgr::fill_data_vec_big(nuraft_mesg::io_blob_list_t& cli_buf, uint32_t size_bytes) {
+    auto cnt = size_bytes / sizeof(uint32_t);
+    sisl::io_blob data(size_bytes);
+    data_vec.clear();
+    uint32_t* const write_buf{reinterpret_cast< uint32_t* >(data.bytes())};
+    for (uint32_t i = 0; i < cnt; i++) {
+        data_vec.emplace_back(i);
+        write_buf[i] = data_vec.back();
+    }
+    cli_buf.emplace_back(data);
+}
+
+void test_state_mgr::fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf, uint32_t size_bytes) {
+    auto cnt = size_bytes / sizeof(uint32_t);
+    data_vec.clear();
+    for (uint32_t i = 0; i < cnt; i++) {
         cli_buf.emplace_back(sizeof(uint32_t));
         uint32_t* const write_buf{reinterpret_cast< uint32_t* >(cli_buf[i].bytes())};
-        data_vec.emplace_back(get_random_num());
+        data_vec.emplace_back(i);
         *write_buf = data_vec.back();
     }
 }
