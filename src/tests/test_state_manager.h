@@ -54,7 +54,8 @@ public:
                                                                      nuraft_mesg::io_blob_list_t const& cli_buf);
 
     bool register_data_service_apis(nuraft_mesg::Manager* messaging);
-    static void fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf);
+    static void fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf, uint32_t size_bytes);
+    static void fill_data_vec_big(nuraft_mesg::io_blob_list_t& cli_buf, uint32_t size_bytes);
     static uint16_t get_random_num();
     static uint32_t get_server_counter();
     static void verify_data(sisl::io_blob const& buf);

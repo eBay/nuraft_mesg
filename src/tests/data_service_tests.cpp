@@ -6,7 +6,7 @@ protected:
     void SetUp() override {
         MessagingFixtureBase::SetUp();
         start(true);
-        test_state_mgr::fill_data_vec(cli_buf);
+        test_state_mgr::fill_data_vec(cli_buf, 8);
     }
 
     void TearDown() override {
@@ -94,6 +94,7 @@ TEST_F(DataServiceFixture, BasicTest1) {
             return folly::Unit();
         }));
 
+
     auto repl_ctx1 = sm1->get_repl_context();
     for (auto svr : repl_ctx1->_server->get_config()->get_servers()) {
         if (svr->get_endpoint() == to_string(app_1_->id_)) continue;
@@ -107,6 +108,30 @@ TEST_F(DataServiceFixture, BasicTest1) {
 
     folly::collectAll(results).via(folly::getGlobalCPUExecutor()).get();
 
+    // test big message
+    LOGINFO("Starting large object write test")
+    io_blob_list_t big_cli_buf;
+    test_state_mgr::fill_data_vec_big(big_cli_buf, 4 * 1024 * 1024);
+    sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, big_cli_buf)
+                          .deferValue([](auto e) -> NullResult {
+                              EXPECT_TRUE(e.hasValue());
+                              return folly::Unit();
+                          }).get();
+    LOGINFO("End large object write test")
+    LOGINFO("Starting large object read test")
+
+    sm4_1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, big_cli_buf)
+                          .deferValue([](auto e) -> NullResult {
+                              EXPECT_TRUE(e.hasValue());
+			      test_state_mgr::verify_data(e.value().response_blob());
+                              return folly::Unit();
+                          }).get();
+    LOGINFO("End large object read test")
+    for (auto& buf : big_cli_buf) {
+        buf.buf_free();
+    }
+
+
     // add a new member to data_service_test_group and check if repl_ctx4 sends data to newly added member
     auto add_3 = app_4->instance_->add_member(data_group, app_3_->id_);
     std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -119,9 +144,9 @@ TEST_F(DataServiceFixture, BasicTest1) {
         .get();
 
     // TODO REVIEW THIS
-    // test_group: 4 (1 SEND_DATA) + 5 (1 REQUEST_DATA) + 1 (SEND_DATA to a peer) = 10
+    // test_group: 4 (2 * 1 SEND_DATA) + 6 (1 REQUEST_DATA) + 1 (SEND_DATA to a peer) = 15
     // data_service_test_group: 1 (1 REQUEST_DATA) + 4 (1 SEND_DATA) = 5
-    EXPECT_EQ(test_state_mgr::get_server_counter(), 15);
+    EXPECT_EQ(test_state_mgr::get_server_counter(), 20);
     app_5->instance_->leave_group(data_group);
     app_5->instance_->leave_group(group_id_);
     app_4->instance_->leave_group(data_group);
