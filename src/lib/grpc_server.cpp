@@ -43,8 +43,8 @@ static shared< nuraft::req_msg > toRequest(RaftMessage const& raft_msg) {
     for (auto const& log : req.log_entries()) {
         auto log_buffer = nuraft::buffer::alloc(log.buffer().size());
         memcpy(log_buffer->data(), log.buffer().data(), log.buffer().size());
-        log_entries.push_back(
-            std::make_shared< nuraft::log_entry >(log.term(), log_buffer, (nuraft::log_val_type)log.type(), log.timestamp()));
+        log_entries.push_back(std::make_shared< nuraft::log_entry >(log.term(), log_buffer,
+                                                                    (nuraft::log_val_type)log.type(), log.timestamp()));
     }
     return message;
 }
@@ -60,6 +60,7 @@ bool grpc_server::request_leadership() { return _raft_server->request_leadership
 void grpc_server::get_srv_config_all(std::vector< nuraft::ptr< nuraft::srv_config > >& configs_out) {
     _raft_server->get_srv_config_all(configs_out);
 }
+int grpc_server::get_leader() { return _raft_server->get_leader(); }
 
 nuraft::ptr< nuraft::cmd_result< nuraft::ptr< nuraft::buffer > > > grpc_server::rem_srv(int const member_id) {
     return _raft_server->remove_srv(member_id);
