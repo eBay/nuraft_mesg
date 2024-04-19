@@ -38,6 +38,7 @@ using generic_unary_callback_t = std::function< void(grpc::ByteBuffer&, ::grpc::
 namespace nuraft_mesg {
 
 using io_blob_list_t = folly::small_vector< sisl::io_blob, 4 >;
+using server_info_t = std::pair< int, std::string >;
 
 // called by the server after it receives the request
 using data_service_request_handler_t = std::function< void(sisl::io_blob const& incoming_buf, void* rpc_data) >;
@@ -130,6 +131,7 @@ public:
     virtual uint32_t logstore_id(std::string const& group_id) const = 0;
     virtual int32_t server_id() const = 0;
     virtual void restart_server() = 0;
+    virtual server_info_t get_leader(std::string const& group_name) = 0;
 
     // data channel APIs
     virtual bool bind_data_service_request(std::string const& request_name, std::string const& group_id,

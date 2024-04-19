@@ -89,7 +89,9 @@ nuraft::cmd_result_code msg_service::add_srv(group_name_t const& group_name, nur
     if (server) {
         try {
             return server->add_srv(cfg)->get_result_code();
-        } catch (std::runtime_error& rte) { LOGERRORMOD(nuraft_mesg, "Caught exception during add_srv(): {}", rte.what()); }
+        } catch (std::runtime_error& rte) {
+            LOGERRORMOD(nuraft_mesg, "Caught exception during add_srv(): {}", rte.what());
+        }
     }
     return nuraft::SERVER_NOT_FOUND;
 }
@@ -103,7 +105,9 @@ nuraft::cmd_result_code msg_service::rm_srv(group_name_t const& group_name, int 
     if (server) {
         try {
             return server->rem_srv(member_id)->get_result_code();
-        } catch (std::runtime_error& rte) { LOGERRORMOD(nuraft_mesg, "Caught exception during rm_srv(): {}", rte.what()); }
+        } catch (std::runtime_error& rte) {
+            LOGERRORMOD(nuraft_mesg, "Caught exception during rm_srv(): {}", rte.what());
+        }
     }
     return nuraft::SERVER_NOT_FOUND;
 }
@@ -136,8 +140,38 @@ void msg_service::get_srv_config_all(group_name_t const& group_name,
         try {
             server->get_srv_config_all(configs_out);
             return;
-        } catch (std::runtime_error& rte) { LOGERRORMOD(nuraft_mesg, "Caught exception during add_srv(): {}", rte.what()); }
+        } catch (std::runtime_error& rte) {
+            LOGERRORMOD(nuraft_mesg, "Caught exception during add_srv(): {}", rte.what());
+        }
     }
+}
+
+server_info_t msg_service::get_leader(group_name_t const& group_name) {
+
+    shared< grpc_server > server;
+    {
+        std::shared_lock< lock_type > rl(_raft_servers_lock);
+        if (auto it = _raft_servers.find(group_name); _raft_servers.end() != it) { server = it->second.m_server; }
+    }
+    if (server) {
+        try {
+            auto leader_id = server->get_leader();
+            std::vector< std::shared_ptr< nuraft::srv_config > > configs;
+            server->get_srv_config_all(configs);
+            std::string leader_endpoint = "";
+            auto it = std::find_if(configs.begin(), configs.end(),
+                                   [&leader_id](const auto& cfg) { return cfg->get_id() == leader_id; });
+
+            if (it != configs.end()) {
+                return std::make_pair(leader_id, (*it)->get_endpoint());
+            } else {
+                LOGERRORMOD(nuraft_mesg, "Could not find leader in the server config");
+            }
+        } catch (std::runtime_error& rte) {
+            LOGERRORMOD(nuraft_mesg, "Caught exception during get_leader(): {}", rte.what());
+        }
+    }
+    return std::make_pair(-1, "");
 }
 
 nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_name,
@@ -150,7 +184,9 @@ nuraft::cmd_result_code msg_service::append_entries(group_name_t const& group_na
     if (server) {
         try {
             return server->append_entries(logs)->get_result_code();
-        } catch (std::runtime_error& rte) { LOGERRORMOD(nuraft_mesg, "Caught exception during step(): {}", rte.what()); }
+        } catch (std::runtime_error& rte) {
+            LOGERRORMOD(nuraft_mesg, "Caught exception during step(): {}", rte.what());
+        }
     }
     return nuraft::SERVER_NOT_FOUND;
 }
@@ -212,7 +248,9 @@ bool msg_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg,
         try {
             rpc_data->set_status(server->step(request.msg(), *response.mutable_msg()));
             return true;
-        } catch (std::runtime_error& rte) { LOGERRORMOD(nuraft_mesg, "Caught exception during step(): {}", rte.what()); }
+        } catch (std::runtime_error& rte) {
+            LOGERRORMOD(nuraft_mesg, "Caught exception during step(): {}", rte.what());
+        }
     } else {
         LOGDEBUGMOD(nuraft_mesg, "Missing RAFT group: {}", group_name);
     }
@@ -226,8 +264,8 @@ bool msg_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg,
 class null_service final : public grpc_server {
 public:
     using grpc_server::grpc_server;
-    void associate(sisl::GrpcServer*) override{};
-    void bind(sisl::GrpcServer*) override{};
+    void associate(sisl::GrpcServer*) override {};
+    void bind(sisl::GrpcServer*) override {};
 };
 
 class msg_group_listner : public nuraft::rpc_listener {
@@ -274,7 +312,8 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
         std::tie(it, happened) = _raft_servers.emplace(std::make_pair(group_name, group_name));
         if (_raft_servers.end() != it && happened) {
             if (auto err = _get_server_ctx(srv_id, group_name, g_type, ctx, it->second.m_metrics); err) {
-                LOGERRORMOD(nuraft_mesg, "Error during RAFT server creation on group {}: {}", group_name, err.message());
+                LOGERRORMOD(nuraft_mesg, "Error during RAFT server creation on group {}: {}", group_name,
+                            err.message());
                 return err;
             }
             DEBUG_ASSERT(!ctx->rpc_listener_, "RPC listner should not be set!");

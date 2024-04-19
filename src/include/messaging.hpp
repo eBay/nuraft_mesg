@@ -23,7 +23,6 @@
 #include <system_error>
 
 #include <sisl/logging/logging.h>
-
 #include "messaging_if.hpp"
 
 namespace sisl {
@@ -84,6 +83,7 @@ public:
     uint32_t logstore_id(std::string const& group_id) const override;
     void get_peers(std::string const& group_id, std::list< std::string >&) const override;
     void restart_server() override;
+    server_info_t get_leader(std::string const& group_name) override;
 
     // data service APIs
     bool bind_data_service_request(std::string const& request_name, std::string const& group_id,

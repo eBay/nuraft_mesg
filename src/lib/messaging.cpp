@@ -142,7 +142,7 @@ nuraft::cb_func::ReturnCode service::callback_handler(std::string const& group_i
     case nuraft::cb_func::JoinedCluster: {
         auto const my_id = param->myId;
         auto const leader_id = param->leaderId;
-        LOGINFO("Joined cluster: {}, [l_id:{},my_id:{}]", group_id, leader_id, my_id);
+        LOGINFO("Joined cluster: {}, [leader_id:{}, my_id:{}]", group_id, leader_id, my_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = (leader_id == my_id);
@@ -161,7 +161,7 @@ nuraft::cb_func::ReturnCode service::callback_handler(std::string const& group_i
         _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeFollower: {
-        LOGDEBUGMOD(nuraft_mesg, "I'm a follower of: {}!", group_id);
+        LOGDEBUGMOD(nuraft_mesg, "I'm a follower of: {} with the leader {}!", group_id, param->leaderId);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = false;
@@ -429,6 +429,8 @@ void service::get_srv_config_all(std::string const& group_name,
                                  std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) {
     _mesg_service->get_srv_config_all(group_name, configs_out);
 }
+
+server_info_t service::get_leader(std::string const& group_name) { return _mesg_service->get_leader(group_name); }
 
 bool service::bind_data_service_request(std::string const& request_name, std::string const& group_id,
                                         data_service_request_handler_t const& request_handler) {

@@ -305,6 +305,8 @@ TEST_F(MessagingFixture, SyncAddMember) {
     srv_list.clear();
     instance_1->get_srv_config_all("test_group", srv_list);
     EXPECT_EQ(srv_list.size(), 4u);
+    LOGINFO("Leader of server1: id: {} endpoint {}", instance_1->get_leader("test_group").first,
+            instance_1->get_leader("test_group").second);
 }
 
 class DataServiceFixture : public MessagingFixtureBase {

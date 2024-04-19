@@ -30,7 +30,6 @@ using group_type_t = std::string;
 class msg_service;
 class mesg_factory;
 class repl_service_ctx_grpc;
-
 using lock_type = folly::SharedMutex;
 
 class group_metrics : public sisl::MetricsGroupWrapper {
@@ -45,9 +44,9 @@ public:
     ~group_metrics() { deregister_me_from_farm(); }
 };
 
-using get_server_ctx_cb = std::function< std::error_condition(int32_t srv_id, group_name_t const&, group_type_t const&,
-                                                              nuraft::context*& ctx_out,
-                                                              shared< group_metrics > metrics) >;
+using get_server_ctx_cb =
+    std::function< std::error_condition(int32_t srv_id, group_name_t const&, group_type_t const&,
+                                        nuraft::context*& ctx_out, shared< group_metrics > metrics) >;
 
 // pluggable type for data service
 using data_service_t = data_service_grpc;
@@ -91,7 +90,7 @@ public:
     nuraft::cmd_result_code rm_srv(group_name_t const& group_name, int const member_id);
     bool request_leadership(group_name_t const& group_name);
     void get_srv_config_all(group_name_t const& group_name, std::vector< shared< nuraft::srv_config > >& configs_out);
-
+    server_info_t get_leader(group_name_t const& group_name);
     nuraft::cmd_result_code append_entries(group_name_t const& group_name,
                                            std::vector< nuraft::ptr< nuraft::buffer > > const& logs);
 
