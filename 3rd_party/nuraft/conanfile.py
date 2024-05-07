@@ -2,7 +2,7 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
-from conan.tools.files import patch, copy, get
+from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get
 import os
 
 required_conan_version = ">=1.53.0"
@@ -10,12 +10,11 @@ required_conan_version = ">=1.53.0"
 
 class NuRaftConan(ConanFile):
     name = "nuraft"
-    homepage = "https://github.corp.ebay.com/sds/NuRaft"
+    homepage = "https://github.com/eBay/nuraft"
     description = """Cornerstone based RAFT library."""
     topics = ("raft",)
-    url = "https://github.com/conan-io/conan-center-index"
+    url = "https://github.com/eBay/nuraft"
     license = "Apache-2.0"
-    version = "2.3.0"
 
     package_type = "library"
     settings = "os", "arch", "compiler", "build_type"
@@ -30,7 +29,8 @@ class NuRaftConan(ConanFile):
         "asio": "boost",
     }
 
-    exports_sources = "patches/*"
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def configure(self):
         if self.options.shared:
@@ -55,7 +55,7 @@ class NuRaftConan(ConanFile):
             check_min_cppstd(self, 11)
 
     def source(self):
-        get(self, "https://github.com/eBay/nuraft/archive/f42b12c3ec9f20a085de61e1294e8167fa747c7d.tar.gz", strip_root=True)
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -64,7 +64,7 @@ class NuRaftConan(ConanFile):
         deps.generate()
 
     def build(self):
-        patch(self, patch_file="patches/patch.diff")
+        apply_conandata_patches(self)
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
