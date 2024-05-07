@@ -19,6 +19,7 @@
 #include "mesg_factory.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
+#include "nuraft_mesg_config.hpp"
 
 SISL_LOGGING_DECL(nuraft_mesg)
 
@@ -75,7 +76,7 @@ void service::start(consensus_component::params& start_params) {
 
     // RAFT request scheduler
     nuraft::asio_service::options service_options;
-    service_options.thread_pool_size_ = 1;
+    service_options.thread_pool_size_ = NURAFT_MESG_CONFIG(raft_timer_thread_pool_size);
     _scheduler = std::make_shared< nuraft::asio_service >(service_options, logger);
 
     // The function passed to msg_service will be called each time a new group is joined,
