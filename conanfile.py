@@ -67,7 +67,7 @@ class NuRaftMesgConan(ConanFile):
     def requirements(self):
         self.requires("boost/1.83.0", transitive_headers=True)
         self.requires("sisl/[~12.2, include_prerelease=True]@oss/master", transitive_headers=True)
-        self.requires("nuraft/2.3.0", transitive_headers=True)
+        self.requires("nuraft/2.4.0", transitive_headers=True)
 
     def layout(self):
         cmake_layout(self)
