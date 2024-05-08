@@ -1,0 +1,13 @@
+diff --git a/src/handle_user_cmd.cxx b/src/handle_user_cmd.cxx
+index 06e65c6..40c9134 100644
+--- a/src/handle_user_cmd.cxx
++++ b/src/handle_user_cmd.cxx
+@@ -182,7 +182,7 @@ ptr< cmd_result< ptr<buffer> > > raft_server::send_msg_to_leader
+         auto entry = auto_fwd_pkgs_.find(leader_id);
+         if (entry == auto_fwd_pkgs_.end()) {
+             cur_pkg = cs_new<auto_fwd_pkg>();
+-            auto_fwd_pkgs_[leader_id] = cur_pkg;
++            //auto_fwd_pkgs_[leader_id] = cur_pkg;
+             p_tr("auto forwarding pkg for leader %d not found, created %p",
+                  leader_id, cur_pkg.get());
+         } else {
