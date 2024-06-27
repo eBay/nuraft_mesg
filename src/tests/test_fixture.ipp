@@ -36,9 +36,12 @@
 
 #include "test_state_manager.h"
 
+SISL_OPTION_GROUP(data_service_test,  (num_iters, "", "num_iters", "iterations in long running test",
+                                      ::cxxopts::value< uint32_t >()->default_value("100"), "number"));
+
 SISL_LOGGING_INIT(NURAFTMESG_LOG_MODS)
 
-SISL_OPTIONS_ENABLE(logging)
+SISL_OPTIONS_ENABLE(logging, data_service_test)
 
 constexpr auto rpc_backoff = 50;
 constexpr auto heartbeat_period = 100;
@@ -205,7 +208,7 @@ protected:
 int main(int argc, char* argv[]) {
     int parsed_argc = argc;
     ::testing::InitGoogleTest(&parsed_argc, argv);
-    SISL_OPTIONS_LOAD(parsed_argc, argv, logging);
+    SISL_OPTIONS_LOAD(parsed_argc, argv, logging, data_service_test);
     sisl::logging::SetLogger(std::string(argv[0]));
     spdlog::set_pattern("[%D %T.%e] [%n] [%^%l%$] [%t] %v");
     parsed_argc = 1;

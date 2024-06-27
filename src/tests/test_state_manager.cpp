@@ -195,6 +195,7 @@ bool test_state_mgr::register_data_service_apis(nuraft_mesg::Manager* messaging)
     return messaging->bind_data_service_request(
                SEND_DATA, _group_id,
                [this](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
+	           LOGINFO("I am {}, SEND_DATA", _srv_addr);
                    rpc_data->set_comp_cb([this](boost::intrusive_ptr< sisl::GenericRpcData >&) { server_counter++; });
                    verify_data(rpc_data->request_blob());
                    m_repl_svc_ctx->send_data_service_response(nuraft_mesg::io_blob_list_t{rpc_data->request_blob()},
@@ -202,6 +203,7 @@ bool test_state_mgr::register_data_service_apis(nuraft_mesg::Manager* messaging)
                }) &&
         messaging->bind_data_service_request(
             REQUEST_DATA, _group_id, [this](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
+	        LOGINFO("I am {}, REQUEST_DATA", _srv_addr);
                 rpc_data->set_comp_cb([this](boost::intrusive_ptr< sisl::GenericRpcData >&) { server_counter++; });
                 m_repl_svc_ctx->send_data_service_response(nuraft_mesg::io_blob_list_t{rpc_data->request_blob()},
                                                            rpc_data);
