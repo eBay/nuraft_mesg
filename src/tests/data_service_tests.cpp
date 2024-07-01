@@ -1,6 +1,9 @@
 #include "test_fixture.ipp"
 #include <libnuraft/raft_server_handler.hxx>
 
+
+
+
 class DataServiceFixture : public MessagingFixtureBase {
 protected:
     void SetUp() override {
@@ -20,6 +23,75 @@ protected:
     std::string SEND_DATA{"send_data"};
     std::string REQUEST_DATA{"request_data"};
 };
+
+TEST_F(DataServiceFixture, LongRunning) {
+    auto sm1 = app_1_->state_mgr_map_[group_id_];
+    auto sm2 = app_2_->state_mgr_map_[group_id_];
+    auto sm3 = app_3_->state_mgr_map_[group_id_];
+    auto repl_ctx = sm1->get_repl_context();
+
+    EXPECT_TRUE(repl_ctx && repl_ctx->is_raft_leader());
+    EXPECT_TRUE(repl_ctx && repl_ctx->raft_leader_id() == to_string(app_1_->id_));
+    auto peer_info = repl_ctx->get_raft_status();
+    EXPECT_TRUE(peer_info.size() == 3);
+    for (auto const& peer : peer_info) {
+        std::cout << "Peer ID: " << peer.id_ << " Last Log Idx: " << peer.last_log_idx_
+                  << " Last Succ Resp Us: " << peer.last_succ_resp_us_ << std::endl;
+        EXPECT_TRUE(peer.id_ == to_string(app_1_->id_) || peer.id_ == to_string(app_2_->id_) ||
+                    peer.id_ == to_string(app_3_->id_));
+        EXPECT_TRUE(peer.last_log_idx_ == 3);
+        if (peer.id_ == to_string(app_1_->id_)) {
+            EXPECT_TRUE(peer.last_succ_resp_us_ == 0);
+        } else {
+            EXPECT_TRUE(peer.last_succ_resp_us_ > 0);
+        }
+    }
+
+    io_blob_list_t big_cli_buf;
+    test_state_mgr::fill_data_vec_big(big_cli_buf, 1024*1024);
+    auto num_iters = SISL_OPTIONS["num_iters"].as< uint32_t >();
+
+    LOGINFO("Starting long running test")
+    for (uint32_t i=0 ; i < num_iters; i++) {
+        auto size = 4 * 1024 * (i % 16 + 1);
+        LOGINFO("Iter {}, size {}", i, size)
+        auto ptr = big_cli_buf[0].bytes();
+        sisl::io_blob iob(ptr, size, true);
+        io_blob_list_t buf;
+        buf.emplace_back(iob);
+
+        std::vector< NullAsyncResult > results;
+        LOGINFO("Iter {}, SEND_DATA, size {}", i, size)
+        results.push_back(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, buf)
+            .deferValue([](auto e) -> NullResult {
+                EXPECT_TRUE(e.hasValue());
+                return folly::Unit();
+            }));
+
+        LOGINFO("Iter {}, REQUEST_DATA from app_2, size {}", i, size)
+        results.push_back(sm2->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, buf)
+            .deferValue([](auto e) -> NullResult {
+                EXPECT_TRUE(e.hasValue());
+                test_state_mgr::verify_data(e.value().response_blob());
+                return folly::Unit();
+            }));
+
+        LOGINFO("Iter {}, REQUEST_DATA from app_3, size {}", i, size)
+        results.push_back(sm3->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, buf)
+            .deferValue([](auto e) -> NullResult {
+                EXPECT_TRUE(e.hasValue());
+                test_state_mgr::verify_data(e.value().response_blob());
+                return folly::Unit();
+            }));
+        folly::collectAll(results).via(folly::getGlobalCPUExecutor()).get();
+    }
+
+    for (auto& buf : big_cli_buf) {
+        buf.buf_free();
+    }
+    LOGINFO("End long running test")
+
+}
 
 TEST_F(DataServiceFixture, BasicTest1) {
     get_random_ports(2u);
