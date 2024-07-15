@@ -95,7 +95,7 @@ void ManagerImpl::restart_server() {
     RELEASE_ASSERT(_mesg_service, "Need to call ::start() first!");
     sisl::GrpcServer* tmp_server = nullptr;
     try {
-        tmp_server = sisl::GrpcServer::make(listen_address, _start_params.token_verifier_,
+        tmp_server = sisl::GrpcServer::make(listen_address, start_params_.token_verifier_,
                                             NURAFT_MESG_CONFIG(grpc_server_thread_cnt), start_params_.ssl_key_,
                                             start_params_.ssl_cert_, start_params_.max_message_size_);
     } catch (std::runtime_error const& e) {
