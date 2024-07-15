@@ -146,8 +146,11 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
             if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
                 if (it->second.m_metrics) COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
                 try {
+                    auto const time_start = std::chrono::steady_clock::now();
                     rpc_data->set_status(
                         step(*it->second.m_server->raft_server(), request.msg(), *response.mutable_msg()));
+                    if (it->second.m_metrics)
+                        HISTOGRAM_OBSERVE(*it->second.m_metrics, group_step_latency, get_elapsed_time_ms(time_start));
                 } catch (std::runtime_error& rte) {
                     LOGE("Caught exception during step(): {}", rte.what());
                     rpc_data->set_status(
