@@ -53,7 +53,6 @@ public:
             msg_service(std::forward< Args >(args)...),
             _raft_thread_pool{NURAFT_MESG_CONFIG(raft_append_entries_thread_cnt)} {}
 
-    virtual ~proto_service() { _raft_thread_pool.join(); }
     void associate(sisl::GrpcServer* server) override;
     void bind(sisl::GrpcServer* server) override;
 

@@ -8,7 +8,6 @@ from os.path import join
 
 required_conan_version = ">=1.60.0"
 
-
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
     version = "3.5.4"
@@ -22,25 +21,25 @@ class NuRaftMesgConan(ConanFile):
     settings = "arch", "os", "compiler", "build_type"
 
     options = {
-        "shared": ["True", "False"],
-        "fPIC": ["True", "False"],
-        "coverage": ["True", "False"],
-        "sanitize": ["True", "False"],
-    }
+                "shared": ['True', 'False'],
+                "fPIC": ['True', 'False'],
+                "coverage": ['True', 'False'],
+                "sanitize": ['True', 'False'],
+                }
     default_options = {
-        "shared": False,
-        "fPIC": True,
-        "coverage": False,
-        "sanitize": False,
-    }
+                'shared': False,
+                'fPIC': True,
+                'coverage': False,
+                'sanitize': False,
+            }
 
     exports_sources = (
-        "LICENSE",
-        "CMakeLists.txt",
-        "cmake/*",
-        "include/*",
-        "src/*",
-    )
+                        "LICENSE",
+                        "CMakeLists.txt",
+                        "cmake/*",
+                        "include/*",
+                        "src/*",
+                        )
 
     def _min_cppstd(self):
         return 20
@@ -54,14 +53,10 @@ class NuRaftMesgConan(ConanFile):
             self.options.rm_safe("fPIC")
         if self.settings.build_type == "Debug":
             if self.options.coverage and self.options.sanitize:
-                raise ConanInvalidConfiguration(
-                    "Sanitizer does not work with Code Coverage!"
-                )
+                raise ConanInvalidConfiguration("Sanitizer does not work with Code Coverage!")
             if self.conf.get("tools.build:skip_test", default=False):
                 if self.options.coverage or self.options.sanitize:
-                    raise ConanInvalidConfiguration(
-                        "Coverage/Sanitizer requires Testing!"
-                    )
+                    raise ConanInvalidConfiguration("Coverage/Sanitizer requires Testing!")
 
     def build_requirements(self):
         if not self.conf.get("tools.build:skip_test", default=False):
@@ -71,9 +66,7 @@ class NuRaftMesgConan(ConanFile):
 
     def requirements(self):
         self.requires("boost/1.83.0", transitive_headers=True)
-        self.requires(
-            "sisl/[~12.2, include_prerelease=True]@oss/master", transitive_headers=True
-        )
+        self.requires("sisl/[~12.2, include_prerelease=True]@oss/master", transitive_headers=True)
         self.requires("nuraft/2.4.0", transitive_headers=True)
 
     def layout(self):
@@ -88,9 +81,9 @@ class NuRaftMesgConan(ConanFile):
         tc.variables["PACKAGE_VERSION"] = self.version
         if self.settings.build_type == "Debug":
             if self.options.get_safe("coverage"):
-                tc.variables["BUILD_COVERAGE"] = "ON"
+                tc.variables['BUILD_COVERAGE'] = 'ON'
             elif self.options.get_safe("sanitize"):
-                tc.variables["MEMORY_SANITIZER_ON"] = "ON"
+                tc.variables['MEMORY_SANITIZER_ON'] = 'ON'
         tc.generate()
 
         # This generates "boost-config.cmake" and "grpc-config.cmake" etc in self.generators_folder
@@ -106,44 +99,26 @@ class NuRaftMesgConan(ConanFile):
 
     def package(self):
         lib_dir = join(self.package_folder, "lib")
-        copy(
-            self,
-            "LICENSE",
-            self.source_folder,
-            join(self.package_folder, "licenses"),
-            keep_path=False,
-        )
-        copy(
-            self,
-            "*.h*",
-            join(self.source_folder, "include"),
-            join(self.package_folder, "include"),
-            keep_path=True,
-        )
+        copy(self, "LICENSE", self.source_folder, join(self.package_folder, "licenses"), keep_path=False)
+        copy(self, "*.h*", join(self.source_folder, "include"), join(self.package_folder, "include"), keep_path=True)
         copy(self, "*.lib", self.build_folder, lib_dir, keep_path=False)
         copy(self, "*.a", self.build_folder, lib_dir, keep_path=False)
         copy(self, "*.so*", self.build_folder, lib_dir, keep_path=False)
         copy(self, "*.dylib*", self.build_folder, lib_dir, keep_path=False)
-        copy(
-            self,
-            "*.dll*",
-            self.build_folder,
-            join(self.package_folder, "bin"),
-            keep_path=False,
-        )
+        copy(self, "*.dll*", self.build_folder, join(self.package_folder, "bin"), keep_path=False)
         copy(self, "*.so*", self.build_folder, lib_dir, keep_path=False)
 
     def package_info(self):
         self.cpp_info.components["proto"].libs = ["nuraft_mesg", "nuraft_mesg_proto"]
-        self.cpp_info.components["proto"].set_property(
-            "pkg_config_name", "libnuraft_mesg_proto"
-        )
-        self.cpp_info.components["proto"].requires.extend(
-            ["nuraft::nuraft", "boost::boost", "sisl::sisl"]
-        )
+        self.cpp_info.components["proto"].set_property("pkg_config_name", "libnuraft_mesg_proto")
+        self.cpp_info.components["proto"].requires.extend([
+            "nuraft::nuraft",
+            "boost::boost",
+            "sisl::sisl"
+            ])
 
         for component in self.cpp_info.components.values():
-            if self.options.get_safe("sanitize"):
+            if  self.options.get_safe("sanitize"):
                 component.sharedlinkflags.append("-fsanitize=address")
                 component.exelinkflags.append("-fsanitize=address")
                 component.sharedlinkflags.append("-fsanitize=undefined")
