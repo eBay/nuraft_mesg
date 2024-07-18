@@ -93,10 +93,22 @@ void ManagerImpl::restart_server() {
 
     std::lock_guard< std::mutex > lg(_manager_lock);
     RELEASE_ASSERT(_mesg_service, "Need to call ::start() first!");
+    sisl::GrpcServer* tmp_server = nullptr;
+    try {
+        tmp_server = sisl::GrpcServer::make(listen_address, start_params_.token_verifier_,
+                                            NURAFT_MESG_CONFIG(grpc_server_thread_cnt), start_params_.ssl_key_,
+                                            start_params_.ssl_cert_, start_params_.max_message_size_);
+    } catch (std::runtime_error const& e) {
+        LOGERROR("Failed to create GRPC server for Messaging Service: {}", e.what());
+        return;
+    }
+    if (!tmp_server) {
+        LOGERROR("Failed to create GRPC server: for Messaging Service");
+        return;
+    }
+
     _grpc_server.reset();
-    _grpc_server = std::unique_ptr< sisl::GrpcServer >(sisl::GrpcServer::make(
-        listen_address, start_params_.token_verifier_, NURAFT_MESG_CONFIG(grpc_server_thread_cnt),
-        start_params_.ssl_key_, start_params_.ssl_cert_, start_params_.max_message_size_));
+    _grpc_server = std::unique_ptr< sisl::GrpcServer >(tmp_server);
     _mesg_service->associate(_grpc_server.get());
 
     _grpc_server->run();
