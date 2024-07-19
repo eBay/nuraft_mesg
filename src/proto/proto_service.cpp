@@ -1,6 +1,7 @@
 #include <boost/uuid/string_generator.hpp>
 #include <folly/Expected.h>
 #include <grpcpp/impl/codegen/status_code_enum.h>
+#include <boost/asio.hpp>
 #include <libnuraft/async.hxx>
 #include <libnuraft/rpc_listener.hxx>
 #include <sisl/options/options.h>
@@ -9,6 +10,7 @@
 #include "nuraft_mesg/nuraft_mesg.hpp"
 
 #include "lib/service.hpp"
+#include "lib/nuraft_mesg_config.hpp"
 
 #include "messaging_service.grpc.pb.h"
 #include "utils.hpp"
@@ -46,12 +48,19 @@ class proto_service : public msg_service {
     ::grpc::Status step(nuraft::raft_server& server, const RaftMessage& request, RaftMessage& reply);
 
 public:
-    using msg_service::msg_service;
+    template < typename... Args >
+    proto_service(Args&&... args) :
+            msg_service(std::forward< Args >(args)...),
+            _raft_thread_pool{NURAFT_MESG_CONFIG(raft_append_entries_thread_cnt)} {}
+
     void associate(sisl::GrpcServer* server) override;
     void bind(sisl::GrpcServer* server) override;
 
     // Incomming gRPC message
     bool raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
+
+private:
+    boost::asio::thread_pool _raft_thread_pool;
 };
 
 void proto_service::associate(::sisl::GrpcServer* server) {
@@ -127,7 +136,7 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
 
     // Setup our response and process the request.
     response.set_group_id(group_id);
-    folly::getGlobalCPUExecutor()->add([this, rpc_data]() {
+    boost::asio::post(_raft_thread_pool, [this, rpc_data]() {
         auto gid = boost::uuids::string_generator()(rpc_data->response().group_id());
         auto& request = rpc_data->request();
         auto& response = rpc_data->response();
@@ -136,8 +145,11 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
             if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
                 if (it->second.m_metrics) COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
                 try {
+                    auto const time_start = std::chrono::steady_clock::now();
                     rpc_data->set_status(
                         step(*it->second.m_server->raft_server(), request.msg(), *response.mutable_msg()));
+                    if (it->second.m_metrics)
+                        HISTOGRAM_OBSERVE(*it->second.m_metrics, group_step_latency, get_elapsed_time_ms(time_start));
                 } catch (std::runtime_error& rte) {
                     LOGE("Caught exception during step(): {}", rte.what());
                     rpc_data->set_status(
