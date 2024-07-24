@@ -45,7 +45,8 @@ static RCResponse* fromRCResponse(nuraft::resp_msg& rcmsg) {
 }
 
 class proto_service : public msg_service {
-    ::grpc::Status step(nuraft::raft_server& server, const RaftMessage& request, RaftMessage& reply);
+    ::grpc::Status step(nuraft::raft_server& server, const RaftMessage& request, RaftMessage& reply,
+                        std::shared_ptr< group_metrics > metrics);
 
 public:
     template < typename... Args >
@@ -81,12 +82,17 @@ void proto_service::bind(::sisl::GrpcServer* server) {
     }
 }
 
-::grpc::Status proto_service::step(nuraft::raft_server& server, const RaftMessage& request, RaftMessage& reply) {
+::grpc::Status proto_service::step(nuraft::raft_server& server, const RaftMessage& request, RaftMessage& reply,
+                                   std::shared_ptr< group_metrics > metrics) {
     LOGT("Stepping [{}] from: [{}] to: [{}]", nuraft::msg_type_to_string(nuraft::msg_type(request.base().type())),
          request.base().src(), request.base().dest());
     auto rcreq = toRequest(request);
+    auto const time_start = std::chrono::steady_clock::now();
     auto resp = nuraft::raft_server_handler::process_req(&server, *rcreq);
     if (!resp) { return ::grpc::Status(::grpc::StatusCode::CANCELLED, "Server rejected request"); }
+    if (metrics && rcreq->get_type() == nuraft::msg_type::append_entries_request) {
+        HISTOGRAM_OBSERVE(*metrics, append_entries_latency_us, get_elapsed_time_us(time_start));
+    }
     assert(resp);
     reply.set_allocated_base(fromBaseRequest(*resp));
     reply.set_allocated_rc_response(fromRCResponse(*resp));
@@ -145,11 +151,8 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
             if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
                 if (it->second.m_metrics) COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
                 try {
-                    auto const time_start = std::chrono::steady_clock::now();
-                    rpc_data->set_status(
-                        step(*it->second.m_server->raft_server(), request.msg(), *response.mutable_msg()));
-                    if (it->second.m_metrics)
-                        HISTOGRAM_OBSERVE(*it->second.m_metrics, group_step_latency, get_elapsed_time_ms(time_start));
+                    rpc_data->set_status(step(*it->second.m_server->raft_server(), request.msg(),
+                                              *response.mutable_msg(), it->second.m_metrics));
                 } catch (std::runtime_error& rte) {
                     LOGE("Caught exception during step(): {}", rte.what());
                     rpc_data->set_status(
