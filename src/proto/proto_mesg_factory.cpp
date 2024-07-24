@@ -132,8 +132,8 @@ public:
                 [weak_this = std::weak_ptr< messaging_client >(shared_from_this())](auto&& response) -> NullResult {
                     if (response.hasError()) {
                         auto mc = weak_this.lock();
-                        std::string addr = mc ? mc->_addr : "unknown";
-                        log_every_nth(addr, response.error(), "unidirectional");
+                        LOGD("Failed to send unidirectional data_service_request to {}, error: {}",
+                             mc ? mc->_addr : "unknown", response.error().error_message());
                         return folly::makeUnexpected(grpc_status_to_nuraft_code(response.error()));
                     }
                     return folly::unit;

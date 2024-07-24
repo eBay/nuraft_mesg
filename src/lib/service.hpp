@@ -28,9 +28,10 @@ class group_metrics : public sisl::MetricsGroupWrapper {
 public:
     explicit group_metrics(group_id_t const& group_id) :
             sisl::MetricsGroupWrapper("RAFTGroup", to_string(group_id).c_str()) {
-        REGISTER_COUNTER(group_steps, "Total group messages received", "raft_group", {"op", "step"});
-        REGISTER_COUNTER(group_sends, "Total group messages sent", "raft_group", {"op", "send"});
-        REGISTER_HISTOGRAM(group_step_latency, "Latency for processing raft step", "raft_group", {"op", "step"});
+        REGISTER_COUNTER(group_steps, "Total group messages received", "raft_group_cnt", {"op", "step_count"});
+        REGISTER_COUNTER(group_sends, "Total group messages sent", "raft_group_cnt", {"op", "send_count"});
+        REGISTER_HISTOGRAM(append_entries_latency_us, "Latency for processing raft step", "raft_group_latency",
+                           {"op", "append_latency"});
         register_me_to_farm();
     }
 
