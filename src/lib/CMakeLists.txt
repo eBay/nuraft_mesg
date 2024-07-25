@@ -1,14 +1,14 @@
 cmake_minimum_required(VERSION 3.11)
 
-add_library(${PROJECT_NAME})
-target_sources(${PROJECT_NAME} PRIVATE
+add_library(${PROJECT_NAME}-core OBJECT)
+target_sources(${PROJECT_NAME}-core PRIVATE
    manager_impl.cpp
    factory.cpp
    repl_service_ctx.cpp
    service.cpp
    grpc_server.cpp
 )
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(${PROJECT_NAME}-core
    sisl::sisl
    nuraft::nuraft
 )

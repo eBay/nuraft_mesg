@@ -9,7 +9,8 @@ target_sources(test_fixture PRIVATE
   test_state_manager.cpp
 )
 target_link_libraries(test_fixture
-  ${PROJECT_NAME}
+  sisl::sisl
+  nuraft::nuraft
   jungle::jungle
   GTest::gmock
 )
@@ -21,7 +22,6 @@ target_sources(raft_service_test PRIVATE
   $<TARGET_OBJECTS:jungle_logstore>
 )
 target_link_libraries (raft_service_test
-  ${PROJECT_NAME}
   ${PROJECT_NAME}_proto
   jungle::jungle
   GTest::gmock
@@ -36,7 +36,6 @@ target_sources(data_service_test PRIVATE
   $<TARGET_OBJECTS:jungle_logstore>
 )
 target_link_libraries (data_service_test
-  ${PROJECT_NAME}
   ${PROJECT_NAME}_proto
   jungle::jungle
   GTest::gmock

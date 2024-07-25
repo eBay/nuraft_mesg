@@ -17,6 +17,7 @@ add_library(${PROJECT_NAME}_flatb)
 target_sources(${PROJECT_NAME}_flatb PRIVATE
     flatb_client.cpp
     $<TARGET_PROPERTY:fbservice,INTERFACE_SOURCES>
+    $<TARGET_OBJECTS:${PROJECT_NAME}-core>
 )
 target_include_directories(${PROJECT_NAME}_flatb PRIVATE
     $<TARGET_PROPERTY:fbschemas,INTERFACE_INCLUDE_DIRECTORIES>

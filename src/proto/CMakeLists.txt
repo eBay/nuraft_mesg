@@ -29,6 +29,7 @@ target_sources(${PROJECT_NAME}_proto PRIVATE
    proto_service.cpp
    $<TARGET_OBJECTS:${PROJECT_NAME}-proto-specs>
    $<TARGET_OBJECTS:${PROJECT_NAME}-data-svc>
+   $<TARGET_OBJECTS:${PROJECT_NAME}-core>
 )
 target_link_libraries(${PROJECT_NAME}_proto
    sisl::sisl
