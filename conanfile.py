@@ -48,7 +48,7 @@ class NuRaftGrpcConan(ConanFile):
 
     def requirements(self):
         self.requires("boost/1.79.0")
-        self.requires("nuraft/nbi.2.4.0")
+        self.requires("nuraft/nbi.2.4.1")
         self.requires("openssl/1.1.1s")
         self.requires("sisl/8.6.8")
 

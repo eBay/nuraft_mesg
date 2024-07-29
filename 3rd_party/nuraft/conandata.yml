@@ -1,8 +1,17 @@
 sources:
+  "nbi.2.4.1":
+    url: "https://github.com/eBay/nuraft/archive/f4c8e057080419cc9c845cfb7df95d7c9b2193c4.tar.gz"
+    sha256: "ba380efe7e9f432a5b48a0bc3426a33128a791d6f7dbcd30ffcad4634fdde5b0"
   "nbi.2.4.0":
     url: "https://github.com/eBay/nuraft/archive/929132f5a0e86ab3070055c63b485a512f82bcb0.tar.gz"
     sha256: "8894be82d396fe3b8eb3ed6e03e65e398c81779bf8c1f8e2345530f8e80da5b3"
 patches:
+  "nbi.2.4.1":
+    - patch_file: "patches/2-4-0.patch"
+      patch_description: "Dependency discovery"
+      patch_type: "conan"
+    - patch_file: "patches/0002-fwd-pkgs.patch"
+      patch_description: "Do not cache the leader for forwarding."
   "nbi.2.4.0":
     - patch_file: "patches/2-4-0.patch"
       patch_description: "Dependency discovery"
