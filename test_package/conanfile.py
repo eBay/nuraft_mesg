@@ -14,7 +14,7 @@ class TestPackageConan(ConanFile):
         cmake.build()
 
     def requirements(self):
-        self.requires("jungle_logstore/nbi.20230607")
+        self.requires("jungle_logstore/nbi.20240729")
         self.requires("nuraft/nbi.2.4.1")
         self.requires("zlib/1.2.13", override=True)
 
