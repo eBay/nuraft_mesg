@@ -401,6 +401,10 @@ static std::error_condition convertToError(nuraft::cmd_result_code const& rc) {
         return std::make_error_condition(std::errc::not_supported);
     case nuraft::SERVER_IS_LEAVING:
         return std::make_error_condition(std::errc::owner_dead);
+    case nuraft::TERM_MISMATCH:
+        return std::make_error_condition(std::errc::argument_out_of_domain);
+    case nuraft::RESULT_NOT_EXIST_YET:
+        return std::make_error_condition(std::errc::resource_unavailable_try_again);
     case nuraft::FAILED:
         [[fallthrough]];
     default:
