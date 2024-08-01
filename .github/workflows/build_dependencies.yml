@@ -130,7 +130,7 @@ jobs:
     - name: Export Recipes
       run: |
         conan export import/sisl oss/master
-        conan export 3rd_party/nuraft nuraft/2.4.1@
+        conan export 3rd_party/nuraft nuraft/2.4.2@
         cached_pkgs=$(ls -1d ~/.conan/data/*/*/*/*/package | sed 's,.*data/,,' | cut -d'/' -f1,2 | paste -sd',' - -)
         echo "::info:: Pre-cached: ${cached_pkgs}"
       if: ${{ inputs.testing == 'True' || steps.restore-cache.outputs.cache-hit != 'true' }}
