@@ -79,11 +79,6 @@ class NuRaftMesgConan(ConanFile):
 
         self.cpp.package.components["proto"].libs = ["nuraft_mesg_proto"]
         self.cpp.package.components["proto"].set_property("pkg_config_name", "libnuraft_mesg_proto")
-        self.cpp.package.components["proto"].requires.extend([
-            "nuraft::nuraft",
-            "boost::boost",
-            "sisl::sisl"
-            ])
         self.cpp.package.includedirs = ["include"] # includedirs is already set to 'include' by
         self.cpp.package.libdirs = ["lib"]
 
@@ -124,6 +119,12 @@ class NuRaftMesgConan(ConanFile):
         copy(self, "*.so*", self.build_folder, lib_dir, keep_path=False)
 
     def package_info(self):
+        self.cpp_info.components["proto"].requires.extend([
+            "nuraft::nuraft",
+            "boost::boost",
+            "sisl::sisl"
+            ])
+
         for component in self.cpp_info.components.values():
             if  self.options.get_safe("sanitize"):
                 component.sharedlinkflags.append("-fsanitize=address")
