@@ -1,7 +1,7 @@
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import check_min_cppstd
-from conan.tools.cmake import CMakeToolchain, CMakeDeps, CMake, cmake_layout
+from conan.tools.cmake import CMakeToolchain, CMakeDeps, CMake
 from conan.tools.files import copy
 from conan.tools.files import copy
 from os.path import join
@@ -10,7 +10,7 @@ required_conan_version = ">=1.60.0"
 
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "3.5.9"
+    version = "3.5.10"
 
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
@@ -59,10 +59,9 @@ class NuRaftMesgConan(ConanFile):
                     raise ConanInvalidConfiguration("Coverage/Sanitizer requires Testing!")
 
     def build_requirements(self):
-        if not self.conf.get("tools.build:skip_test", default=False):
-            self.test_requires("lz4/[>=1.9]")
-            self.test_requires("gtest/1.14.0")
-            self.test_requires("jungle/cci.20221201")
+        self.test_requires("lz4/[>=1.9]")
+        self.test_requires("gtest/1.14.0")
+        self.test_requires("jungle/cci.20221201")
 
     def requirements(self):
         self.requires("boost/1.83.0", transitive_headers=True)
@@ -70,7 +69,18 @@ class NuRaftMesgConan(ConanFile):
         self.requires("nuraft/2.4.2", transitive_headers=True)
 
     def layout(self):
-        cmake_layout(self)
+        self.folders.source = "."
+        self.folders.build = join("build", str(self.settings.build_type))
+        self.folders.generators = join(self.folders.build, "generators")
+
+        self.cpp.source.includedirs = ["include"]
+
+        self.cpp.build.components["proto"].libdirs = ["src/proto"]
+
+        self.cpp.package.components["proto"].libs = ["nuraft_mesg_proto"]
+        self.cpp.package.components["proto"].set_property("pkg_config_name", "libnuraft_mesg_proto")
+        self.cpp.package.includedirs = ["include"] # includedirs is already set to 'include' by
+        self.cpp.package.libdirs = ["lib"]
 
     def generate(self):
         # This generates "conan_toolchain.cmake" in self.generators_folder
@@ -109,8 +119,6 @@ class NuRaftMesgConan(ConanFile):
         copy(self, "*.so*", self.build_folder, lib_dir, keep_path=False)
 
     def package_info(self):
-        self.cpp_info.components["proto"].libs = ["nuraft_mesg_proto"]
-        self.cpp_info.components["proto"].set_property("pkg_config_name", "libnuraft_mesg_proto")
         self.cpp_info.components["proto"].requires.extend([
             "nuraft::nuraft",
             "boost::boost",
