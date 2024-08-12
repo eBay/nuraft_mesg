@@ -99,7 +99,7 @@ jobs:
 
     - name: Load NuRaftMsg Cache
       id: restore-cache
-      uses: eBay/sisl/.github/actions/load_conan@stable/v8.x
+      uses: eBay/sisl/.github/actions/load_conan@master
       with:
         testing: ${{ inputs.testing }}
         key_prefix: NuMesgDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}-${{ inputs.prerelease }}
