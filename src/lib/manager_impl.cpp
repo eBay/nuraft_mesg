@@ -51,8 +51,10 @@ public:
 
 ManagerImpl::~ManagerImpl() {
     if (_mesg_service) {
-        _grpc_server->shutdown();
+        // IMPORTANT: The order matters. nuraft can be using the grpc server that might crash the system if grpc server
+        // is shutdown first.
         _mesg_service->shutdown();
+        _grpc_server->shutdown();
     }
 }
 
