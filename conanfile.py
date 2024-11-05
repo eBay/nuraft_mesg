@@ -3,7 +3,7 @@ from conans import ConanFile, CMake, tools
 
 class NuRaftGrpcConan(ConanFile):
     name = "nuraft_grpc"
-    version = "6.1.2"
+    version = "6.1.3"
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
     topics = ("ebay", "nublox", "raft")

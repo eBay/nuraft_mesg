@@ -42,6 +42,7 @@ public:
             [[fallthrough]];
         case 2: {
             LOGERRORMOD_USING_LOGGER(nuraft, _custom_logger, "ERROR {}", mesg);
+            LOGERRORMOD(nuraft, "ERROR {}", mesg);
         } break;
             ;
         case 3: {
