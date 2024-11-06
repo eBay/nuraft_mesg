@@ -124,7 +124,7 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
     // Verify this is for the service it was intended for
     auto const& base = request.msg().base();
     if (sid != _service_address) {
-        LOGW("Recieved mesg for {} intended for {}, we are {}",
+        LOGW("Recieved mesg for [{}:{}] intended for {}, we are {}", group_id,
              nuraft::msg_type_to_string(nuraft::msg_type(base.type())), intended_addr, _service_address);
         rpc_data->set_status(::grpc::Status(
             ::grpc::INVALID_ARGUMENT,

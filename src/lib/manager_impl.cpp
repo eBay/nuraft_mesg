@@ -128,15 +128,15 @@ void ManagerImpl::register_mgr_type(group_type_t const& group_type, group_params
 nuraft::cb_func::ReturnCode ManagerImpl::generic_raft_event_handler(group_id_t const& group_id,
                                                                     nuraft::cb_func::Type type,
                                                                     nuraft::cb_func::Param* param) {
+    auto const& my_id = param->myId;
+    auto const& leader_id = param->leaderId;
     switch (type) {
     case nuraft::cb_func::RemovedFromCluster: {
-        LOGI("[srv_id={}] evicted from: [group={}]", start_params_.server_uuid_, group_id);
+        LOGI("[srv_id={}] evicted from: [group={}, leader_id:{}, my_id:{}]", start_params_.server_uuid_, group_id, leader_id, my_id);
         exit_group(group_id);
     } break;
     case nuraft::cb_func::JoinedCluster: {
-        auto const my_id = param->myId;
-        auto const leader_id = param->leaderId;
-        LOGI("[srv_id={}] joined: [group={}], [leader_id:{},my_id:{}]", start_params_.server_uuid_, group_id, leader_id,
+        LOGI("[srv_id={}] joined: [group={}, leader_id:{}, my_id:{}]", start_params_.server_uuid_, group_id, leader_id,
              my_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
@@ -144,11 +144,11 @@ nuraft::cb_func::ReturnCode ManagerImpl::generic_raft_event_handler(group_id_t c
         }
     } break;
     case nuraft::cb_func::NewConfig: {
-        LOGD("[srv_id={}] saw cluster change: [group={}]", start_params_.server_uuid_, group_id);
+        LOGD("[srv_id={}] saw cluster change: [group={}, leader_id:{}, my_id:{}]", start_params_.server_uuid_, group_id, leader_id, my_id);
         _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeLeader: {
-        LOGI("[srv_id={}] became leader: [group={}]!", start_params_.server_uuid_, group_id);
+        LOGI("[srv_id={}] became leader: [group={}, leader_id:{}, my_id:{}]!", start_params_.server_uuid_, group_id, leader_id, my_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = true;
@@ -156,12 +156,18 @@ nuraft::cb_func::ReturnCode ManagerImpl::generic_raft_event_handler(group_id_t c
         _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeFollower: {
-        LOGI("[srv_id={}] following: [group={}]!", start_params_.server_uuid_, group_id);
+        LOGI("[srv_id={}] following: [group={}, leader_id:{}, my_id:{}]!", start_params_.server_uuid_, group_id, leader_id, my_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = false;
         }
-    }
+    } break;
+    case nuraft::cb_func::SaveSnapshot: {
+        LOGI("Received Snapshot to sync for: {}, [leader_id:{}, my_id:{}]", group_id, leader_id, my_id);
+    } break;
+    case nuraft::cb_func::FollowerLost: {
+        LOGI("Lost follower: {}, [leader_id:{}, my_id:{}]", param->peerId, group_id, leader_id, my_id);
+    } break;
     default:
         break;
     };
