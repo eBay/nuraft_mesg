@@ -34,14 +34,20 @@ public:
                      const std::string& log_line) override {
         switch (level) {
         case 1: {
-            if (LEVELCHECK(nuraft_mesg, spdlog::level::level_enum::critical))
+            if (LEVELCHECK(nuraft_mesg, spdlog::level::level_enum::critical)) {
                 sisl::logging::GetLogger()->critical("[{}:{}:{}] {} [group={}]", file_name(source_file), line_number,
                                                      func_name, log_line, _group_id);
+                _custom_logger->critical("[{}:{}:{}] {} [group={}]", file_name(source_file), line_number, func_name,
+                                         log_line, _group_id);
+            }
         } break;
         case 2: {
-            if (LEVELCHECK(nuraft_mesg, spdlog::level::level_enum::err))
+            if (LEVELCHECK(nuraft_mesg, spdlog::level::level_enum::err)) {
                 sisl::logging::GetLogger()->error("[{}:{}:{}] {} [group={}]", file_name(source_file), line_number,
                                                   func_name, log_line, _group_id);
+                _custom_logger->error("[{}:{}:{}] {} [group={}]", file_name(source_file), line_number, func_name,
+                                      log_line, _group_id);
+            }
         } break;
         case 3: {
             if (LEVELCHECK(nuraft_mesg, spdlog::level::level_enum::warn))
