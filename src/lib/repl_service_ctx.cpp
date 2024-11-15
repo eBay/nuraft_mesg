@@ -89,24 +89,32 @@ const std::string& repl_service_ctx::raft_leader_id() const {
 
 std::vector< peer_info > repl_service_ctx::get_raft_status() const {
     std::vector< peer_info > peers;
-    if (!is_raft_leader()) return peers;
     if (!_server) return peers;
 
-    auto pinfo_all = _server->get_peer_info_all();
-    // add leader to the list
-    nuraft::raft_server::peer_info pi_leader;
-    pi_leader.id_ = _server->get_id();
-    pi_leader.last_log_idx_ = _server->get_last_log_idx();
-    pinfo_all.emplace_back(pi_leader);
-
-    for (auto const& pinfo : pinfo_all) {
-        std::string_view peer_id;
-        if (auto srv_config = _server->get_srv_config(pinfo.id_); nullptr != srv_config) {
-            peer_id = srv_config->get_endpoint();
+    if (is_raft_leader()) {
+        // leader can get all the peer info
+        auto pinfo_all = _server->get_peer_info_all();
+        // get all the peer info except the leader
+        for (auto const& pinfo : pinfo_all) {
+            std::string_view peer_id;
+            if (auto srv_config = _server->get_srv_config(pinfo.id_); nullptr != srv_config) {
+                peer_id = srv_config->get_endpoint();
+            }
+            if (peer_id.empty()) {
+                // if remove_member case , leader will first remove the member from peer_list, and then apply the new
+                // cluster configuraiton which excludes the removed member, so there is case that the peer_id is not in
+                // the config of leader.
+                LOGW("do not find peer id  {} in the conifg of leader", pinfo.id_);
+                continue;
+            }
+            peers.emplace_back(peer_info{std::string(peer_id), pinfo.last_log_idx_, pinfo.last_succ_resp_us_});
         }
-        DEBUG_ASSERT(!peer_id.empty(), "Unknown peer in config");
-        peers.emplace_back(peer_info{std::string(peer_id), pinfo.last_log_idx_, pinfo.last_succ_resp_us_});
     }
+
+    // add the peer info of itself(leader or follower) , which is useful for upper layer
+    // from the view a node itself, last_succ_resp_us_ make no sense, so set it to 0
+    peers.emplace_back(peer_info{std::string(_server->get_id()), _server->get_last_log_idx(), 0});
+
     return peers;
 }
 
