@@ -111,9 +111,12 @@ std::vector< peer_info > repl_service_ctx::get_raft_status() const {
         }
     }
 
+    auto my_id = _server->get_id();
+    auto my_peer_id = _server->get_srv_config(my_id)->get_endpoint();
+
     // add the peer info of itself(leader or follower) , which is useful for upper layer
     // from the view a node itself, last_succ_resp_us_ make no sense, so set it to 0
-    peers.emplace_back(peer_info{std::string(_server->get_id()), _server->get_last_log_idx(), 0});
+    peers.emplace_back(my_peer_id, _server->get_last_log_idx(), 0);
 
     return peers;
 }
