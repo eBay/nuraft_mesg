@@ -94,7 +94,6 @@ TEST_F(DataServiceFixture, BasicTest1) {
             return folly::Unit();
         }));
 
-
     auto repl_ctx1 = sm1->get_repl_context();
     for (auto svr : repl_ctx1->_server->get_config()->get_servers()) {
         if (svr->get_endpoint() == to_string(app_1_->id_)) continue;
@@ -113,24 +112,25 @@ TEST_F(DataServiceFixture, BasicTest1) {
     io_blob_list_t big_cli_buf;
     test_state_mgr::fill_data_vec_big(big_cli_buf, 4 * 1024 * 1024);
     sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, big_cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasValue());
-                              return folly::Unit();
-                          }).get();
+        .deferValue([](auto e) -> NullResult {
+            EXPECT_TRUE(e.hasValue());
+            return folly::Unit();
+        })
+        .get();
     LOGINFO("End large object write test")
     LOGINFO("Starting large object read test")
 
     sm4_1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, big_cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasValue());
-			      test_state_mgr::verify_data(e.value().response_blob());
-                              return folly::Unit();
-                          }).get();
+        .deferValue([](auto e) -> NullResult {
+            EXPECT_TRUE(e.hasValue());
+            test_state_mgr::verify_data(e.value().response_blob());
+            return folly::Unit();
+        })
+        .get();
     LOGINFO("End large object read test")
     for (auto& buf : big_cli_buf) {
         buf.buf_free();
     }
-
 
     // add a new member to data_service_test_group and check if repl_ctx4 sends data to newly added member
     auto add_3 = app_4->instance_->add_member(data_group, app_3_->id_);
@@ -180,12 +180,13 @@ TEST_F(DataServiceFixture, BasicTest2) {
     auto repl_ctx_2 = app_2_->state_mgr_map_[group_id_]->get_repl_context();
     EXPECT_TRUE(repl_ctx_2 && !repl_ctx_2->is_raft_leader());
     EXPECT_TRUE(repl_ctx_2 && repl_ctx_2->raft_leader_id() == to_string(app_1_->id_));
-    EXPECT_TRUE(repl_ctx && repl_ctx_2->get_raft_status().size() == 0);
+    // if it`s a follower, it should have only one peer info of itself
+    EXPECT_TRUE(repl_ctx && repl_ctx_2->get_raft_status().size() == 1);
 
     auto repl_ctx_3 = app_3_->state_mgr_map_[group_id_]->get_repl_context();
     EXPECT_TRUE(repl_ctx_3 && !repl_ctx_3->is_raft_leader());
     EXPECT_TRUE(repl_ctx_3 && repl_ctx_3->raft_leader_id() == to_string(app_1_->id_));
-    EXPECT_TRUE(repl_ctx && repl_ctx_3->get_raft_status().size() == 0);
+    EXPECT_TRUE(repl_ctx && repl_ctx_3->get_raft_status().size() == 1);
 
     std::list< nuraft_mesg::replica_config > cluster_config;
     repl_ctx->get_cluster_config(cluster_config);
