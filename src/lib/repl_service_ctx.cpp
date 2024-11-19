@@ -107,16 +107,22 @@ std::vector< peer_info > repl_service_ctx::get_raft_status() const {
                 LOGW("do not find peer id  {} in the conifg of leader", pinfo.id_);
                 continue;
             }
-            peers.emplace_back(peer_info{std::string(peer_id), pinfo.last_log_idx_, pinfo.last_succ_resp_us_});
+
+            peers.emplace_back(std::string(peer_id), pinfo.last_log_idx_, pinfo.last_succ_resp_us_);
         }
     }
 
-    auto my_id = _server->get_id();
-    auto my_peer_id = _server->get_srv_config(my_id)->get_endpoint();
+    auto my_config = _server->get_srv_config(_server->get_id());
 
-    // add the peer info of itself(leader or follower) , which is useful for upper layer
-    // from the view a node itself, last_succ_resp_us_ make no sense, so set it to 0
-    peers.emplace_back(my_peer_id, _server->get_last_log_idx(), 0);
+    // if I am the removed memeber, I can not find myself in the configuration. this will happen when a removed member
+    // tries to get the raft status
+    if (my_config) {
+        auto my_peer_id = my_config->get_endpoint();
+
+        // add the peer info of itself(leader or follower) , which is useful for upper layer
+        // from the view of a node itself, last_succ_resp_us_ make no sense, so set it to 0
+        peers.emplace_back(my_peer_id, _server->get_last_log_idx(), 0);
+    }
 
     return peers;
 }

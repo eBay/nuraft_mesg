@@ -10,7 +10,7 @@ required_conan_version = ">=1.60.0"
 
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "3.6.3"
+    version = "3.6.4"
 
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
