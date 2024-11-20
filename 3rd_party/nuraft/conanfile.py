@@ -59,6 +59,7 @@ class NuRaftConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
+        tc.variables["USE_PTHREAD_EXIT"] = "ON"
         tc.generate()
         deps = CMakeDeps(self)
         deps.generate()

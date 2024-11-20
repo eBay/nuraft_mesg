@@ -1,0 +1,231 @@
+diff -Naur a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt	2023-10-02 16:14:29.000000000 -0700
++++ b/CMakeLists.txt	2023-10-04 14:47:30.034743439 -0700
+@@ -61,15 +61,23 @@
+ 
+ 
+ # === Compiler flags ===
++option(USE_PTHREAD_EXIT "Call pthread_exit on server threads" OFF)
+ if (NOT WIN32)
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-pessimizing-move")
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
++    if (USE_PTHREAD_EXIT)
++        message(STATUS "Using ::pthread_exit for termination")
++        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_PTHREAD_EXIT")
++    endif()
+ 
+ else ()
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd5045 /wd4571 /wd4774 /wd4820 /wd5039 /wd4626 /wd4625 /wd5026 /wd5027 /wd4623 /wd4996 /wd4530 /wd4267 /wd4244 /W3")
+     message(STATUS "---- WIN32 ----")
++    if (USE_PTHREAD_EXIT)
++        message(FATAL_ERROR "Using ::pthread_exit not supported on Windows")
++    endif()
+ endif ()
+ 
+ # === Disable SSL ===
+diff --git a/src/exit_handler.hxx b/src/exit_handler.hxx
+new file mode 100644
+index 0000000..2cababd
+--- /dev/null
++++ b/src/exit_handler.hxx
+@@ -0,0 +1,15 @@
++#pragma once
++
++// What should be called to shutdown when raft_server is in abnormal state
++#ifdef USE_PTHREAD_EXIT
++extern "C" {
++#include <pthread.h>
++}
++#define _sys_exit(status) ::pthread_exit(nullptr)
++
++#else
++
++#include <cstdlib>
++#define _sys_exit(status) ::exit((status))
++
++#endif
+diff --git a/src/handle_append_entries.cxx b/src/handle_append_entries.cxx
+index 00461e0..d23d97a 100644
+--- a/src/handle_append_entries.cxx
++++ b/src/handle_append_entries.cxx
+@@ -25,6 +25,7 @@ limitations under the License.
+ #include "cluster_config.hxx"
+ #include "error_code.hxx"
+ #include "event_awaiter.hxx"
++#include "exit_handler.hxx"
+ #include "handle_custom_notification.hxx"
+ #include "peer.hxx"
+ #include "snapshot.hxx"
+@@ -406,7 +407,7 @@ ptr<req_msg> raft_server::create_append_entries_req(ptr<peer>& pp) {
+         p_er( "Peer's lastLogIndex is too large %" PRIu64 " v.s. %" PRIu64 ", ",
+               last_log_idx, cur_nxt_idx );
+         ctx_->state_mgr_->system_exit(raft_err::N8_peer_last_log_idx_too_large);
+-        ::exit(-1);
++        _sys_exit(-1);
+         return ptr<req_msg>();
+         // LCOV_EXCL_STOP
+     }
+diff --git a/src/handle_commit.cxx b/src/handle_commit.cxx
+index 9fefc15..278ced3 100644
+--- a/src/handle_commit.cxx
++++ b/src/handle_commit.cxx
+@@ -23,6 +23,7 @@ limitations under the License.
+ 
+ #include "cluster_config.hxx"
+ #include "error_code.hxx"
++#include "exit_handler.hxx"
+ #include "handle_client_request.hxx"
+ #include "global_mgr.hxx"
+ #include "peer.hxx"
+@@ -150,7 +151,7 @@ void raft_server::commit_in_bg() {
+               "exiting to protect the system",
+               err.what() );
+         ctx_->state_mgr_->system_exit(raft_err::N20_background_commit_err);
+-        ::exit(-1);
++        _sys_exit(-1);
+         // LCOV_EXCL_STOP
+      }
+     }
+@@ -228,7 +229,7 @@ bool raft_server::commit_in_bg_exec(size_t timeout_ms) {
+             // LCOV_EXCL_START
+             p_ft( "failed to get log entry with idx %" PRIu64 "", index_to_commit );
+             ctx_->state_mgr_->system_exit(raft_err::N19_bad_log_idx_for_term);
+-            ::exit(-1);
++            _sys_exit(-1);
+             // LCOV_EXCL_STOP
+         }
+ 
+@@ -239,7 +240,7 @@ bool raft_server::commit_in_bg_exec(size_t timeout_ms) {
+             p_ft( "empty log at idx %" PRIu64 ", must be log corruption",
+                   index_to_commit );
+             ctx_->state_mgr_->system_exit(raft_err::N19_bad_log_idx_for_term);
+-            ::exit(-1);
++            _sys_exit(-1);
+             // LCOV_EXCL_STOP
+         }
+ 
+@@ -304,7 +305,7 @@ void raft_server::commit_app_log(ulong idx_to_commit,
+         p_ft( "pre-commit index %" PRIu64 " is smaller than commit index %" PRIu64,
+               pc_idx, sm_idx );
+         ctx_->state_mgr_->system_exit(raft_err::N23_precommit_order_inversion);
+-        ::exit(-1);
++        _sys_exit(-1);
+     }
+     ret_value = state_machine_->commit_ext
+                 ( state_machine::ext_op_params( sm_idx, buf ) );
+@@ -583,7 +584,7 @@ bool raft_server::snapshot_and_compact(ulong committed_idx, bool forced_creation
+                      "cannot be found in current committed logs, "
+                      "this is a system error, exiting");
+                 ctx_->state_mgr_->system_exit(raft_err::N6_no_snapshot_found);
+-                ::exit(-1);
++                _sys_exit(-1);
+                 return false;
+                 // LCOV_EXCL_STOP
+             }
+@@ -600,7 +601,7 @@ bool raft_server::snapshot_and_compact(ulong committed_idx, bool forced_creation
+                  ", committed idx %" PRIu64,
+                  conf->get_log_idx(), conf->get_prev_log_idx(), committed_idx);
+             //ctx_->state_mgr_->system_exit(raft_err::N7_no_config_at_idx_one);
+-            //::exit(-1);
++            //_sys_exit(-1);
+             //return;
+         }
+ 
+diff --git a/src/handle_snapshot_sync.cxx b/src/handle_snapshot_sync.cxx
+index 8165cd1..a0c4c33 100644
+--- a/src/handle_snapshot_sync.cxx
++++ b/src/handle_snapshot_sync.cxx
+@@ -23,6 +23,7 @@ limitations under the License.
+ #include "context.hxx"
+ #include "error_code.hxx"
+ #include "event_awaiter.hxx"
++#include "exit_handler.hxx"
+ #include "peer.hxx"
+ #include "snapshot.hxx"
+ #include "snapshot_sync_ctx.hxx"
+@@ -123,7 +124,7 @@ ptr<req_msg> raft_server::create_sync_snapshot_req(ptr<peer>& pp,
+                      last_log_idx, snp->get_last_log_idx());
+             }
+             ctx_->state_mgr_->system_exit(raft_err::N16_snapshot_for_peer_not_found);
+-            ::exit(-1);
++            _sys_exit(-1);
+             return ptr<req_msg>();
+             // LCOV_EXCL_STOP
+         }
+@@ -135,7 +136,7 @@ ptr<req_msg> raft_server::create_sync_snapshot_req(ptr<peer>& pp,
+                  "machine implementation, stop the system to prevent "
+                  "further errors");
+             ctx_->state_mgr_->system_exit(raft_err::N17_empty_snapshot);
+-            ::exit(-1);
++            _sys_exit(-1);
+             return ptr<req_msg>();
+             // LCOV_EXCL_STOP
+         }
+@@ -187,7 +188,7 @@ ptr<req_msg> raft_server::create_sync_snapshot_req(ptr<peer>& pp,
+                   "bytes are expected, must be something wrong, exit.",
+                   sz_rd, data->size() );
+             ctx_->state_mgr_->system_exit(raft_err::N18_partial_snapshot_block);
+-            ::exit(-1);
++            _sys_exit(-1);
+             return ptr<req_msg>();
+             // LCOV_EXCL_STOP
+         }
+@@ -251,7 +252,7 @@ ptr<resp_msg> raft_server::handle_install_snapshot_req(req_msg& req, std::unique
+                   req.get_src() );
+             ctx_->state_mgr_->system_exit
+                 ( raft_err::N10_leader_receive_InstallSnapshotRequest );
+-            ::exit(-1);
++            _sys_exit(-1);
+             return ptr<resp_msg>();
+             // LCOV_EXCL_STOP
+ 
+@@ -543,7 +544,7 @@ bool raft_server::handle_snapshot_sync_req(snapshot_sync_req& req, std::unique_l
+             // LCOV_EXCL_START
+             p_er("bad server role for applying a snapshot, exit for debugging");
+             ctx_->state_mgr_->system_exit(raft_err::N11_not_follower_for_snapshot);
+-            ::exit(-1);
++            _sys_exit(-1);
+             // LCOV_EXCL_STOP
+         }
+ 
+@@ -564,7 +565,7 @@ bool raft_server::handle_snapshot_sync_req(snapshot_sync_req& req, std::unique_l
+                 p_er("failed to apply the snapshot after log compacted, "
+                      "to ensure the safety, will shutdown the system");
+                 ctx_->state_mgr_->system_exit(raft_err::N12_apply_snapshot_failed);
+-                ::exit(-1);
++                _sys_exit(-1);
+                 return false;
+                 // LCOV_EXCL_STOP
+             }
+@@ -608,7 +609,7 @@ bool raft_server::handle_snapshot_sync_req(snapshot_sync_req& req, std::unique_l
+     // LCOV_EXCL_START
+     p_er("failed to handle snapshot installation due to system errors");
+     ctx_->state_mgr_->system_exit(raft_err::N13_snapshot_install_failed);
+-    ::exit(-1);
++    _sys_exit(-1);
+     return false;
+     // LCOV_EXCL_STOP
+  }
+diff --git a/src/raft_server.cxx b/src/raft_server.cxx
+index 730e7ea..15dacb4 100644
+--- a/src/raft_server.cxx
++++ b/src/raft_server.cxx
+@@ -24,6 +24,7 @@ limitations under the License.
+ #include "context.hxx"
+ #include "error_code.hxx"
+ #include "event_awaiter.hxx"
++#include "exit_handler.hxx"
+ #include "global_mgr.hxx"
+ #include "handle_client_request.hxx"
+ #include "handle_custom_notification.hxx"
+@@ -1628,7 +1629,7 @@ ulong raft_server::term_for_log(ulong log_idx) {
+         }
+         p_lv(log_lv, "log_store_->start_index() %" PRIu64, log_store_->start_index());
+         //ctx_->state_mgr_->system_exit(raft_err::N19_bad_log_idx_for_term);
+-        //::exit(-1);
++        //_sys_exit(-1);
+         return 0L;
+     }
+ 
