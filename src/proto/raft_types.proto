@@ -73,6 +73,7 @@ message RCResponse {
     bytes context = 3;
     string dest_addr = 4;
     ResultCode result_code = 5;
+    uint64 batch_size_hint = 6;
 }
 
 message RaftMessage {
