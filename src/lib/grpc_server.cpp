@@ -26,6 +26,7 @@ static RCResponse* fromRCResponse(nuraft::resp_msg& rcmsg) {
     auto req = new RCResponse;
     req->set_next_index(rcmsg.get_next_idx());
     req->set_accepted(rcmsg.get_accepted());
+    req->set_batch_size_hint(rcmsg.get_next_batch_size_hint_in_bytes());
     req->set_result_code((ResultCode)(0 - rcmsg.get_result_code()));
     auto ctx = rcmsg.get_ctx();
     if (ctx) { req->set_context(ctx->data(), ctx->container_size()); }

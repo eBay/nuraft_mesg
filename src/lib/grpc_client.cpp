@@ -50,6 +50,7 @@ inline shared< nuraft::resp_msg > toResponse(RaftMessage const& raft_msg) {
     auto const& resp = raft_msg.rc_response();
     auto message = std::make_shared< grpc_resp >(base.term(), (nuraft::msg_type)base.type(), base.src(), base.dest(),
                                                  resp.next_index(), resp.accepted());
+    message->set_next_batch_size_hint_in_bytes(resp.batch_size_hint());
     message->set_result_code((nuraft::cmd_result_code)(0 - resp.result_code()));
     if (nuraft::cmd_result_code::NOT_LEADER == message->get_result_code()) {
         LOGINFOMOD(nuraft_mesg, "Leader has changed!");
