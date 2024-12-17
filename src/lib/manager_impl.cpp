@@ -125,9 +125,9 @@ void ManagerImpl::register_mgr_type(group_type_t const& group_type, group_params
     if (_state_mgr_types.end() == it) { LOGE("Could not register [group_type={}]", group_type); }
 }
 
-nuraft::cb_func::ReturnCode ManagerImpl::generic_raft_event_handler(group_id_t const& group_id,
-                                                                    nuraft::cb_func::Type type,
-                                                                    nuraft::cb_func::Param* param) {
+void ManagerImpl::generic_raft_event_handler(group_id_t const& group_id,
+                                             nuraft::cb_func::Type type,
+                                             nuraft::cb_func::Param* param) {
     auto const& my_id = param->myId;
     auto const& leader_id = param->leaderId;
     switch (type) {
@@ -171,7 +171,6 @@ nuraft::cb_func::ReturnCode ManagerImpl::generic_raft_event_handler(group_id_t c
     default:
         break;
     };
-    return nuraft::cb_func::ReturnCode::Ok;
 }
 
 void ManagerImpl::exit_group(group_id_t const& group_id) {
@@ -388,9 +387,12 @@ void mesg_state_mgr::make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_fa
 nuraft::cb_func::ReturnCode mesg_state_mgr::internal_raft_event_handler(group_id_t const& group_id,
                                                                         nuraft::cb_func::Type type,
                                                                         nuraft::cb_func::Param* param) {
-    if (auto const [handled, ret] = handle_raft_event(type, param); handled) { return ret; }
-    if (auto sp = m_manager.lock(); sp) { return sp->generic_raft_event_handler(group_id, type, param); }
-    return nuraft::cb_func::Ok;
+    // Have we shutdown?
+    if (auto sp = m_manager.lock(); sp)
+        sp->generic_raft_event_handler(group_id, type, param);
+    else
+        return nuraft::cb_func::ReturnNull;
+    return handle_raft_event(type, param).second;
 }
 
 std::shared_ptr< Manager > init_messaging(Manager::Params const& p, std::weak_ptr< MessagingApplication > w,

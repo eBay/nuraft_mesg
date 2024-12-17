@@ -79,9 +79,14 @@ public:
     virtual void permanent_destroy() = 0;
     virtual void leave() = 0;
 
-    virtual std::pair< bool, nuraft::cb_func::ReturnCode > handle_raft_event(nuraft::cb_func::Type,
-                                                                             nuraft::cb_func::Param*) {
-        return std::pair(false, nuraft::cb_func::ReturnCode::Ok);
+    /// TODO: Deprecated DO NOT USE
+    virtual std::pair< bool, nuraft::cb_func::ReturnCode > handle_raft_event(nuraft::cb_func::Type t,
+                                                                             nuraft::cb_func::Param* p) {
+        return std::pair(false, raft_event(t, p));
+    }
+
+    virtual nuraft::cb_func::ReturnCode raft_event(nuraft::cb_func::Type, nuraft::cb_func::Param*) {
+        return nuraft::cb_func::ReturnCode::Ok;
     }
 
     nuraft::cb_func::ReturnCode internal_raft_event_handler(group_id_t const& group_id, nuraft::cb_func::Type type,
