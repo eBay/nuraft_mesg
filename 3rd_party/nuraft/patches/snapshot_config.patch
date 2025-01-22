@@ -19,9 +19,9 @@ index 8165cd1..3e87e4f 100644
 +            auto snap_conf = req.get_snapshot().get_last_config();
              ptr<cluster_config> c_conf = get_config();
 -            ctx_->state_mgr_->save_config(*c_conf);
-+            if (snap_conf->get_log_idx() > get_config()->get_log_idx()) {
++            if (snap_conf->get_log_idx() > c_conf->get_log_idx()) {
 +                ctx_->state_mgr_->save_config(*snap_conf);
-+                reconfigure(req.get_snapshot().get_last_config());
++                reconfigure(snap_conf);
 +                c_conf = get_config();
 +            }
  
