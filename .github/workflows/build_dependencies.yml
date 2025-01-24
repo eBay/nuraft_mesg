@@ -127,10 +127,10 @@ jobs:
         platform: ${{ inputs.platform }}
       if: ${{ inputs.testing == 'True' || steps.restore-cache.outputs.cache-hit != 'true' }}
 
-    - name: Export Recipes
+    - name: Prepare Recipes
       run: |
         conan export import/sisl oss/master
-        conan export 3rd_party/nuraft nuraft/2.4.3@
+        ./prepare.sh
         cached_pkgs=$(ls -1d ~/.conan/data/*/*/*/*/package | sed 's,.*data/,,' | cut -d'/' -f1,2 | paste -sd',' - -)
         echo "::info:: Pre-cached: ${cached_pkgs}"
       if: ${{ inputs.testing == 'True' || steps.restore-cache.outputs.cache-hit != 'true' }}
