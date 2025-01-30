@@ -3,7 +3,7 @@ from conans import ConanFile, CMake, tools
 
 class NuRaftGrpcConan(ConanFile):
     name = "nuraft_grpc"
-    version = "6.2.1"
+    version = "6.2.2"
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
     topics = ("ebay", "nublox", "raft")
@@ -59,6 +59,7 @@ class NuRaftGrpcConan(ConanFile):
         cmake = CMake(self)
 
         definitions = {'CMAKE_EXPORT_COMPILE_COMMANDS': 'ON',
+                       'CTEST_OUTPUT_ON_FAILURE': 'ON',
                        'MEMORY_SANITIZER_ON': 'OFF'}
         test_target = None
 
