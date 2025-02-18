@@ -101,7 +101,7 @@ public:
 
     using grpc_base_client::send;
 
-    std::atomic_uint bad_service;
+    std::atomic_uint bad_service{0};
 
     void send(RaftGroupMsg const& message, handle_resp complete) {
         auto weak_this = std::weak_ptr< messaging_client >(shared_from_this());
@@ -147,8 +147,11 @@ public:
             .deferValue([weak_this = std::weak_ptr< messaging_client >(shared_from_this())](
                             auto&& response) -> Result< sisl::GenericClientResponse > {
                 if (response.hasError()) {
-                    auto mc = weak_this.lock();
-                    std::string addr = mc ? mc->_addr : "unknown";
+                    std::string addr = "unknown";
+                    if (auto mc = weak_this.lock(); mc) {
+                        mc->bad_service.fetch_add(1, std::memory_order_relaxed);
+                        addr = mc->_addr;
+                    }
                     log_every_nth(addr, response.error(), "bidirectional");
                     return folly::makeUnexpected(grpc_status_to_nuraft_code(response.error()));
                 }
@@ -182,6 +185,7 @@ public:
 
     std::shared_ptr< messaging_client > realClient() { return _client; }
     void setClient(std::shared_ptr< messaging_client > new_client) { _client = new_client; }
+    bool reinitRequired() const { return (!_client || 0 < _client->bad_service.load(std::memory_order_relaxed)); }
 
     void send(RaftMessage const& message, handle_resp complete) {
         RaftGroupMsg group_msg;
@@ -259,22 +263,34 @@ NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional<
 AsyncResult< sisl::GenericClientResponse >
 mesg_factory::data_service_request_bidirectional(std::optional< Result< peer_id_t > > const& dest,
                                                  std::string const& request_name, io_blob_list_t const& cli_buf) {
-    std::shared_lock< client_factory_lock_type > rl(_client_lock);
-    auto calls = std::vector< AsyncResult< sisl::io_blob > >();
-    if (dest) {
-        if (dest->hasError()) return folly::makeUnexpected(dest->error());
+    if (!dest) {
+        LOGE("Cannot send request to all the peers, not implemented yet!. Request name [{}]", request_name);
+        return folly::makeUnexpected(nuraft::cmd_result_code::BAD_REQUEST);
+    }
+    if (dest->hasError()) return folly::makeUnexpected(dest->error());
+
+    {
+        std::shared_lock< client_factory_lock_type > rl(_client_lock);
         if (auto it = _clients.find(dest->value()); _clients.end() != it) {
-            auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(it->second);
-            return g_client->data_service_request_bidirectional(get_generic_method_name(request_name, _group_id),
-                                                                cli_buf);
+            if (auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(it->second);
+                !g_client->reinitRequired()) {
+                return g_client->data_service_request_bidirectional(get_generic_method_name(request_name, _group_id),
+                                                                    cli_buf);
+            }
         } else {
             LOGE("Failed to find client for [{}], request name [{}]", dest->value(), request_name);
             return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
         }
     }
-    // else
-    LOGE("Cannot send request to all the peers, not implemented yet!. Request name [{}]", request_name);
-    return folly::makeUnexpected(nuraft::cmd_result_code::BAD_REQUEST);
+
+    std::unique_lock< client_factory_lock_type > wl(_client_lock);
+    auto it = _clients.find(dest->value());
+    if (auto err = reinit_client(dest->value(), it->second); nuraft::OK != err) {
+        LOGD("Failed to re-initialize client {}: {}", dest->value(), err);
+        return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+    }
+    auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(it->second);
+    return g_client->data_service_request_bidirectional(get_generic_method_name(request_name, _group_id), cli_buf);
 }
 
 group_factory::group_factory(int const cli_thread_count, group_id_t const& name,
