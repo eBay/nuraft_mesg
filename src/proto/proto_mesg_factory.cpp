@@ -185,7 +185,7 @@ public:
 
     std::shared_ptr< messaging_client > realClient() { return _client; }
     void setClient(std::shared_ptr< messaging_client > new_client) { _client = new_client; }
-    bool reinitRequired() const { return (0 < _client->bad_service.load(std::memory_order_relaxed)); }
+    bool reinitRequired() const { return (!_client || 0 < _client->bad_service.load(std::memory_order_relaxed)); }
 
     void send(RaftMessage const& message, handle_resp complete) {
         RaftGroupMsg group_msg;
@@ -287,6 +287,7 @@ mesg_factory::data_service_request_bidirectional(std::optional< Result< peer_id_
     auto it = _clients.find(dest->value());
     if (auto err = reinit_client(dest->value(), it->second); nuraft::OK != err) {
         LOGD("Failed to re-initialize client {}: {}", dest->value(), err);
+        return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
     }
     auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(it->second);
     return g_client->data_service_request_bidirectional(get_generic_method_name(request_name, _group_id), cli_buf);
