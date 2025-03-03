@@ -137,26 +137,26 @@ void service::register_mgr_type(std::string const& group_type, register_params& 
 
 nuraft::cb_func::ReturnCode service::callback_handler(std::string const& group_id, nuraft::cb_func::Type type,
                                                       nuraft::cb_func::Param* param) {
-    auto const my_id = param->myId;
-    auto const leader_id = param->leaderId;
     switch (type) {
     case nuraft::cb_func::RemovedFromCluster: {
-        LOGINFO("Removed from cluster {}, [leader_id:{}, my_id:{}]", group_id, leader_id, my_id);
+        LOGINFO("Removed from cluster [group:{}]", group_id);
         exit_group(group_id);
     } break;
     case nuraft::cb_func::JoinedCluster: {
-        LOGINFO("Joined cluster: {}, [leader_id:{}, my_id:{}]", group_id, leader_id, my_id);
+        auto const leader_id = param->leaderId;
+        auto const my_id = param->myId;
+        LOGINFO("Joined cluster [group:{}]", group_id, leader_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = (leader_id == my_id);
         }
     } break;
     case nuraft::cb_func::NewConfig: {
-        LOGDEBUGMOD(nuraft_mesg, "Cluster change for: {}, [leader_id:{}, my_id:{}]", group_id, leader_id, my_id);
+        LOGDEBUGMOD(nuraft_mesg, "Cluster change [group:{}]", group_id);
         _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeLeader: {
-        LOGINFOMOD(nuraft_mesg, "Elected leader of: {}, [leader_id:{}, my_id:{}]", group_id, leader_id, my_id);
+        LOGINFOMOD(nuraft_mesg, "Elected leader [group:{}]", group_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = true;
@@ -164,17 +164,17 @@ nuraft::cb_func::ReturnCode service::callback_handler(std::string const& group_i
         _config_change.notify_all();
     } break;
     case nuraft::cb_func::BecomeFollower: {
-        LOGINFOMOD(nuraft_mesg, "Became a follower of: {}, [leader_id:{}, my_id:{}]", group_id, leader_id, my_id);
+        LOGINFOMOD(nuraft_mesg, "Became a follower [group:{}]", group_id);
         {
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = false;
         }
     } break;
     case nuraft::cb_func::SaveSnapshot: {
-        LOGINFOMOD(nuraft_mesg, "Received Snapshot to sync for: {}, [leader_id:{}, my_id:{}]", group_id, leader_id, my_id);
+        LOGINFOMOD(nuraft_mesg, "Received Snapshot to sync [group:{}]", group_id);
     } break;
     case nuraft::cb_func::FollowerLost: {
-        LOGINFOMOD(nuraft_mesg, "Lost follower: {}, [leader_id:{}, my_id:{}]", param->peerId, group_id, leader_id, my_id);
+        LOGINFOMOD(nuraft_mesg, "Lost follower [peer_id:{}] [group:{}]", param->peerId, group_id);
     } break;
     default:
         break;
