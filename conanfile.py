@@ -21,7 +21,7 @@ class NuRaftGrpcConan(ConanFile):
                 'shared': False,
                 'fPIC': True,
                 'sanitize': False,
-                'testing': False,
+                'testing': True,
                 'sisl:prerelease': True,
             }
 
