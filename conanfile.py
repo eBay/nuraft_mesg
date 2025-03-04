@@ -21,7 +21,7 @@ class NuRaftGrpcConan(ConanFile):
                 'shared': False,
                 'fPIC': True,
                 'sanitize': False,
-                'testing': False,
+                'testing': True,
                 'sisl:prerelease': True,
             }
 
@@ -50,7 +50,7 @@ class NuRaftGrpcConan(ConanFile):
         self.requires("boost/1.79.0")
         self.requires("nuraft/nbi.2.4.2")
         self.requires("openssl/1.1.1s")
-        self.requires("sisl/[~=8.9]")
+        self.requires("sisl/8.9.3")
 
         self.requires("lz4/1.9.4", override=True)
         self.requires("grpc/1.50.1", override=True)

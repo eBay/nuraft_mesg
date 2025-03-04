@@ -319,7 +319,15 @@ std::error_condition msg_service::joinRaftGroup(int32_t const srv_id, group_name
             DEBUG_ASSERT(!ctx->rpc_listener_, "RPC listner should not be set!");
             auto new_listner = std::make_shared< msg_group_listner >(shared_from_this(), group_name);
             ctx->rpc_listener_ = std::static_pointer_cast< nuraft::rpc_listener >(new_listner);
+
             auto server = std::make_shared< nuraft::raft_server >(ctx);
+
+            // When the IP address is dynamic, we need to adjust the limits
+            // from the nuraft defaults
+            auto n_limits = nuraft::raft_server::limits{};
+            n_limits.pre_vote_rejection_limit_ = 10000;
+            server->set_raft_limits(n_limits);
+
             it->second.m_server = std::make_shared< null_service >(server);
             if (_data_service_enabled) {
                 auto smgr = std::dynamic_pointer_cast< mesg_state_mgr >(ctx->state_mgr_);
