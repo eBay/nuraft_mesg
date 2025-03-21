@@ -12,10 +12,6 @@
 #include <sisl/fds/buffer.hpp>
 #include <sisl/logging/logging.h>
 
-SISL_LOGGING_DECL(nuraft_mesg)
-
-#define NURAFTMESG_LOG_MODS nuraft_mesg, grpc_server
-
 namespace sisl {
 class GenericClientResponse;
 } // namespace sisl

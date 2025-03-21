@@ -23,8 +23,6 @@
 #include "logger.hpp"
 #include "nuraft_mesg_config.hpp"
 
-SISL_LOGGING_DEF(nuraft_mesg)
-
 namespace nuraft_mesg {
 
 int32_t to_server_id(peer_id_t const& server_addr) {
@@ -50,6 +48,7 @@ public:
 };
 
 ManagerImpl::~ManagerImpl() {
+    REGISTER_LOG_MOD(nuraft_mesg);
     if (_mesg_service) {
         // IMPORTANT: The order matters. nuraft can be using the grpc server that might crash the system if grpc server
         // is shutdown first.

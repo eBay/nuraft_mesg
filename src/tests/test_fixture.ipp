@@ -36,8 +36,6 @@
 
 #include "test_state_manager.h"
 
-SISL_LOGGING_INIT(NURAFTMESG_LOG_MODS)
-
 SISL_OPTIONS_ENABLE(logging)
 
 constexpr auto rpc_backoff = 50;
