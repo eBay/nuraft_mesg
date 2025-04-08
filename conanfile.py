@@ -10,7 +10,8 @@ required_conan_version = ">=1.60.0"
 
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "3.7.4"
+    version = "3.7.5"
+
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
     topics = ("ebay", "nublox", "raft")
@@ -64,7 +65,7 @@ class NuRaftMesgConan(ConanFile):
 
     def requirements(self):
         self.requires("boost/1.83.0", transitive_headers=True)
-        self.requires("sisl/[^12.3]@oss/master", transitive_headers=True)
+        self.requires("sisl/[>=12.3.3]@oss/master", transitive_headers=True)
         self.requires("nuraft/2.4.5", transitive_headers=True)
 
     def layout(self):

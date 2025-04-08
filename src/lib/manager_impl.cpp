@@ -39,7 +39,8 @@ public:
     engine_factory(int const raft_threads, int const data_threads, Manager::Params const& start_params,
                    std::weak_ptr< MessagingApplication > app) :
             group_factory::group_factory(raft_threads, data_threads, start_params.server_uuid_,
-                                         start_params.token_client_, start_params.ssl_cert_),
+                                         start_params.token_client_, start_params.ssl_cert_,
+                                         start_params.max_receive_message_size_, start_params.max_send_message_size_),
             application_(app) {}
 
     std::string lookupEndpoint(peer_id_t const& client) override {
@@ -99,7 +100,8 @@ void ManagerImpl::restart_server() {
     try {
         tmp_server = sisl::GrpcServer::make(listen_address, start_params_.token_verifier_,
                                             NURAFT_MESG_CONFIG(grpc_server_thread_cnt), start_params_.ssl_key_,
-                                            start_params_.ssl_cert_, start_params_.max_message_size_);
+                                            start_params_.ssl_cert_, start_params_.max_receive_message_size_,
+                                            start_params_.max_send_message_size_);
     } catch (std::runtime_error const& e) {
         LOGERROR("Failed to create GRPC server for Messaging Service: {}", e.what());
         return;
