@@ -71,13 +71,16 @@ public:
 class group_factory : public grpc_factory {
     std::shared_ptr< sisl::GrpcTokenClient > m_token_client;
     static std::string m_ssl_cert;
+    int m_max_receive_message_size;
+    int m_max_send_message_size;
 
 public:
     group_factory(int const cli_thread_count, group_id_t const& name,
                   std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert = "");
 
     group_factory(int const raft_cli_thread_count, int const data_cli_thread_count, group_id_t const& name,
-                  std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert = "");
+                  std::shared_ptr< sisl::GrpcTokenClient > const token_client, std::string const& ssl_cert = "",
+                  int const max_receive_message_size = 0, int const max_send_message_size = 0);
 
     using grpc_factory::create_client;
     nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) override;
