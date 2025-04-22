@@ -12,7 +12,7 @@ class MessagingFixture : public MessagingFixtureBase {
 protected:
     void SetUp() override {
         MessagingFixtureBase::SetUp();
-        start();
+        start(true);
     }
 };
 
@@ -23,6 +23,12 @@ TEST_F(MessagingFixture, BasicTests) {
     auto buf = create_message(nlohmann::json{
         {"op_type", 2},
     });
+
+    auto sm1 = app_1_->state_mgr_map_[group_id_];
+    auto repl_ctx1 = sm1->get_repl_context();
+    //app_1 is leader
+    EXPECT_TRUE(repl_ctx1->is_raft_leader());
+
     // Basic resiliency test (append_entries)
     EXPECT_TRUE(app_1_->instance_->append_entries(group_id_, {buf}).get());
 
@@ -43,17 +49,49 @@ TEST_F(MessagingFixture, BasicTests) {
     app_3_ = std::make_shared< TestApplication >("sm3", ports[2]);
     app_3_->set_id(our_id);
     app_3_->map_peers(lookup_map);
-    app_3_->start();
-    app_3_->instance_->join_group(
-        group_id_, "test_type",
-        std::make_shared< test_state_mgr >(nuraft_mesg::to_server_id(our_id), our_id, group_id_));
+    app_3_->start(true);
+    auto sm3 = std::make_shared< test_state_mgr >(nuraft_mesg::to_server_id(our_id), our_id, group_id_);
+    app_3_->instance_->join_group(group_id_, "test_type", sm3);
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_FALSE(app_3_->instance_->become_leader(bogus_uuid).get());
     EXPECT_TRUE(app_3_->instance_->become_leader(group_id_).get());
+    // now app_3 is the leader via explicity reqeust
+    {
+        auto repl_ctx3 = sm3->get_repl_context();
+        EXPECT_TRUE(repl_ctx3->is_raft_leader());
+    }
     EXPECT_TRUE(app_3_->instance_->append_entries(group_id_, {buf}).get());
 
     // Test sending a message for a group the messaging service is not aware of.
     EXPECT_FALSE(app_1_->instance_->add_member(bogus_uuid, bogus_uuid).get());
+
+    // Simulate app_3 crash again
+    app_3_.reset();
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    //now app_1 will be the leader as it has highest priority
+    EXPECT_TRUE(repl_ctx1->is_raft_leader());
+
+    //restart app_3
+    app_3_ = std::make_shared< TestApplication >("sm3", ports[2]);
+    app_3_->set_id(our_id);
+    app_3_->map_peers(lookup_map);
+    app_3_->start(true);
+    sm3 = std::make_shared< test_state_mgr >(nuraft_mesg::to_server_id(our_id), our_id, group_id_);
+    app_3_->instance_->join_group(
+        group_id_, "test_type", sm3);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    // leader shoud still on app_1
+    EXPECT_TRUE(repl_ctx1->is_raft_leader());
+    // app_3 take over leadership
+    EXPECT_TRUE(app_3_->instance_->become_leader(group_id_).get());
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    // now app_3 is the leader via explicity reqeust
+    {
+        auto repl_ctx3 = sm3->get_repl_context();
+        EXPECT_TRUE(repl_ctx3->is_raft_leader());
+    }
 
     // Add a 4th Member to the Group
     std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;

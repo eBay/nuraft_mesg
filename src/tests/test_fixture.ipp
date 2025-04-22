@@ -19,6 +19,7 @@
 
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/uuid/random_generator.hpp>
+#include <boost/uuid/string_generator.hpp>
 #include <folly/init/Init.h>
 #include <folly/executors/GlobalExecutor.h>
 #include <sisl/grpc/rpc_client.hpp>
@@ -188,7 +189,7 @@ protected:
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
         // Use app1 to add Server 3
-        auto add2 = app_1_->instance_->add_member(group_id_, app_2_->id_);
+        auto add2 = app_1_->instance_->add_member(group_id_, nuraft::srv_config(to_server_id(app_2_->id_), to_string(app_2_->id_)));
         std::this_thread::sleep_for(std::chrono::seconds(1));
         EXPECT_TRUE(std::move(add2).get());
 
@@ -197,7 +198,7 @@ protected:
 
         // Use custom factory to add Server 3
         auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
-        auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_), to_string(app_1_->id_));
+        auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_),to_string(app_1_->id_));
         EXPECT_TRUE(factory->add_server(to_server_id(app_3_->id_), app_3_->id_, dest_cfg).get());
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }

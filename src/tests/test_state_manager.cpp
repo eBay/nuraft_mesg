@@ -115,7 +115,7 @@ nuraft::ptr< nuraft::cluster_config > test_state_mgr::load_config() {
     json config_map;
     if (auto err = loadConfigFile(config_map, _group_id, _srv_id); !err) { return fromClusterConfig(config_map); }
     auto conf = nuraft::cs_new< nuraft::cluster_config >();
-    conf->get_servers().push_back(nuraft::cs_new< nuraft::srv_config >(_srv_id, to_string(_srv_addr)));
+    conf->get_servers().push_back(nuraft::cs_new< nuraft::srv_config >(_srv_id, 0, to_string(_srv_addr), "", false, 100));
     return conf;
 }
 
