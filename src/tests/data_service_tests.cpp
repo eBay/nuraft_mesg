@@ -64,18 +64,22 @@ TEST_F(DataServiceFixture, BasicTest1) {
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(std::move(add2).get());
     add5 =
-        app_4->instance_->add_member(data_group, nuraft::srv_config(to_server_id(app_5->id_), 0, to_string(app_5->id_), "", false, follower_priority));
+        app_4->instance_->add_member(data_group, nuraft::srv_config(to_server_id(app_5->id_), 0, to_string(app_5->id_), "", true, follower_priority));
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(std::move(add5).get());
-    std::vector< std::shared_ptr< nuraft::srv_config > > config_out;
     // check priority
-    app_4->instance_->get_srv_config_all(data_group, config_out);
-    for (auto cfg : config_out) {
-        LOGINFO("Server id: {}, endpoint: {}, priority: {}", cfg->get_id(), cfg->get_endpoint(), cfg->get_priority());
-        if (cfg->get_id() == to_server_id(app_4->id_)) {
-            EXPECT_EQ(cfg->get_priority(), 100);
+    auto repl_ctx = app_4->state_mgr_map_[data_group]->get_repl_context();
+    EXPECT_TRUE(repl_ctx && repl_ctx->is_raft_leader());
+    auto peer_info = repl_ctx->get_raft_status();
+    for (auto pinfo : peer_info) {
+        LOGINFO("endpoint: {}, priority: {}", pinfo.id_, pinfo.priority_);
+        if (pinfo.id_ == to_string(app_4->id_)) {
+            EXPECT_EQ(pinfo.priority_, 100);
         } else {
-            EXPECT_EQ(cfg->get_priority(), follower_priority);
+            EXPECT_EQ(pinfo.priority_, follower_priority);
+        }
+        if (pinfo.id_ == to_string(app_5->id_)) {
+            EXPECT_TRUE(pinfo.is_learner_);
         }
     }
 
@@ -184,7 +188,8 @@ TEST_F(DataServiceFixture, BasicTest2) {
     EXPECT_TRUE(peer_info.size() == 3);
     for (auto const& peer : peer_info) {
         std::cout << "Peer ID: " << peer.id_ << " Last Log Idx: " << peer.last_log_idx_
-                  << " Last Succ Resp Us: " << peer.last_succ_resp_us_ << std::endl;
+                  << " Last Succ Resp Us: " << peer.last_succ_resp_us_ << " Priority: " << peer.priority_
+                  << " Is Learner: " << peer.is_learner_ << " Is New Joiner: " << peer.is_new_joiner_ << std::endl;
         EXPECT_TRUE(peer.id_ == to_string(app_1_->id_) || peer.id_ == to_string(app_2_->id_) ||
                     peer.id_ == to_string(app_3_->id_));
         EXPECT_TRUE(peer.last_log_idx_ == 3);

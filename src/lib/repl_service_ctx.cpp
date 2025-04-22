@@ -96,19 +96,24 @@ std::vector< peer_info > repl_service_ctx::get_raft_status() const {
         auto pinfo_all = _server->get_peer_info_all();
         // get all the peer info except the leader
         for (auto const& pinfo : pinfo_all) {
-            std::string_view peer_id;
+            peer_info peer;
             if (auto srv_config = _server->get_srv_config(pinfo.id_); nullptr != srv_config) {
-                peer_id = srv_config->get_endpoint();
+                peer.id_ = srv_config->get_endpoint();
+                if (peer.id_.empty()) {
+                    // if remove_member case , leader will first remove the member from peer_list, and then apply the
+                    // new cluster configuraiton which excludes the removed member, so there is case that the peer_id is
+                    // not in the config of leader.
+                    LOGW("do not find peer id  {} in the conifg of leader", pinfo.id_);
+                    continue;
+                }
+                // default priority=1
+                peer.last_log_idx_ = _server->get_last_log_idx();
+                peer.last_succ_resp_us_ = pinfo.last_succ_resp_us_;
+                peer.priority_ = srv_config->get_priority();
+                peer.is_learner_ = srv_config->is_learner();
+                peer.is_new_joiner_ = srv_config->is_new_joiner();
             }
-            if (peer_id.empty()) {
-                // if remove_member case , leader will first remove the member from peer_list, and then apply the new
-                // cluster configuraiton which excludes the removed member, so there is case that the peer_id is not in
-                // the config of leader.
-                LOGW("do not find peer id  {} in the conifg of leader", pinfo.id_);
-                continue;
-            }
-
-            peers.emplace_back(std::string(peer_id), pinfo.last_log_idx_, pinfo.last_succ_resp_us_);
+            peers.emplace_back(peer);
         }
     }
 
@@ -121,7 +126,8 @@ std::vector< peer_info > repl_service_ctx::get_raft_status() const {
 
         // add the peer info of itself(leader or follower) , which is useful for upper layer
         // from the view of a node itself, last_succ_resp_us_ make no sense, so set it to 0
-        peers.emplace_back(my_peer_id, _server->get_last_log_idx(), 0);
+        peers.emplace_back(my_peer_id, _server->get_last_log_idx(), 0, my_config->get_priority(),
+                           my_config->is_learner(), my_config->is_new_joiner());
     }
 
     return peers;

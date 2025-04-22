@@ -37,6 +37,12 @@ struct peer_info {
     uint64_t last_log_idx_;
     // The elapsed time since the last successful response from this peer, set to 0 on leader
     uint64_t last_succ_resp_us_;
+    // The priority for leader election
+    uint32_t priority_;
+    // The peer is learner or not
+    bool is_learner_;
+    // The peer is new joiner or not
+    bool is_new_joiner_;
 };
 
 class repl_service_ctx {
