@@ -31,7 +31,8 @@ TEST_F(DataServiceFixture, BasicTest1) {
     app_3_->map_peers(lookup_map);
     app_4->map_peers(lookup_map);
     app_4->start(true);
-    auto add4 = app_1_->instance_->add_member(group_id_, app_4->id_);
+    auto add4 =
+        app_1_->instance_->add_member(group_id_, nuraft::srv_config(to_server_id(app_4->id_), to_string(app_4->id_)));
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(std::move(add4).get());
 
@@ -43,23 +44,44 @@ TEST_F(DataServiceFixture, BasicTest1) {
     app_4->map_peers(lookup_map);
     app_5->map_peers(lookup_map);
     app_5->start(true);
-    auto add5 = app_1_->instance_->add_member(group_id_, app_5->id_);
+    auto add5 =
+        app_1_->instance_->add_member(group_id_, nuraft::srv_config(to_server_id(app_5->id_), to_string(app_5->id_)));
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(std::move(add5).get());
 
     // create new group
+    auto follower_priority = 80;
     auto data_group = boost::uuids::random_generator()();
     app_4->instance_->create_group(data_group, "test_type");
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    auto add1 = app_4->instance_->add_member(data_group, app_1_->id_);
+
+    auto add1 =
+        app_4->instance_->add_member(data_group, nuraft::srv_config(to_server_id(app_1_->id_), 0, to_string(app_1_->id_), "", false, follower_priority));
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(std::move(add1).get());
-    auto add2 = app_4->instance_->add_member(data_group, app_2_->id_);
+    auto add2 =
+        app_4->instance_->add_member(data_group, nuraft::srv_config(to_server_id(app_2_->id_), 0, to_string(app_2_->id_), "", false, follower_priority));
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(std::move(add2).get());
-    add5 = app_4->instance_->add_member(data_group, app_5->id_);
+    add5 =
+        app_4->instance_->add_member(data_group, nuraft::srv_config(to_server_id(app_5->id_), 0, to_string(app_5->id_), "", true, follower_priority));
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(std::move(add5).get());
+    // check priority
+    auto repl_ctx = app_4->state_mgr_map_[data_group]->get_repl_context();
+    EXPECT_TRUE(repl_ctx && repl_ctx->is_raft_leader());
+    auto peer_info = repl_ctx->get_raft_status();
+    for (auto pinfo : peer_info) {
+        LOGINFO("endpoint: {}, priority: {}", pinfo.id_, pinfo.priority_);
+        if (pinfo.id_ == to_string(app_4->id_)) {
+            EXPECT_EQ(pinfo.priority_, 100);
+        } else {
+            EXPECT_EQ(pinfo.priority_, follower_priority);
+        }
+        if (pinfo.id_ == to_string(app_5->id_)) {
+            EXPECT_TRUE(pinfo.is_learner_);
+        }
+    }
 
     auto sm1 = app_1_->state_mgr_map_[group_id_];
     RELEASE_ASSERT(sm1, "Bad pointer!");
@@ -166,7 +188,8 @@ TEST_F(DataServiceFixture, BasicTest2) {
     EXPECT_TRUE(peer_info.size() == 3);
     for (auto const& peer : peer_info) {
         std::cout << "Peer ID: " << peer.id_ << " Last Log Idx: " << peer.last_log_idx_
-                  << " Last Succ Resp Us: " << peer.last_succ_resp_us_ << std::endl;
+                  << " Last Succ Resp Us: " << peer.last_succ_resp_us_ << " Priority: " << peer.priority_
+                  << " Is Learner: " << peer.is_learner_ << " Is New Joiner: " << peer.is_new_joiner_ << std::endl;
         EXPECT_TRUE(peer.id_ == to_string(app_1_->id_) || peer.id_ == to_string(app_2_->id_) ||
                     peer.id_ == to_string(app_3_->id_));
         EXPECT_TRUE(peer.last_log_idx_ == 3);

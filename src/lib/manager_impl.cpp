@@ -238,7 +238,13 @@ nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t
 
 NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, peer_id_t const& new_id) {
     auto str_id = to_string(new_id);
-    return _mesg_service->add_member(group_id, nuraft::srv_config(to_server_id(new_id), str_id))
+    auto srv_config = nuraft::srv_config(to_server_id(new_id), str_id);
+    return add_member(group_id, srv_config);
+}
+
+NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, nuraft::srv_config const& srv_config) {
+    auto str_id = srv_config.get_endpoint();
+    return _mesg_service->add_member(group_id, srv_config)
         .deferValue([this, g_id = group_id, n_id = std::move(str_id)](auto cmd_result) mutable -> NullResult {
             if (!cmd_result) return folly::makeUnexpected(cmd_result.error());
             // TODO This should not block, but attach a new promise!

@@ -71,6 +71,7 @@ public:
                           std::shared_ptr< mesg_state_mgr > smgr) override;
 
     NullAsyncResult add_member(group_id_t const& group_id, peer_id_t const& server_id) override;
+    NullAsyncResult add_member(group_id_t const& group_id, nuraft::srv_config const& srv_config) override;
     NullAsyncResult rem_member(group_id_t const& group_id, peer_id_t const& server_id) override;
     NullAsyncResult become_leader(group_id_t const& group_id) override;
     NullAsyncResult append_entries(group_id_t const& group_id,
