@@ -8,9 +8,10 @@ from os.path import join
 
 required_conan_version = ">=1.60.0"
 
+
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "3.8.0"
+    version = "3.8.1"
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
     topics = ("ebay", "nublox", "raft")
@@ -20,25 +21,25 @@ class NuRaftMesgConan(ConanFile):
     settings = "arch", "os", "compiler", "build_type"
 
     options = {
-                "shared": ['True', 'False'],
-                "fPIC": ['True', 'False'],
-                "coverage": ['True', 'False'],
-                "sanitize": ['True', 'False'],
-                }
+        "shared": ['True', 'False'],
+        "fPIC": ['True', 'False'],
+        "coverage": ['True', 'False'],
+        "sanitize": ['True', 'False'],
+    }
     default_options = {
-                'shared': False,
-                'fPIC': True,
-                'coverage': False,
-                'sanitize': False,
-            }
+        'shared': False,
+        'fPIC': True,
+        'coverage': False,
+        'sanitize': False,
+    }
 
     exports_sources = (
-                        "LICENSE",
-                        "CMakeLists.txt",
-                        "cmake/*",
-                        "include/*",
-                        "src/*",
-                        )
+        "LICENSE",
+        "CMakeLists.txt",
+        "cmake/*",
+        "include/*",
+        "src/*",
+    )
 
     def _min_cppstd(self):
         return 20
@@ -65,7 +66,7 @@ class NuRaftMesgConan(ConanFile):
     def requirements(self):
         self.requires("boost/1.83.0", transitive_headers=True)
         self.requires("sisl/[>=12.3.3]@oss/master", transitive_headers=True)
-        self.requires("nuraft/2.4.5", transitive_headers=True)
+        self.requires("nuraft/2.4.6", transitive_headers=True)
 
     def layout(self):
         self.folders.source = "."
@@ -78,7 +79,7 @@ class NuRaftMesgConan(ConanFile):
 
         self.cpp.package.components["proto"].libs = ["nuraft_mesg_proto"]
         self.cpp.package.components["proto"].set_property("pkg_config_name", "libnuraft_mesg_proto")
-        self.cpp.package.includedirs = ["include"] # includedirs is already set to 'include' by
+        self.cpp.package.includedirs = ["include"]  # includedirs is already set to 'include' by
         self.cpp.package.libdirs = ["lib"]
 
     def generate(self):
@@ -122,10 +123,10 @@ class NuRaftMesgConan(ConanFile):
             "nuraft::nuraft",
             "boost::boost",
             "sisl::sisl"
-            ])
+        ])
 
         for component in self.cpp_info.components.values():
-            if  self.options.get_safe("sanitize"):
+            if self.options.get_safe("sanitize"):
                 component.sharedlinkflags.append("-fsanitize=address")
                 component.exelinkflags.append("-fsanitize=address")
                 component.sharedlinkflags.append("-fsanitize=undefined")
