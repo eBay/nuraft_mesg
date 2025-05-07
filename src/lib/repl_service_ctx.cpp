@@ -107,7 +107,7 @@ std::vector< peer_info > repl_service_ctx::get_raft_status() const {
                     continue;
                 }
                 // default priority=1
-                peer.last_log_idx_ = _server->get_last_log_idx();
+                peer.last_log_idx_ = pinfo.last_log_idx_;
                 peer.last_succ_resp_us_ = pinfo.last_succ_resp_us_;
                 peer.priority_ = srv_config->get_priority();
                 peer.is_learner_ = srv_config->is_learner();
