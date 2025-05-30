@@ -112,8 +112,10 @@ std::vector< peer_info > repl_service_ctx::get_raft_status() const {
                 peer.priority_ = srv_config->get_priority();
                 peer.is_learner_ = srv_config->is_learner();
                 peer.is_new_joiner_ = srv_config->is_new_joiner();
+                peers.emplace_back(peer);
+            } else {
+                LOGW("do not find peer id  {} in the conifg of leader", pinfo.id_);
             }
-            peers.emplace_back(peer);
         }
     }
 
