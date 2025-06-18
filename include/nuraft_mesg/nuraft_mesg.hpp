@@ -66,6 +66,7 @@ public:
         std::shared_ptr< sisl::GrpcTokenClient > token_client_{nullptr};
         int max_receive_message_size_{0};
         int max_send_message_size_{0};
+        bool enable_console_log_{false};
     };
     using group_params = nuraft::raft_params;
     virtual ~Manager() = default;
