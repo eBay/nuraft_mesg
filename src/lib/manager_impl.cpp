@@ -69,7 +69,9 @@ ManagerImpl::ManagerImpl(Manager::Params const& start_params, std::weak_ptr< Mes
     // NOTE: The Unit tests require this instance to be recreated with the same parameters.
     // This exception is only expected in this case where we "restart" the server by just recreating the instance.
     try {
-        _custom_logger = sisl::logging::CreateCustomLogger(logger_name, "", false, false /* tee_to_stdout_stderr */);
+        _custom_logger = sisl::logging::CreateCustomLogger(logger_name, "",
+                                                           start_params_.enable_console_log_,
+                                                           start_params_.enable_console_log_ /* tee_to_stdout_stderr */);
     } catch (spdlog::spdlog_ex const& e) { _custom_logger = spdlog::details::registry::instance().get(logger_name); }
 
     sisl::logging::SetLogPattern("[%D %T.%f] [%^%L%$] [%t] %v", _custom_logger);
