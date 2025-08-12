@@ -62,6 +62,7 @@ public:
         group_type_t default_group_type_;
         std::string ssl_key_;
         std::string ssl_cert_;
+        std::string ssl_ca_;
         std::shared_ptr< sisl::GrpcTokenVerifier > token_verifier_{nullptr};
         std::shared_ptr< sisl::GrpcTokenClient > token_client_{nullptr};
         int max_receive_message_size_{0};
