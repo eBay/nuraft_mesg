@@ -113,6 +113,7 @@ void ManagerImpl::restart_server() {
         return;
     }
 
+    if (_grpc_server) { _grpc_server->shutdown(); }
     _grpc_server.reset();
     _grpc_server = std::unique_ptr< sisl::GrpcServer >(tmp_server);
     _mesg_service->associate(_grpc_server.get());
