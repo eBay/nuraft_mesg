@@ -62,7 +62,7 @@ std::atomic_uint64_t grpc_base_client::_client_counter = 0ul;
 
 void grpc_base_client::send(std::shared_ptr< nuraft::req_msg >& req, nuraft::rpc_handler& complete, uint64_t) {
     assert(req && complete);
-    static_cast< grpc_flatb_client* >(this)->send(
+    static_cast< grpc_flatb_client* >(this)->send_fb(
         fromRequest(*req), [req, complete](Response& response, ::grpc::Status& status) mutable -> void {
             std::shared_ptr< nuraft::rpc_exception > err;
             std::shared_ptr< nuraft::resp_msg > resp;

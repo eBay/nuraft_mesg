@@ -35,7 +35,9 @@ std::string group_factory::m_ssl_cert;
 using handle_resp = std::function< void(RaftMessage&, ::grpc::Status&) >;
 
 static nuraft::cmd_result_code grpc_status_to_nuraft_code(::grpc::Status const& s) {
-    if (s.ok()) { return nuraft::cmd_result_code::OK; }
+    if (s.ok()) {
+        return nuraft::cmd_result_code::OK;
+    }
     auto const ec = s.error_code();
     switch (ec) {
     case ::grpc::StatusCode::DEADLINE_EXCEEDED:
@@ -96,8 +98,8 @@ public:
 
     messaging_client(std::string const& raft_worker_name, std::string const& data_worker_name, std::string const& addr,
                      const std::shared_ptr< sisl::GrpcTokenClient > token_client, std::string const& target_domain = "",
-                     std::string const& ssl_cert = "",
-                     int const max_receive_msg_size = 0, int const max_send_msg_size = 0) :
+                     std::string const& ssl_cert = "", int const max_receive_msg_size = 0,
+                     int const max_send_msg_size = 0) :
             nuraft_mesg::grpc_client< Messaging >::grpc_client(raft_worker_name, addr, token_client, target_domain,
                                                                ssl_cert, max_receive_msg_size, max_send_msg_size) {
         _generic_stub = sisl::GrpcAsyncClient::make_generic_stub(data_worker_name);
@@ -108,7 +110,7 @@ public:
 
     std::atomic_uint bad_service{0};
 
-    void send(RaftGroupMsg const& message, handle_resp complete) {
+    void send_grp(RaftGroupMsg const& message, handle_resp complete) {
         auto weak_this = std::weak_ptr< messaging_client >(shared_from_this());
         auto group_compl = [weak_this, complete](auto response, auto status) mutable {
             if (::grpc::INVALID_ARGUMENT == status.error_code()) {
@@ -192,18 +194,20 @@ public:
     void setClient(std::shared_ptr< messaging_client > new_client) { _client = new_client; }
     bool reinitRequired() const { return (!_client || 0 < _client->bad_service.load(std::memory_order_relaxed)); }
 
-    void send(RaftMessage const& message, handle_resp complete) {
+    void send_raft(RaftMessage const& message, handle_resp complete) {
         RaftGroupMsg group_msg;
 
         LOGT("Sending [{}] from: [{}] to: [{}] Group: [{}]",
              nuraft::msg_type_to_string(nuraft::msg_type(message.base().type())), message.base().src(),
              message.base().dest(), _group_id);
-        if (_metrics) { COUNTER_INCREMENT(*_metrics, group_sends, 1); }
+        if (_metrics) {
+            COUNTER_INCREMENT(*_metrics, group_sends, 1);
+        }
         group_msg.set_intended_addr(_client_addr);
         group_msg.set_group_id(to_string(_group_id));
         group_msg.set_group_type(_group_type);
         group_msg.mutable_msg()->CopyFrom(message);
-        _client->send(group_msg, complete);
+        _client->send_grp(group_msg, complete);
     }
 
     NullAsyncResult data_service_request_unidirectional(std::string const& request_name,
@@ -232,7 +236,9 @@ nuraft::cmd_result_code mesg_factory::reinit_client(peer_id_t const& client,
     LOGD("Re-init client to {}", client);
     auto g_client = std::dynamic_pointer_cast< grpc_proto_client >(raft_client);
     auto new_raft_client = std::static_pointer_cast< nuraft::rpc_client >(g_client->realClient());
-    if (auto err = _group_factory->reinit_client(client, new_raft_client); err) { return err; }
+    if (auto err = _group_factory->reinit_client(client, new_raft_client); err) {
+        return err;
+    }
     g_client->setClient(std::dynamic_pointer_cast< messaging_client >(new_raft_client));
     return nuraft::OK;
 }
@@ -392,14 +398,16 @@ void grpc_base_client::send(std::shared_ptr< nuraft::req_msg >& req, nuraft::rpc
     LOGT("Sending [{}] from: [{}] to: [{}]", nuraft::msg_type_to_string(nuraft::msg_type(grpc_request.base().type())),
          grpc_request.base().src(), grpc_request.base().dest());
 
-    static_cast< grpc_proto_client* >(this)->send(
+    static_cast< grpc_proto_client* >(this)->send_raft(
         grpc_request, [req, complete](RaftMessage& response, ::grpc::Status& status) mutable -> void {
             std::shared_ptr< nuraft::rpc_exception > err;
             std::shared_ptr< nuraft::resp_msg > resp;
 
             if (status.ok()) {
                 resp = toResponse(response);
-                if (!resp) { err = std::make_shared< nuraft::rpc_exception >("missing response", req); }
+                if (!resp) {
+                    err = std::make_shared< nuraft::rpc_exception >("missing response", req);
+                }
             } else {
                 err = std::make_shared< nuraft::rpc_exception >(status.error_message(), req);
             }
