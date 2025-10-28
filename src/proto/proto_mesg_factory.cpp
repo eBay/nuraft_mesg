@@ -15,7 +15,11 @@
 #include <libnuraft/async.hxx>
 #include <string>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #include <folly/futures/Future.h>
+#pragma GCC diagnostic pop
 
 #include "nuraft_mesg/mesg_factory.hpp"
 #include "lib/client.hpp"

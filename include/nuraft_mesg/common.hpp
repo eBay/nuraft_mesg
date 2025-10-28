@@ -6,7 +6,11 @@
 #include <folly/Expected.h>
 #include <folly/small_vector.h>
 #include <folly/Unit.h>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #include <folly/futures/Future.h>
+#pragma GCC diagnostic pop
 
 #include <libnuraft/async.hxx>
 #include <sisl/fds/buffer.hpp>
