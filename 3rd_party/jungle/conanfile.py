@@ -78,6 +78,6 @@ class JungleConan(ConanFile):
                  keep_path=False)
 
     def package_info(self):
-        self.cpp_info.libs = ["jungle"]
+        self.cpp_info.libs = ["jungle", "simplelogger"]
         if self.settings.os in ["Linux", "FreeBSD"]:
             self.cpp_info.system_libs.extend(["pthread", "dl"])
