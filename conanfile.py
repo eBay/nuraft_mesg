@@ -120,7 +120,6 @@ class NuRaftMesgConan(ConanFile):
     def package_info(self):
         self.cpp_info.components["proto"].requires.extend([
             "nuraft::nuraft",
-            "boost::boost",
             "sisl::sisl"
         ])
 
