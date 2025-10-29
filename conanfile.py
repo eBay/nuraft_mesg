@@ -64,7 +64,6 @@ class NuRaftMesgConan(ConanFile):
         self.test_requires("jungle/cci.20250316")
 
     def requirements(self):
-        self.requires("boost/1.85.0", transitive_headers=True)
         self.requires("sisl/[>=13]@oss/dev", transitive_headers=True)
         self.requires("nuraft/2.4.8", transitive_headers=True)
 
@@ -121,7 +120,6 @@ class NuRaftMesgConan(ConanFile):
     def package_info(self):
         self.cpp_info.components["proto"].requires.extend([
             "nuraft::nuraft",
-            "boost::boost",
             "sisl::sisl"
         ])
 
