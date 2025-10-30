@@ -43,6 +43,7 @@ class JungleConan(ConanFile):
 
     def requirements(self):
         self.requires("forestdb/cci.20250315")
+        self.requires("zlib/[^1.3]")
 
     def validate(self):
         if self.settings.compiler.cppstd:
