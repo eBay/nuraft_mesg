@@ -23,6 +23,7 @@
 #include <libnuraft/raft_params.hxx>
 
 #include "common.hpp"
+#include <sisl/version.hpp>
 
 namespace grpc {
 class ByteBuffer;
@@ -50,6 +51,7 @@ using data_service_request_handler_t = std::function< void(boost::intrusive_ptr<
 class MessagingApplication {
 public:
     virtual ~MessagingApplication() = default;
+    MessagingApplication();
     virtual std::string lookup_peer(peer_id_t const&) = 0;
     virtual std::shared_ptr< mesg_state_mgr > create_state_mgr(int32_t const srv_id, group_id_t const& group_id) = 0;
 };
