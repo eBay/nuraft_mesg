@@ -11,7 +11,7 @@ required_conan_version = ">=1.60.0"
 
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "4.0.0"
+    version = "4.0.1"
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
     topics = ("ebay", "nublox", "raft")
@@ -93,6 +93,8 @@ class NuRaftMesgConan(ConanFile):
                 tc.variables['BUILD_COVERAGE'] = 'ON'
             elif self.options.get_safe("sanitize"):
                 tc.variables['MEMORY_SANITIZER_ON'] = 'ON'
+        tc.variables["CONAN_PACKAGE_NAME"] = self.name
+        tc.variables["CONAN_PACKAGE_VERSION"] = self.version
         tc.generate()
 
         # This generates "boost-config.cmake" and "grpc-config.cmake" etc in self.generators_folder
