@@ -1,11 +1,11 @@
 #pragma once
 
+#include <expected>
+
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
-#include <folly/Expected.h>
 #include <folly/small_vector.h>
-#include <folly/Unit.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wuninitialized"
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
@@ -33,12 +33,12 @@ using svr_id_t = int32_t;
 using io_blob_list_t = folly::small_vector< sisl::io_blob, 4 >;
 
 template < typename T >
-using Result = folly::Expected< T, nuraft::cmd_result_code >;
+using Result = std::expected< T, nuraft::cmd_result_code >;
 template < typename T >
 using AsyncResult = folly::SemiFuture< Result< T > >;
 
-using NullResult = Result< folly::Unit >;
-using NullAsyncResult = AsyncResult< folly::Unit >;
+using NullResult = Result< void >;
+using NullAsyncResult = AsyncResult< void >;
 
 ENUM(role_regex, uint8_t, LEADER, FOLLOWER, ALL, ANY);
 using destination_t = std::variant< peer_id_t, role_regex, svr_id_t >;

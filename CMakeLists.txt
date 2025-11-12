@@ -5,7 +5,7 @@ enable_testing()
 
 include(cmake/Flags.cmake)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 
 enable_testing()
 find_package(GTest QUIET REQUIRED)

@@ -1,5 +1,4 @@
 #include <boost/uuid/string_generator.hpp>
-#include <folly/Expected.h>
 #include <grpcpp/impl/codegen/status_code_enum.h>
 #include <boost/asio.hpp>
 #include <libnuraft/async.hxx>

@@ -3,15 +3,13 @@ from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMakeToolchain, CMakeDeps, CMake
 from conan.tools.files import copy
-from conan.tools.files import copy
 from os.path import join
 
-required_conan_version = ">=1.60.0"
-
+required_conan_version = ">=2.0"
 
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "4.0.1"
+    version = "5.0.0"
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
     topics = ("ebay", "nublox", "raft")
@@ -42,7 +40,7 @@ class NuRaftMesgConan(ConanFile):
     )
 
     def _min_cppstd(self):
-        return 20
+        return 23
 
     def validate(self):
         if self.settings.compiler.get_safe("cppstd"):
