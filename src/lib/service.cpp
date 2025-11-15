@@ -17,8 +17,8 @@ SISL_OPTION_GROUP(nuraft_mesg,
 #define CONTINUE_RESP(resp)                                                                                            \
     try {                                                                                                              \
         if (auto r = (resp)->get_result_code(); r != nuraft::RESULT_NOT_EXIST_YET) {                                   \
-            if (nuraft::OK == r) return folly::Unit();                                                                 \
-            return folly::makeUnexpected(r);                                                                           \
+            if (nuraft::OK == r) return NullResult();                                                                  \
+            return std::unexpected(r);                                                                                 \
         }                                                                                                              \
         auto [p, sf] = folly::makePromiseContract< NullResult >();                                                     \
         (resp)->when_ready(                                                                                            \
@@ -26,12 +26,14 @@ SISL_OPTION_GROUP(nuraft_mesg,
                 nuraft::cmd_result< nuraft::ptr< nuraft::buffer >, nuraft::ptr< std::exception > >& result,            \
                 auto&) mutable {                                                                                       \
                 if (nuraft::cmd_result_code::OK != result.get_result_code())                                           \
-                    p->setValue(folly::makeUnexpected(result.get_result_code()));                                      \
+                    p->setValue(std::unexpected(result.get_result_code()));                                            \
                 else                                                                                                   \
-                    p->setValue(folly::Unit());                                                                        \
+                    p->setValue(NullResult());                                                                         \
             });                                                                                                        \
         return std::move(sf);                                                                                          \
-    } catch (std::runtime_error & rte) { LOGE("Caught exception: [group={}] {}", group_id, rte.what()); }
+    } catch (std::runtime_error & rte) {                                                                               \
+        LOGE("Caught exception: [group={}] {}", group_id, rte.what());                                                 \
+    }
 
 namespace nuraft_mesg {
 
@@ -54,7 +56,9 @@ void msg_service::associate(::sisl::GrpcServer* server) {
 
 void msg_service::bind(::sisl::GrpcServer* server) {
     RELEASE_ASSERT(server, "NULL server!");
-    if (_data_service_enabled) { _data_service.bind(); }
+    if (_data_service_enabled) {
+        _data_service.bind();
+    }
 }
 
 bool msg_service::bind_data_service_request(std::string const& request_name, group_id_t const& group_id,
@@ -70,21 +74,23 @@ NullAsyncResult msg_service::add_member(group_id_t const& group_id, nuraft::srv_
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         CONTINUE_RESP(it->second.m_server->add_srv(cfg))
     }
-    return folly::makeUnexpected(nuraft::SERVER_NOT_FOUND);
+    return std::unexpected(nuraft::SERVER_NOT_FOUND);
 }
 
 NullAsyncResult msg_service::rem_member(group_id_t const& group_id, int const member_id) {
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         CONTINUE_RESP(it->second.m_server->rem_srv(member_id))
     }
-    return folly::makeUnexpected(nuraft::SERVER_NOT_FOUND);
+    return std::unexpected(nuraft::SERVER_NOT_FOUND);
 }
 
 bool msg_service::become_leader(group_id_t const& group_id) {
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         try {
             return it->second.m_server->request_leadership();
-        } catch (std::runtime_error& rte) { LOGE("Caught exception during request_leadership(): {}", rte.what()) }
+        } catch (std::runtime_error& rte) {
+            LOGE("Caught exception during request_leadership(): {}", rte.what())
+        }
     }
     LOGW("Unknown [group={}] cannot get config.", group_id);
     return false;
@@ -95,7 +101,9 @@ void msg_service::get_srv_config_all(group_id_t const& group_id,
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         try {
             it->second.m_server->get_srv_config_all(configs_out);
-        } catch (std::runtime_error& rte) { LOGE("Caught exception during add_srv(): {}", rte.what()); }
+        } catch (std::runtime_error& rte) {
+            LOGE("Caught exception during add_srv(): {}", rte.what());
+        }
     } else {
         LOGW("Unknown [group={}] cannot get config.", group_id);
     }
@@ -106,7 +114,7 @@ NullAsyncResult msg_service::append_entries(group_id_t const& group_id,
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         CONTINUE_RESP(it->second.m_server->append_entries(logs))
     }
-    return folly::makeUnexpected(nuraft::SERVER_NOT_FOUND);
+    return std::unexpected(nuraft::SERVER_NOT_FOUND);
 }
 
 class msg_group_listner : public nuraft::rpc_listener {
@@ -149,7 +157,9 @@ nuraft::cmd_result_code msg_service::joinRaftGroup(int32_t const srv_id, group_i
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) return nuraft::cmd_result_code::OK;
 
     auto metrics = std::shared_ptr< group_metrics >();
-    if (0 < SISL_OPTIONS.count("msg_metrics")) { metrics = std::make_shared< group_metrics >(group_id); }
+    if (0 < SISL_OPTIONS.count("msg_metrics")) {
+        metrics = std::make_shared< group_metrics >(group_id);
+    }
 
     nuraft::context* ctx{nullptr};
     if (auto err = mgr->group_init(srv_id, group_id, g_type, ctx, metrics); err) {
