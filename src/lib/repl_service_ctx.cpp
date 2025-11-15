@@ -23,22 +23,22 @@ const std::optional< Result< peer_id_t > > repl_service_ctx_grpc::get_peer_id(de
 
     if (!_server) {
         LOGW("server not initialized");
-        return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+        return std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
     }
 
     if (std::holds_alternative< svr_id_t >(dest)) {
         if (auto const id_str = id_to_str(std::get< svr_id_t >(dest)); !id_str.empty()) {
             return boost::uuids::string_generator()(id_str);
         }
-        return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+        return std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
     }
 
     if (std::holds_alternative< role_regex >(dest)) {
         switch (std::get< role_regex >(dest)) {
         case role_regex::LEADER: {
-            if (is_raft_leader()) return folly::makeUnexpected(nuraft::cmd_result_code::BAD_REQUEST);
+            if (is_raft_leader()) return std::unexpected(nuraft::cmd_result_code::BAD_REQUEST);
             auto const leader = _server->get_leader();
-            if (leader == -1) return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+            if (leader == -1) return std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
             return boost::uuids::string_generator()(id_to_str(leader));
         } break;
         case role_regex::ALL: {
@@ -46,19 +46,19 @@ const std::optional< Result< peer_id_t > > repl_service_ctx_grpc::get_peer_id(de
         } break;
         default: {
             LOGE("Method not implemented");
-            return folly::makeUnexpected(nuraft::cmd_result_code::BAD_REQUEST);
+            return std::unexpected(nuraft::cmd_result_code::BAD_REQUEST);
         } break;
         }
     }
     DEBUG_ASSERT(false, "Unknown destination type");
-    return folly::makeUnexpected(nuraft::cmd_result_code::BAD_REQUEST);
+    return std::unexpected(nuraft::cmd_result_code::BAD_REQUEST);
 }
 
 NullAsyncResult repl_service_ctx_grpc::data_service_request_unidirectional(destination_t const& dest,
                                                                            std::string const& request_name,
                                                                            io_blob_list_t const& cli_buf) {
     return (!m_mesg_factory)
-        ? folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND)
+        ? std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND)
         : m_mesg_factory->data_service_request_unidirectional(get_peer_id(dest), request_name, cli_buf);
 }
 
@@ -66,7 +66,7 @@ AsyncResult< sisl::GenericClientResponse >
 repl_service_ctx_grpc::data_service_request_bidirectional(destination_t const& dest, std::string const& request_name,
                                                           io_blob_list_t const& cli_buf) {
     return (!m_mesg_factory)
-        ? folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND)
+        ? std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND)
         : m_mesg_factory->data_service_request_bidirectional(get_peer_id(dest), request_name, cli_buf);
 }
 

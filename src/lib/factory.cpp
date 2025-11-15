@@ -42,9 +42,9 @@ struct client_ctx {
     }
     void set(nuraft::cmd_result_code const code) {
         if (nuraft::OK == code)
-            _promise.setValue(folly::Unit());
+            _promise.setValue(NullResult());
         else
-            _promise.setValue(folly::makeUnexpected(code));
+            _promise.setValue(std::unexpected(code));
     }
 
 private:
@@ -150,7 +150,9 @@ class grpc_error_client : public grpc_base_client {
 nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(std::string const& client) {
     try {
         return create_client(boost::uuids::string_generator()(client));
-    } catch (std::runtime_error const& e) { LOGC("Client Endpoint Invalid! [{}]", client); }
+    } catch (std::runtime_error const& e) {
+        LOGC("Client Endpoint Invalid! [{}]", client);
+    }
     return nullptr;
 }
 
@@ -177,7 +179,9 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(peer_id_t const& c
                 new_client = it->second;
             }
         }
-        if (!it->second) { _clients.erase(it); }
+        if (!it->second) {
+            _clients.erase(it);
+        }
     }
     return new_client;
 }
@@ -185,7 +189,9 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(peer_id_t const& c
 NullAsyncResult grpc_factory::add_server(uint32_t const srv_id, peer_id_t const& srv_addr,
                                          nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
-    if (!client) { return folly::makeUnexpected(nuraft::CANCELLED); }
+    if (!client) {
+        return std::unexpected(nuraft::CANCELLED);
+    }
 
     auto ctx = std::make_shared< client_ctx< uint32_t > >(srv_id, shared_from_this(), dest_cfg.get_id(), srv_addr);
     auto handler = static_cast< nuraft::rpc_handler >(
@@ -200,7 +206,9 @@ NullAsyncResult grpc_factory::add_server(uint32_t const srv_id, peer_id_t const&
 
 NullAsyncResult grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
-    if (!client) { return folly::makeUnexpected(nuraft::CANCELLED); }
+    if (!client) {
+        return std::unexpected(nuraft::CANCELLED);
+    }
 
     auto ctx = std::make_shared< client_ctx< int32_t > >(srv_id, shared_from_this(), dest_cfg.get_id());
     auto handler = static_cast< nuraft::rpc_handler >(
@@ -215,7 +223,9 @@ NullAsyncResult grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_conf
 
 NullAsyncResult grpc_factory::append_entry(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
-    if (!client) { return folly::makeUnexpected(nuraft::CANCELLED); }
+    if (!client) {
+        return std::unexpected(nuraft::CANCELLED);
+    }
 
     auto ctx =
         std::make_shared< client_ctx< std::shared_ptr< nuraft::buffer > > >(buf, shared_from_this(), dest_cfg.get_id());

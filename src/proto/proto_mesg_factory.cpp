@@ -137,13 +137,11 @@ public:
             ->call_unary(cli_buf, request_name, NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs))
             .deferValue(
                 [weak_this = std::weak_ptr< messaging_client >(shared_from_this())](auto&& response) -> NullResult {
-                    if (response.hasError()) {
-                        auto mc = weak_this.lock();
-                        LOGD("Failed to send unidirectional data_service_request to {}, error: {}",
-                             mc ? mc->_addr : "unknown", response.error().error_message());
-                        return folly::makeUnexpected(grpc_status_to_nuraft_code(response.error()));
-                    }
-                    return folly::unit;
+                    if (response.has_value()) return {};
+                    auto mc = weak_this.lock();
+                    LOGD("Failed to send unidirectional data_service_request to {}, error: {}",
+                         mc ? mc->_addr : "unknown", response.error().error_message());
+                    return std::unexpected(grpc_status_to_nuraft_code(response.error()));
                 });
     }
 
@@ -153,16 +151,14 @@ public:
             ->call_unary(cli_buf, request_name, NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs))
             .deferValue([weak_this = std::weak_ptr< messaging_client >(shared_from_this())](
                             auto&& response) -> Result< sisl::GenericClientResponse > {
-                if (response.hasError()) {
-                    std::string addr = "unknown";
-                    if (auto mc = weak_this.lock(); mc) {
-                        mc->bad_service.fetch_add(1, std::memory_order_relaxed);
-                        addr = mc->_addr;
-                    }
-                    log_every_nth(addr, response.error(), "bidirectional");
-                    return folly::makeUnexpected(grpc_status_to_nuraft_code(response.error()));
+                if (response.has_value()) return std::move(response.value());
+                std::string addr = "unknown";
+                if (auto mc = weak_this.lock(); mc) {
+                    mc->bad_service.fetch_add(1, std::memory_order_relaxed);
+                    addr = mc->_addr;
                 }
-                return std::move(response.value());
+                log_every_nth(addr, response.error(), "bidirectional");
+                return std::unexpected(grpc_status_to_nuraft_code(response.error()));
             });
     }
 
@@ -249,14 +245,14 @@ NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional<
     std::shared_lock< client_factory_lock_type > rl(_client_lock);
     auto calls = std::vector< NullAsyncResult >();
     if (dest) {
-        if (dest->hasError()) return folly::makeUnexpected(dest->error());
+        if (!dest->has_value()) return std::unexpected(dest->error());
         if (auto it = _clients.find(dest->value()); _clients.end() != it) {
             auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(it->second);
             return g_client->data_service_request_unidirectional(get_generic_method_name(request_name, _group_id),
                                                                  cli_buf);
         } else {
             LOGE("Failed to find client for [{}], request name [{}]", dest->value(), request_name);
-            return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+            return std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
         }
     }
     // else
@@ -268,7 +264,7 @@ NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional<
     // We ignore the vector of future response from collect all and st the value as folly::unit.
     // This is because we do not have a use case to handle the errors that happen during the unidirectional call to
     // all the peers.
-    return folly::collectAll(calls).deferValue([](auto&&) -> NullResult { return folly::unit; });
+    return folly::collectAll(calls).deferValue([](auto&&) -> NullResult { return {}; });
 }
 
 AsyncResult< sisl::GenericClientResponse >
@@ -276,9 +272,9 @@ mesg_factory::data_service_request_bidirectional(std::optional< Result< peer_id_
                                                  std::string const& request_name, io_blob_list_t const& cli_buf) {
     if (!dest) {
         LOGE("Cannot send request to all the peers, not implemented yet!. Request name [{}]", request_name);
-        return folly::makeUnexpected(nuraft::cmd_result_code::BAD_REQUEST);
+        return std::unexpected(nuraft::cmd_result_code::BAD_REQUEST);
     }
-    if (dest->hasError()) return folly::makeUnexpected(dest->error());
+    if (!dest->has_value()) return std::unexpected(dest->error());
 
     {
         std::shared_lock< client_factory_lock_type > rl(_client_lock);
@@ -290,7 +286,7 @@ mesg_factory::data_service_request_bidirectional(std::optional< Result< peer_id_
             }
         } else {
             LOGE("Failed to find client for [{}], request name [{}]", dest->value(), request_name);
-            return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+            return std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
         }
     }
 
@@ -298,7 +294,7 @@ mesg_factory::data_service_request_bidirectional(std::optional< Result< peer_id_
     auto it = _clients.find(dest->value());
     if (auto err = reinit_client(dest->value(), it->second); nuraft::OK != err) {
         LOGD("Failed to re-initialize client {}: {}", dest->value(), err);
-        return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+        return std::unexpected(nuraft::cmd_result_code::CANCELLED);
     }
     auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(it->second);
     return g_client->data_service_request_bidirectional(get_generic_method_name(request_name, _group_id), cli_buf);
