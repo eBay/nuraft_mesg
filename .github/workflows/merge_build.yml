@@ -1,10 +1,10 @@
-name: NuraftMesg Build
+name: NuraftMesg3 Build
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - stable/v3.x
 
 jobs:
   Build:
