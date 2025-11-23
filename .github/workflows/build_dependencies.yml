@@ -131,7 +131,6 @@ jobs:
       run: |
         conan export import/sisl oss/master
         ./prepare.sh
-        python -m pip install gcovr==5.0.0
         cached_pkgs=$(ls -1d ~/.conan/data/*/*/*/*/package | sed 's,.*data/,,' | cut -d'/' -f1,2 | paste -sd',' - -)
         echo "::info:: Pre-cached: ${cached_pkgs}"
       if: ${{ inputs.testing == 'True' || steps.restore-cache.outputs.cache-hit != 'true' }}
@@ -184,6 +183,7 @@ jobs:
             --build missing \
             .
         conan build .
+        python -m pip install gcovr
         gcovr \
           --merge-lines \
           --cobertura ./coverage.xml \
