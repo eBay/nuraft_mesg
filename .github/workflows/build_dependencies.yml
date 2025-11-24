@@ -175,27 +175,20 @@ jobs:
 
     - name: Code Coverage Run
       run: |
-        conan install \
+        python -m pip install gcovr
+        conan build \
             -o sisl:prerelease=${{ inputs.prerelease }} \
             -o sisl:malloc_impl=${{ inputs.malloc-impl }} \
             -o coverage=True \
             -s build_type=${{ inputs.build-type }} \
             --build missing \
             .
-        conan build .
-        python -m pip install gcovr
-        gcovr \
-          --merge-lines \
-          --cobertura ./coverage.xml \
-          --exclude '.*generated.*' \
-          --exclude '.*tests.*' \
-          --exclude-lines-by-pattern '.*ASSERT.*' \
-          --exclude-lines-by-pattern '.*LOG.*' \
-          --gcov-ignore-parse-errors all
+        gcovr --cobertura ./coverage.xml
       if: ${{ inputs.testing == 'True' && inputs.tooling == 'Coverage' }}
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5
       with:
         files: ./coverage.xml
+        disable_search: true
       if: ${{ inputs.testing == 'True' && inputs.tooling == 'Coverage' }}
