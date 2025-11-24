@@ -64,12 +64,17 @@ class NuRaftMesgConan(ConanFile):
         self.test_requires("jungle/cci.20221201")
 
     def requirements(self):
-        self.requires("sisl/[>=12.3.3]@oss/master", transitive_headers=True)
+        self.requires("sisl/[^12.3]@oss/master", transitive_headers=True)
         self.requires("nuraft/2.4.8", transitive_headers=True)
 
     def layout(self):
         self.folders.source = "."
-        self.folders.build = join("build", str(self.settings.build_type))
+        if self.options.get_safe("sanitize"):
+            self.folders.build = join("build", "Sanitized")
+        elif self.options.get_safe("coverage"):
+            self.folders.build = join("build", "Coverage")
+        else:
+            self.folders.build = join("build", str(self.settings.build_type))
         self.folders.generators = join(self.folders.build, "generators")
 
         self.cpp.source.includedirs = ["include"]
