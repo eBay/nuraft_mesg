@@ -11,14 +11,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: ["ubuntu-22.04"]
+        platform: ["ubuntu-24.04"]
         build-type: ["Debug", "Release"]
         malloc-impl: ["libc", "tcmalloc"]
-        prerelease: ["True", "False"]
         tooling: ["Sanitize", "Coverage", "None"]
         exclude:
-          - build-type: Debug
-            prerelease: "False"
           - build-type: Debug
             tooling: None
           - build-type: Debug
@@ -34,5 +31,4 @@ jobs:
       platform: ${{ matrix.platform }}
       build-type: ${{ matrix.build-type }}
       malloc-impl: ${{ matrix.malloc-impl }}
-      prerelease: ${{ matrix.prerelease }}
       tooling: ${{ matrix.tooling }}

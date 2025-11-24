@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
+
 project(nuraft_mesg CXX)
 enable_testing()
 
-include (cmake/Flags.cmake)
+include(cmake/Flags.cmake)
 
 set(CMAKE_CXX_STANDARD 20)
 
@@ -10,18 +11,18 @@ enable_testing()
 find_package(GTest QUIET REQUIRED)
 
 if (DEFINED BUILD_COVERAGE)
-  if (${BUILD_COVERAGE})
-    include (cmake/CodeCoverage.cmake)
-    APPEND_COVERAGE_COMPILER_FLAGS()
-    SETUP_TARGET_FOR_COVERAGE_GCOVR_XML(NAME coverage EXECUTABLE ctest DEPENDENCIES )
-  endif ()
+    if (${BUILD_COVERAGE})
+        include(cmake/CodeCoverage.cmake)
+        APPEND_COVERAGE_COMPILER_FLAGS()
+        SETUP_TARGET_FOR_COVERAGE_GCOVR_XML(NAME coverage EXECUTABLE ctest DEPENDENCIES)
+    endif ()
 endif ()
 
 if (DEFINED MEMORY_SANITIZER_ON)
-  if  (${MEMORY_SANITIZER_ON})
-    include (cmake/mem_sanitizer.cmake)
-  endif ()
-endif()
+    if (${MEMORY_SANITIZER_ON})
+        include(cmake/mem_sanitizer.cmake)
+    endif ()
+endif ()
 
 find_program(CCACHE_FOUND ccache)
 if (CCACHE_FOUND)
@@ -30,7 +31,7 @@ if (CCACHE_FOUND)
 endif ()
 
 include_directories(BEFORE "include")
-add_subdirectory (src)
+add_subdirectory(src)
 
 # build info
 string(TOUPPER "${CMAKE_BUILD_TYPE}" UC_CMAKE_BUILD_TYPE)

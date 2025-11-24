@@ -35,7 +35,7 @@ class grpc_flatb_client : public grpc_base_client {
 public:
     using handle_resp = std::function< void(Response&, ::grpc::Status&) >;
     using grpc_base_client::grpc_base_client;
-    virtual void send(flatbuffers::Offset< Request > const& request, handle_resp complete) = 0;
+    virtual void send_fb(flatbuffers::Offset< Request > const& request, handle_resp complete) = 0;
 };
 
 } // namespace nuraft_mesg

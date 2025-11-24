@@ -6,7 +6,11 @@
 #include <folly/Expected.h>
 #include <folly/small_vector.h>
 #include <folly/Unit.h>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #include <folly/futures/Future.h>
+#pragma GCC diagnostic pop
 
 #include <libnuraft/async.hxx>
 #include <sisl/fds/buffer.hpp>
@@ -51,7 +55,7 @@ struct formatter< nuraft_mesg::group_id_t > {
 
     template < typename FormatContext >
     auto format(nuraft_mesg::group_id_t const& n, FormatContext& ctx) {
-        return format_to(ctx.out(), "{}", to_string(n));
+        return fmt::v10::format_to(ctx.out(), "{}", boost::uuids::to_string(n));
     }
 };
 
@@ -64,7 +68,7 @@ struct formatter< nuraft::cmd_result_code > {
 
     template < typename FormatContext >
     auto format(nuraft::cmd_result_code const& c, FormatContext& ctx) {
-        return format_to(ctx.out(), "{}", int32_t(c));
+        return fmt::v10::format_to(ctx.out(), "{}", int32_t(c));
     }
 };
 } // namespace fmt
