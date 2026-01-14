@@ -1,4 +1,7 @@
 sources:
+  "2.4.9":
+    url: "https://github.com/eBay/nuraft/archive/10f7e79b06d843f840b84cb7887bace1f89349ef.tar.gz"
+    sha256: "6f94d875dfc324840ddf28ace2807729ab76a9aac5e652b8dddc04a8ab9a99fa"
   "2.4.8":
     url: "https://github.com/eBay/nuraft/archive/57356df58e461b8dfddc698c412c99d1d16ee250.tar.gz"
     sha256: "06064f15e7a142d306ad13ea855b98c424ff05e404b5bc990f8e4688418cb499"
@@ -29,6 +32,10 @@ sources:
   "2.3.0":
     url: "https://github.com/eBay/nuraft/archive/f42b12c3ec9f20a085de61e1294e8167fa747c7d.tar.gz"
 patches:
+  "2.4.9":
+    - patch_file: "patches/2-4-9.patch"
+      patch_description: "Dependency discovery"
+      patch_type: "conan"
   "2.4.8":
     - patch_file: "patches/2-4-7.patch"
       patch_description: "Dependency discovery"

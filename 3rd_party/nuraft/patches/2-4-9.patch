@@ -1,0 +1,190 @@
+--- CMakeLists.txt.orig	2026-01-14 08:12:10
++++ CMakeLists.txt	2026-01-14 16:24:36
+@@ -48,9 +48,9 @@
+ if(WITH_CONAN)
+     if(NOT DISABLE_ASIO)
+         if(BOOST_ASIO)
+-            find_package(Boost REQUIRED)
++            find_package(Boost REQUIRED COMPONENTS Boost::system)
+             add_compile_definitions(USE_BOOST_ASIO)
+-            set(LIBBOOST_SYSTEM boost::boost)
++            set(LIBBOOST_SYSTEM Boost::system)
+         else()
+             find_package(Asio REQUIRED)
+             add_compile_definitions(ASIO_STANDALONE)
+@@ -76,42 +76,23 @@
+ else()
+     if(NOT DISABLE_ASIO)
+         # === Find ASIO ===
+-        if(BOOST_INCLUDE_PATH AND BOOST_LIBRARY_PATH)
++        find_package(OpenSSL CONFIG REQUIRED)
++        find_package(Boost CONFIG)
++        if (Boost_FOUND)
+             # If Boost path (both include and library) is given,
+             # use Boost's ASIO.
+-            message(STATUS "Boost include path: " ${BOOST_INCLUDE_PATH})
+-            message(STATUS "Boost library path: " ${BOOST_LIBRARY_PATH})
+-
+             add_compile_definitions(USE_BOOST_ASIO)
+-
+-            set(ASIO_INCLUDE_DIR ${BOOST_INCLUDE_PATH})
+-            set(LIBBOOST_SYSTEM "${BOOST_LIBRARY_PATH}/libboost_system.a")
+-
++            set(ASIO_DEP boost::boost)
+         else()
+             # If not, ASIO standalone mode.
+-            find_path(ASIO_INCLUDE_DIR
+-                NAME asio.hpp
+-                HINTS ${PROJECT_SOURCE_DIR}/asio/asio/include
+-                $ENV{HOME}/local/include
+-                /opt/local/include
+-                /usr/local/include
+-                /usr/include)
+-
++            find_package(Asio CONFIG REQUIRED)
+             add_compile_definitions(ASIO_STANDALONE)
++            set(ASIO_DEP asio::asio)
+         endif()
+         set(ASIO_SERVICE_SRC "${ROOT_SRC}/asio_service.cxx")
+     else()
+         message(STATUS "ASIO is disabled and will not be included")
+     endif()
+-
+-    if(NOT ASIO_INCLUDE_DIR)
+-        message(FATAL_ERROR "Can't find ASIO header files")
+-    else()
+-        message(STATUS "ASIO include path: " ${ASIO_INCLUDE_DIR})
+-    endif()
+-
+-    # === Includes ===
+-    include_directories(BEFORE ${ASIO_INCLUDE_DIR})
+ 
+     if(DEPS_PREFIX)
+         message(STATUS "deps prefix: " ${DEPS_PREFIX})
+@@ -191,7 +172,9 @@
+ set(LIBRARIES
+     ${LIBSSL}
+     ${LIBCRYPTO}
+-    ${LIBBOOST_SYSTEM})
++    ${LIBBOOST_SYSTEM}
++    ${LIBDL}
++    ${LIBZ})
+ 
+ # === Compiler flags ===
+ option(USE_PTHREAD_EXIT "Call pthread_exit on server threads" OFF)
+@@ -200,20 +183,8 @@
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-pessimizing-move")
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
+-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+ 
+-    if(APPLE)
+-    # include_directories(BEFORE
+-    # /usr/local/opt/openssl/include
+-    # )
+-    # link_directories(
+-    # /usr/local/opt/openssl/lib
+-    # )
+-    else()
+-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+-    endif()
+-
+     if(USE_PTHREAD_EXIT)
+         message(STATUS "Using ::pthread_exit for termination")
+         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_PTHREAD_EXIT")
+@@ -331,90 +302,16 @@
+     ${ROOT_SRC}/stat_mgr.cxx
+ )
+ add_library(RAFT_CORE_OBJ OBJECT ${RAFT_CORE})
+-target_link_libraries(RAFT_CORE_OBJ ${LIBRARIES})
++target_link_libraries(RAFT_CORE_OBJ ${ASIO_DEP} ${LIBRARIES})
+ 
+ set(STATIC_LIB_SRC
+     $<TARGET_OBJECTS:RAFT_CORE_OBJ>)
+ 
+-# === Executables ===
+-set(LIBRARY_NAME "nuraft")
+-
+-add_library(static_lib ${STATIC_LIB_SRC})
+-add_library(NuRaft::static_lib ALIAS static_lib)
+-set_target_properties(static_lib PROPERTIES OUTPUT_NAME ${LIBRARY_NAME} CLEAN_DIRECT_OUTPUT 1)
+-
+-add_library(shared_lib SHARED ${STATIC_LIB_SRC})
+-add_library(NuRaft::shared_lib ALIAS shared_lib)
+-set_target_properties(shared_lib PROPERTIES OUTPUT_NAME ${LIBRARY_NAME} CLEAN_DIRECT_OUTPUT 1)
+-
+-# Include directories are necessary for dependents to use the targets.
+-target_include_directories(static_lib
+-    PUBLIC
+-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include>
+-)
++add_library(nuraft ${STATIC_LIB_SRC})
++target_link_libraries(nuraft ${ASIO_DEP} openssl::openssl)
+ 
+-target_include_directories(shared_lib
+-    PUBLIC
+-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include>
+-)
+-
+-# if (APPLE)
+-# There is no harm in adding libraries; this is required when building with Conan
+-target_link_libraries(shared_lib ${LIBRARIES})
+-target_link_libraries(static_lib ${LIBRARIES})
+-
+-# endif ()
+-if(WIN32)
+-    set(LIBRARY_OUTPUT_NAME "${LIBRARY_NAME}.lib")
+-else()
+-    set(LIBRARY_OUTPUT_NAME "lib${LIBRARY_NAME}.a")
+-endif()
+-
+-message(STATUS "Output library file name: ${LIBRARY_OUTPUT_NAME}")
+-
+-# overwrite to set it to target name instead which passes all lib dependencies to tests and examples
+-set(LIBRARY_NAME static_lib)
+-
+-# === Examples ===
+-if(BUILD_EXAMPLES AND NOT DISABLE_ASIO)
+-    add_subdirectory(examples)
+-endif()
+-
+-# === Tests ===
+-if(BUILD_TESTING)
+-    add_subdirectory(tests)
+-endif()
+-
+-if(CODE_COVERAGE GREATER 0)
+-    set(CODE_COVERAGE_DEPS
+-        buffer_test
+-        serialization_test
+-        strfmt_test
+-        stat_mgr_test
+-        raft_server_test
+-        snapshot_test
+-        leader_election_test
+-        learner_new_joiner_test
+-        failure_test
+-        timer_test
+-        asio_service_test
+-        req_resp_meta_test
+-        stream_transport_layer_test
+-        raft_stream_mode_test
+-    )
+-
+-    # lcov
+-    SETUP_TARGET_FOR_COVERAGE(
+-        NAME raft_cov
+-        EXECUTABLE ./runtests.sh
+-        DEPENDENCIES ${CODE_COVERAGE_DEPS}
+-    )
+-endif()
+-
+ # === Install Targets ===
+-install(TARGETS shared_lib static_lib
++install(TARGETS nuraft
+     EXPORT nuraft-targets
+     LIBRARY DESTINATION lib
+     ARCHIVE DESTINATION lib
