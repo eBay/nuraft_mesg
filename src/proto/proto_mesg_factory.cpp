@@ -246,20 +246,34 @@ nuraft::cmd_result_code mesg_factory::reinit_client(peer_id_t const& client,
 NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional< Result< peer_id_t > > const& dest,
                                                                   std::string const& request_name,
                                                                   io_blob_list_t const& cli_buf) {
-    std::shared_lock< client_factory_lock_type > rl(_client_lock);
-    auto calls = std::vector< NullAsyncResult >();
     if (dest) {
         if (dest->hasError()) return folly::makeUnexpected(dest->error());
-        if (auto it = _clients.find(dest->value()); _clients.end() != it) {
-            auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(it->second);
-            return g_client->data_service_request_unidirectional(get_generic_method_name(request_name, _group_id),
-                                                                 cli_buf);
-        } else {
-            LOGE("Failed to find client for [{}], request name [{}]", dest->value(), request_name);
+
+        // Try to find existing client with read lock
+        {
+            std::shared_lock< client_factory_lock_type > rl(_client_lock);
+            if (auto it = _clients.find(dest->value()); _clients.end() != it) {
+                auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(it->second);
+                return g_client->data_service_request_unidirectional(get_generic_method_name(request_name, _group_id),
+                                                                     cli_buf);
+            }
+        }
+
+        // Client not found, create a new one
+        LOGI("Client not found, attempting to create client for [{}], request name [{}]", dest->value(), request_name);
+        auto client = create_client(dest->value());
+        auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(client);
+        if (!g_client) {
+            LOGE("Failed to create client for [{}], request name [{}]", dest->value(), request_name);
             return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
         }
+        return g_client->data_service_request_unidirectional(get_generic_method_name(request_name, _group_id),
+                                                             cli_buf);
     }
-    // else
+
+    // else - send to all clients
+    auto calls = std::vector< NullAsyncResult >();
+    std::shared_lock< client_factory_lock_type > rl(_client_lock);
     for (auto& nuraft_client : _clients) {
         auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(nuraft_client.second);
         calls.push_back(
@@ -288,19 +302,17 @@ mesg_factory::data_service_request_bidirectional(std::optional< Result< peer_id_
                 return g_client->data_service_request_bidirectional(get_generic_method_name(request_name, _group_id),
                                                                     cli_buf);
             }
-        } else {
-            LOGE("Failed to find client for [{}], request name [{}]", dest->value(), request_name);
-            return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
         }
     }
 
-    std::unique_lock< client_factory_lock_type > wl(_client_lock);
-    auto it = _clients.find(dest->value());
-    if (auto err = reinit_client(dest->value(), it->second); nuraft::OK != err) {
-        LOGD("Failed to re-initialize client {}: {}", dest->value(), err);
-        return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+    // Client not found or needs reinit - use create_client to handle both cases
+    LOGI("Client not found, attempting to create client for [{}], request name [{}]", dest->value(), request_name);
+    auto client = create_client(dest->value());
+    auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(client);
+    if (!g_client) {
+        LOGE("Failed to create/reinit client for [{}], request name [{}]", dest->value(), request_name);
+        return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
     }
-    auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(it->second);
     return g_client->data_service_request_bidirectional(get_generic_method_name(request_name, _group_id), cli_buf);
 }
 
