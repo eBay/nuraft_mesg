@@ -328,3 +328,62 @@ TEST_F(DataServiceFixture, NegativeTests) {
 
     folly::collectAll(results).via(folly::getGlobalCPUExecutor()).get();
 }
+
+TEST_F(DataServiceFixture, AutoCreateClientTest) {
+    // Test that data_service_request_* works correctly when sending to a peer
+    // that is in lookup_map but the sender doesn't have a client to it yet
+    // This verifies the auto-create client functionality
+
+    get_random_ports(1u);
+
+    // Create app_4 and add it to lookup_map
+    auto app_4 = std::make_shared< TestApplication >("sm4", ports[3]);
+
+    // Register the peer in lookup_map (so create_client can find the endpoint)
+    lookup_map.emplace(app_4->id_, fmt::format("127.0.0.1:{}", ports[3]));
+    app_1_->map_peers(lookup_map);
+    app_2_->map_peers(lookup_map);
+    app_3_->map_peers(lookup_map);
+    app_4->map_peers(lookup_map);
+    app_4->start(true);
+
+    // app_1 adds app_4 to the group -> app_1 will have client to app_4
+    auto add4 = app_1_->instance_->add_member(group_id_, nuraft::srv_config(to_server_id(app_4->id_), to_string(app_4->id_)));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    EXPECT_TRUE(std::move(add4).get());
+
+    auto sm1 = app_1_->state_mgr_map_[group_id_];
+    RELEASE_ASSERT(sm1, "Bad pointer for app_1!");
+    auto sm4 = app_4->state_mgr_map_[group_id_];
+    RELEASE_ASSERT(sm4, "Bad pointer for app_4!");
+
+    std::vector< NullAsyncResult > results;
+
+    // Key test: app_4 sends to app_1
+    // At this point, app_4's factory might not have a client to app_1
+    // because app_4 was passively added to the group
+    // The auto-create functionality should kick in
+
+    // Test 1: data_service_request_unidirectional with auto-created client
+    LOGINFO("Testing unidirectional request - should auto-create client if needed");
+    results.push_back(sm4->data_service_request_unidirectional(app_1_->id_, SEND_DATA, cli_buf)
+                          .deferValue([](auto e) -> NullResult {
+                              EXPECT_TRUE(e.hasValue()) << "Unidirectional request should succeed with auto-created client";
+                              return folly::Unit();
+                          }));
+
+    // Test 2: data_service_request_bidirectional with auto-created client
+    LOGINFO("Testing bidirectional request - client should already exist from test 1");
+    results.push_back(sm4->data_service_request_bidirectional(app_1_->id_, REQUEST_DATA, cli_buf)
+                          .deferValue([](auto e) -> NullResult {
+                              EXPECT_TRUE(e.hasValue()) << "Bidirectional request should succeed";
+                              return folly::Unit();
+                          }));
+
+    folly::collectAll(results).via(folly::getGlobalCPUExecutor()).get();
+
+    LOGINFO("Auto-create client test passed");
+
+    // Clean up
+    app_4->instance_->leave_group(group_id_);
+}

@@ -107,6 +107,7 @@ public:
 
     group_id_t group_id() const { return _group_id; }
 
+    using grpc_factory::create_client;
     nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >& rpc_ptr) override;
 
     nuraft::cmd_result_code reinit_client(peer_id_t const& client,
