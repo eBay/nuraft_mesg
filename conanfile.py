@@ -59,13 +59,13 @@ class NuRaftMesgConan(ConanFile):
                     raise ConanInvalidConfiguration("Coverage/Sanitizer requires Testing!")
 
     def build_requirements(self):
-        self.test_requires("lz4/[>=1.9]")
-        self.test_requires("gtest/1.17.0")
+        self.test_requires("lz4/[^1.9]")
+        self.test_requires("gtest/[^1.17]")
         self.test_requires("jungle/cci.20250316")
 
     def requirements(self):
-        self.requires("sisl/[>=13]@oss/master", transitive_headers=True)
-        self.requires("nuraft/2.4.9", transitive_headers=True)
+        self.requires("sisl/[^13.2]", transitive_headers=True)
+        self.requires("nuraft/[^2.4]", transitive_headers=True)
 
     def layout(self):
         self.folders.source = "."

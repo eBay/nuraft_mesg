@@ -4,8 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
     branches:
-      - main
-      - feature/*
+      - stable/v4*
 
 jobs:
   Build:
