@@ -71,13 +71,13 @@ jobs:
     runs-on: ${{ inputs.platform }}
     steps:
     - name: Retrieve Code
-      uses: actions/checkout@main
+      uses: actions/checkout@v4
       with:
         ref: ${{ inputs.branch }}
       if: ${{ inputs.testing == 'True' }}
 
     - name: Retrieve Recipe
-      uses: actions/checkout@main
+      uses: actions/checkout@v4
       with:
         repository: eBay/nuraft_mesg
         ref: ${{ inputs.branch }}
@@ -97,7 +97,7 @@ jobs:
         key_prefix: NuMesgDeps-${{ inputs.platform }}-${{ inputs.build-type }}-${{ inputs.malloc-impl }}
 
     - name: Retrieve Dependencies
-      uses: actions/checkout@main
+      uses: actions/checkout@v4
       with:
         repository: eBay/sisl
         path: import/sisl

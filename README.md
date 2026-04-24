@@ -1,6 +1,6 @@
 # nuRAFT-Messaging
-[![Conan Build](https://github.com/eBay/nuraft_mesg/actions/workflows/merge_build.yml/badge.svg?branch=main)](https://github.com/eBay/nuraft_mesg/actions/workflows/merge_build.yml)
-[![CodeCov](https://codecov.io/gh/eBay/nuraft_mesg/branch/main/graph/badge.svg)](https://codecov.io/gh/eBay/nuraft_mesg)
+[![Conan Build](https://github.com/eBay/nuraft_mesg/actions/workflows/merge_build.yml/badge.svg?branch=stable%2Fv4.x)](https://github.com/eBay/nuraft_mesg/actions/workflows/merge_build.yml)
+[![CodeCov](https://codecov.io/gh/szmyd/nuraft_mesg/branch/stable%2Fv4.x/graph/badge.svg)](https://codecov.io/gh/szmyd/nuraft_mesg)
 
 ## Brief
 
@@ -46,7 +46,7 @@ in conan-center. If using conan-center one must first export this recipe to thei
 $ git clone https://github.com/eBay/sisl sisl
 $ pip install --user conan
 $ conan profile detect --name default
-$ conan export sisl/ oss/master
+$ conan export sisl/
 ```
 
 ## Building the Package
