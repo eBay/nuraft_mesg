@@ -5,7 +5,7 @@ enable_testing()
 
 include(cmake/Flags.cmake)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 
 enable_testing()
 find_package(GTest QUIET REQUIRED)
@@ -18,10 +18,12 @@ if (DEFINED BUILD_COVERAGE)
     endif ()
 endif ()
 
-if (DEFINED MEMORY_SANITIZER_ON)
-    if (${MEMORY_SANITIZER_ON})
-        include(cmake/mem_sanitizer.cmake)
-    endif ()
+if ((DEFINED THREAD_SANITIZER_ON) AND (${THREAD_SANITIZER_ON}))
+    set(SANITIZER_TYPE "thread")
+    include(cmake/sanitize.cmake)
+elseif ((DEFINED ADDRESS_SANITIZER_ON) AND (${ADDRESS_SANITIZER_ON}))
+    set(SANITIZER_TYPE "address")
+    include(cmake/sanitize.cmake)
 endif ()
 
 find_program(CCACHE_FOUND ccache)

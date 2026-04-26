@@ -1,0 +1,126 @@
+# ThreadSanitizer suppression file for sisl
+# Add suppressions here as TSAN identifies false positives.
+# Format: race:<function_name>
+
+# FileWatcher pipe-based shutdown: stop() writes to m_pipefd[1] to wake the watcher, then
+# joins the thread. The watcher closes both pipe ends after breaking its poll loop. TSAN
+# flags the concurrent write(fd)/close(fd) pair, but the write() returns before the watcher
+# can reach the close — pipe buffer ordering provides the happens-before that TSAN cannot model.
+#race:sisl::FileWatcher::run
+#race:sisl::FileWatcher::stop
+#
+## test_status_factory benchmarks: URCU races are false positives (synchronize_rcu() provides
+## the happens-before that TSAN cannot model); parallel_update/test_raw_gets races are
+## intentional — the benchmark deliberately exercises unsynchronized access as a baseline.
+#race:test_urcu_gets
+#race:parallel_update
+#race:test_raw_gets
+
+# test_flip / echo_server / echo_async_client / auth_test: gRPC/absl TSAN false positives.
+# All races are within gRPC/absl internal lock-free initialization and EventEngine management
+# code. Suppressions cover three layers:
+#   1. grpc_core / grpc_event_engine::experimental / absl — internal gRPC/absl namespaces
+#   2. grpc:: / google::protobuf — the C++ public API layer (CQ-based happens-before invisible to TSAN)
+#   3. sisl gRPC wrappers — races surface here because gRPC's completion queue delivery
+#      provides happens-before that TSAN cannot model; operator new tracking makes TSAN
+#      believe the allocating thread is still writing when the CQ thread reads the object.
+race:grpc_event_engine::experimental
+race:grpc_core
+race:absl::lts_20250127
+race:DoAllocWithArena
+race:grpc::
+race:google::protobuf
+#race:sisl::RpcTag
+#race:sisl::RpcData
+#race:sisl::ClientRpcData
+race:grpc_slice
+race:grpc_handler_private_op_data
+# GenericRpcData/RpcDataAbstract: CQ delivery provides happens-before that TSAN cannot model.
+# The allocating thread (bind_data_service_request) appears to race with the CQ delivery thread
+# (intrusive_ptr_release) because operator new tracking makes TSAN believe the allocating thread
+# still owns the object when the CQ thread unrefs it.
+race:sisl::GenericRpcData
+race:sisl::RpcDataAbstract
+## wisr_vector_test: URCU false positives — urcu_scoped_ptr::_make_and_exchange swaps in a new
+## buffer while writers read through the URCU pointer; synchronize_rcu() provides the
+## happens-before that TSAN cannot model.
+#race:sisl::wisr_framework
+#race:sisl::urcu_scoped_ptr
+
+# Jungle SimpleLogger: the log store's sl_flusher/j_flusher threads write to the circular
+# ring buffer concurrently with the main thread; Jungle uses its own internal lock-free
+# synchronization that TSAN cannot model.
+race:SimpleLogger
+
+# c-ares: DNS resolver global init/shutdown and per-channel state use lock-free patterns
+# (atomic CAS, flag-based barriers) invisible to TSAN.
+race:ares_
+
+# gRPC C-layer: gpr_malloc/gpr_free/gpr_realloc share a lock-free slab; the allocating
+# thread and the CQ delivery thread appear to race because gRPC's CQ provides the
+# happens-before that TSAN cannot model.
+race:gpr_
+
+# gRPC TcpSend: posix_engine TCP send path reads slice buffers while the CQ delivery
+# thread frees them; sendmsg() provides happens-before via the kernel that TSAN cannot
+# model. Also covers sisl::AlignedAllocatorImpl::aligned_free racing with TcpSend's
+# sendmsg() read of the same backing allocation.
+race:TcpSend
+
+# sisl::GrpcAsyncClient::make: the constructing thread writes the channel target string
+# while gRPC's event_engine thread has already begun reading it; the channel-connect
+# handoff (via gRPC's internal CQ mechanism) provides happens-before invisible to TSAN.
+race:sisl::GrpcAsyncClient
+
+# sisl::GrpcAsyncClientWorker::client_loop: the CQ delivery thread reads response objects
+# allocated by a different thread; CQ delivery provides happens-before that TSAN cannot
+# model via operator new tracking.
+race:sisl::GrpcAsyncClientWorker
+
+# grpc_resolved_address: gRPC event_engine DNS resolution objects shared between
+# event_engine threads without TSAN-visible fences (gRPC's internal ref-counting provides
+# the happens-before).
+race:grpc_resolved_address
+
+# gRPC event_engine internal copy: two event_engine threads race on std::copy over
+# gRPC's internal int arrays (fd sets, pollset arrays). The stack is too shallow to
+# show the grpc_event_engine::experimental frames that carry the actual synchronization.
+race:std::__copy_move
+
+# gRPC transport layer: made_transport_op is constructed and destroyed by different
+# event_engine threads; gRPC's internal ref-counting provides the happens-before
+# that TSAN cannot model.
+race:made_transport_op
+
+# std::char_traits string ops (copy/compare/assign) racing between gRPC event_engine
+# threads on gRPC-internal string buffers. Stacks are only 3 frames deep — too shallow
+# to expose the grpc_event_engine::experimental namespace that carries the actual sync.
+race:std::char_traits
+
+# std::default_delete called by event_engine threads on gRPC-internal unique_ptr objects;
+# gRPC's completion queue delivery provides the happens-before that TSAN cannot model.
+race:std::default_delete
+
+# gRPC event_engine threads racing on std::__new_allocator (e.g., Rb_tree_node<long>
+# allocations for internal sets/maps). gRPC's event_engine provides the happens-before
+# invisible to TSAN.
+race:std::__new_allocator
+
+# Same event_engine allocator races but with short (2-frame) stacks where the class
+# name is optimized away — only bare deallocate/allocate is visible. GCC 13 TSan does
+# not support src: suppressions so race:std::__new_allocator doesn't fire either.
+race:deallocate
+
+# gRPC server shutdown: main thread calls SendShutdown (grpc server.cc) while an
+# event_engine thread runs ShutdownCleanup in the same file; gRPC's shutdown
+# sequencing provides the happens-before that TSAN cannot model.
+race:ShutdownCleanup
+
+# Lock-order-inversion: msg_service::add_member holds _raft_servers_mutex (shared) and
+# calls nuraft's add_srv (acquires nuraft's internal lock); nuraft's shutdown holds its
+# lock and calls ~msg_group_listner which calls shutdown_for (write-locks
+# _raft_servers_mutex). shutdown_for is always a no-op in the leave_group path because
+# leave_group erases the entry from _raft_servers before calling raft_server::shutdown(),
+# so the cycle cannot actually deadlock in practice.
+deadlock:nuraft_mesg::msg_service::shutdown_for
+

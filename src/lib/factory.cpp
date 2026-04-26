@@ -36,21 +36,20 @@ struct client_ctx {
     Payload payload() const { return _payload; }
     std::shared_ptr< grpc_factory > cli_factory() const { return _cli_factory; }
     NullAsyncResult future() {
-        auto [p, sf] = folly::makePromiseContract< NullResult >();
-        _promise = std::move(p);
-        return sf;
+        _promise = std::make_shared< std::promise< NullResult > >();
+        return _promise->get_future();
     }
     void set(nuraft::cmd_result_code const code) {
         if (nuraft::OK == code)
-            _promise.setValue(folly::Unit());
+            _promise->set_value({});
         else
-            _promise.setValue(folly::makeUnexpected(code));
+            _promise->set_value(std::unexpected(code));
     }
 
 private:
     Payload const _payload;
     std::shared_ptr< grpc_factory > _cli_factory;
-    folly::Promise< NullResult > _promise;
+    std::shared_ptr< std::promise< NullResult > > _promise;
 };
 
 template < typename PayloadType >
@@ -185,7 +184,11 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(peer_id_t const& c
 NullAsyncResult grpc_factory::add_server(uint32_t const srv_id, peer_id_t const& srv_addr,
                                          nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
-    if (!client) { return folly::makeUnexpected(nuraft::CANCELLED); }
+    if (!client) {
+        std::promise< NullResult > p;
+        p.set_value(std::unexpected(nuraft::CANCELLED));
+        return p.get_future();
+    }
 
     auto ctx = std::make_shared< client_ctx< uint32_t > >(srv_id, shared_from_this(), dest_cfg.get_id(), srv_addr);
     auto handler = static_cast< nuraft::rpc_handler >(
@@ -200,7 +203,11 @@ NullAsyncResult grpc_factory::add_server(uint32_t const srv_id, peer_id_t const&
 
 NullAsyncResult grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
-    if (!client) { return folly::makeUnexpected(nuraft::CANCELLED); }
+    if (!client) {
+        std::promise< NullResult > p;
+        p.set_value(std::unexpected(nuraft::CANCELLED));
+        return p.get_future();
+    }
 
     auto ctx = std::make_shared< client_ctx< int32_t > >(srv_id, shared_from_this(), dest_cfg.get_id());
     auto handler = static_cast< nuraft::rpc_handler >(
@@ -215,7 +222,11 @@ NullAsyncResult grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_conf
 
 NullAsyncResult grpc_factory::append_entry(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
-    if (!client) { return folly::makeUnexpected(nuraft::CANCELLED); }
+    if (!client) {
+        std::promise< NullResult > p;
+        p.set_value(std::unexpected(nuraft::CANCELLED));
+        return p.get_future();
+    }
 
     auto ctx =
         std::make_shared< client_ctx< std::shared_ptr< nuraft::buffer > > >(buf, shared_from_this(), dest_cfg.get_id());

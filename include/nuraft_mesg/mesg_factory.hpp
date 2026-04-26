@@ -14,10 +14,11 @@
  *********************************************************************************/
 #pragma once
 
+#include <map>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 
-#include <folly/SharedMutex.h>
 #include <sisl/logging/logging.h>
 #include <libnuraft/rpc_cli_factory.hxx>
 #include <libnuraft/srv_config.hxx>
@@ -32,7 +33,7 @@ class MetricsGroup;
 
 namespace nuraft_mesg {
 
-using client_factory_lock_type = folly::SharedMutex;
+using client_factory_lock_type = std::shared_mutex;
 // Brief:
 //   Implements cornerstone's rpc_client_factory providing sisl::GrpcAsyncClient
 //   inherited rpc_client instances sharing a common worker pool.
@@ -59,13 +60,15 @@ public:
     virtual nuraft::cmd_result_code reinit_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 
     // Construct and send an AddServer message to the cluster
-    NullAsyncResult add_server(uint32_t const srv_id, peer_id_t const& srv_addr, nuraft::srv_config const& dest_cfg);
+    [[nodiscard]] NullAsyncResult add_server(uint32_t const srv_id, peer_id_t const& srv_addr,
+                                             nuraft::srv_config const& dest_cfg);
 
     // Send a client request to the cluster
-    NullAsyncResult append_entry(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg);
+    [[nodiscard]] NullAsyncResult append_entry(std::shared_ptr< nuraft::buffer > buf,
+                                               nuraft::srv_config const& dest_cfg);
 
     // Construct and send a RemoveServer message to the cluster
-    NullAsyncResult rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);
+    [[nodiscard]] NullAsyncResult rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);
 };
 
 class group_factory : public grpc_factory {
@@ -113,10 +116,11 @@ public:
     nuraft::cmd_result_code reinit_client(peer_id_t const& client,
                                           std::shared_ptr< nuraft::rpc_client >& raft_client) override;
 
-    NullAsyncResult data_service_request_unidirectional(std::optional< Result< peer_id_t > > const& dest,
-                                                        std::string const& request_name, io_blob_list_t const& cli_buf);
+    [[nodiscard]] NullAsyncResult
+    data_service_request_unidirectional(std::optional< Result< peer_id_t > > const& dest,
+                                        std::string const& request_name, io_blob_list_t const& cli_buf);
 
-    AsyncResult< sisl::GenericClientResponse >
+    [[nodiscard]] AsyncResult< sisl::GenericClientResponse >
     data_service_request_bidirectional(std::optional< Result< peer_id_t > > const&, std::string const&,
                                        io_blob_list_t const&);
 };

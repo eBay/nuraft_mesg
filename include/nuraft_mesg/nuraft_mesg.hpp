@@ -78,17 +78,19 @@ public:
     virtual void register_mgr_type(group_type_t const& group_type, group_params const&) = 0;
 
     virtual std::shared_ptr< mesg_state_mgr > lookup_state_manager(group_id_t const& group_id) const = 0;
-    virtual NullAsyncResult create_group(group_id_t const& group_id, group_type_t const& group_type) = 0;
-    virtual NullResult join_group(group_id_t const& group_id, group_type_t const& group_type,
-                                  std::shared_ptr< mesg_state_mgr >) = 0;
+    [[nodiscard]] virtual NullAsyncResult create_group(group_id_t const& group_id,
+                                                        group_type_t const& group_type) = 0;
+    [[nodiscard]] virtual NullResult join_group(group_id_t const& group_id, group_type_t const& group_type,
+                                                std::shared_ptr< mesg_state_mgr >) = 0;
 
     // Send a client request to the cluster
-    virtual NullAsyncResult add_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
-    virtual NullAsyncResult add_member(group_id_t const& group_id, nuraft::srv_config const& srv_config) = 0;
-    virtual NullAsyncResult rem_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
-    virtual NullAsyncResult become_leader(group_id_t const& group_id) = 0;
-    virtual NullAsyncResult append_entries(group_id_t const& group_id,
-                                           std::vector< std::shared_ptr< nuraft::buffer > > const&) = 0;
+    [[nodiscard]] virtual NullAsyncResult add_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
+    [[nodiscard]] virtual NullAsyncResult add_member(group_id_t const& group_id,
+                                                     nuraft::srv_config const& srv_config) = 0;
+    [[nodiscard]] virtual NullAsyncResult rem_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
+    [[nodiscard]] virtual NullAsyncResult become_leader(group_id_t const& group_id) = 0;
+    [[nodiscard]] virtual NullAsyncResult append_entries(group_id_t const& group_id,
+                                                         std::vector< std::shared_ptr< nuraft::buffer > > const&) = 0;
 
     // Misc Mgmt
     virtual void get_srv_config_all(group_id_t const& group_id,

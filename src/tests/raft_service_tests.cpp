@@ -51,7 +51,7 @@ TEST_F(MessagingFixture, BasicTests) {
     app_3_->map_peers(lookup_map);
     app_3_->start(true);
     auto sm3 = std::make_shared< test_state_mgr >(nuraft_mesg::to_server_id(our_id), our_id, group_id_);
-    app_3_->instance_->join_group(group_id_, "test_type", sm3);
+    ASSERT_TRUE(app_3_->instance_->join_group(group_id_, "test_type", sm3));
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_FALSE(app_3_->instance_->become_leader(bogus_uuid).get());
     EXPECT_TRUE(app_3_->instance_->become_leader(group_id_).get());
@@ -78,8 +78,7 @@ TEST_F(MessagingFixture, BasicTests) {
     app_3_->map_peers(lookup_map);
     app_3_->start(true);
     sm3 = std::make_shared< test_state_mgr >(nuraft_mesg::to_server_id(our_id), our_id, group_id_);
-    app_3_->instance_->join_group(
-        group_id_, "test_type", sm3);
+    ASSERT_TRUE(app_3_->instance_->join_group(group_id_, "test_type", sm3));
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // leader shoud still on app_1

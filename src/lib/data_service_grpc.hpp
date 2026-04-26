@@ -1,8 +1,8 @@
 #pragma once
 
+#include <shared_mutex>
 #include <unordered_map>
 #include <sisl/grpc/rpc_server.hpp>
-#include <folly/SharedMutex.h>
 
 #include "nuraft_mesg/nuraft_mesg.hpp"
 
@@ -11,7 +11,7 @@ struct io_blob;
 }
 namespace nuraft_mesg {
 
-using data_lock_type = folly::SharedMutex;
+using data_lock_type = std::shared_mutex;
 
 class data_service_grpc {
     // key: group_id, value: map

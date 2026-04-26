@@ -4,9 +4,11 @@
 #pragma once
 
 #include <map>
+#include <shared_mutex>
+#include <unordered_map>
 
+#include <boost/functional/hash.hpp>
 #include <libnuraft/async.hxx>
-#include <folly/concurrency/ConcurrentHashMap.h>
 #include <sisl/grpc/rpc_server.hpp>
 #include <sisl/metrics/metrics.hpp>
 
@@ -14,20 +16,21 @@
 #include "manager_impl.hpp"
 #include "data_service_grpc.hpp"
 
-/// This is for the ConcurrentHashMap
 namespace std {
 template <>
 struct hash< boost::uuids::uuid > {
-    size_t operator()(const boost::uuids::uuid& uid) { return boost::hash< boost::uuids::uuid >()(uid); }
+    size_t operator()(const boost::uuids::uuid& uid) const {
+        return boost::hash< boost::uuids::uuid >()(uid);
+    }
 };
 } // namespace std
 
 namespace nuraft_mesg {
 
-class group_metrics : public sisl::MetricsGroupWrapper {
+class group_metrics : public sisl::MetricsGroup {
 public:
     explicit group_metrics(group_id_t const& group_id) :
-            sisl::MetricsGroupWrapper("RAFTGroup", to_string(group_id).c_str()) {
+            sisl::MetricsGroup("RAFTGroup", to_string(group_id)) {
         REGISTER_COUNTER(group_steps, "Total group messages received", "raft_group_cnt", {"op", "step_count"});
         REGISTER_COUNTER(group_sends, "Total group messages sent", "raft_group_cnt", {"op", "send_count"});
         REGISTER_HISTOGRAM(append_entries_latency_us, "Latency for processing raft step", "raft_group_latency",
@@ -41,6 +44,9 @@ public:
 struct grpc_server_wrapper {
     std::shared_ptr< group_metrics > m_metrics;
     std::unique_ptr< grpc_server > m_server;
+
+    grpc_server_wrapper(std::shared_ptr< group_metrics > m, std::unique_ptr< grpc_server > s) :
+            m_metrics(std::move(m)), m_server(std::move(s)) {}
 };
 
 class msg_service : public nuraft::raft_server_handler, public std::enable_shared_from_this< msg_service > {
@@ -50,7 +56,8 @@ class msg_service : public nuraft::raft_server_handler, public std::enable_share
     std::weak_ptr< ManagerImpl > _manager;
 
 protected:
-    folly::ConcurrentHashMap< group_id_t, grpc_server_wrapper > _raft_servers;
+    mutable std::shared_mutex _raft_servers_mutex;
+    std::unordered_map< group_id_t, grpc_server_wrapper > _raft_servers;
     peer_id_t const _service_address;
 
 public:
@@ -70,7 +77,7 @@ public:
     virtual void bind(sisl::GrpcServer* server);
     //
 
-    void shutdown();
+    virtual void shutdown();
 
     NullAsyncResult add_member(group_id_t const& group_id, nuraft::srv_config const& cfg);
     NullAsyncResult rem_member(group_id_t const& group_id, int const member_id);

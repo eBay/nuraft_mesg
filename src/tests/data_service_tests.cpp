@@ -52,7 +52,7 @@ TEST_F(DataServiceFixture, BasicTest1) {
     // create new group
     auto follower_priority = 80;
     auto data_group = boost::uuids::random_generator()();
-    app_4->instance_->create_group(data_group, "test_type");
+    (void)app_4->instance_->create_group(data_group, "test_type");
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
     auto add1 =
@@ -92,63 +92,37 @@ TEST_F(DataServiceFixture, BasicTest1) {
     auto sm5 = app_5->state_mgr_map_[data_group];
     RELEASE_ASSERT(sm5, "Bad pointer!");
 
-    std::vector< NullAsyncResult > results;
-    results.push_back(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasValue());
-                              return folly::Unit();
-                          }));
-    results.push_back(sm5->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasValue());
-                              return folly::Unit();
-                          }));
+    EXPECT_TRUE(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, cli_buf).get());
 
-    results.push_back(sm4_1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              test_state_mgr::verify_data(e.value().response_blob());
-                              return folly::Unit();
-                          }));
+    EXPECT_TRUE(sm5->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, cli_buf).get());
 
-    results.push_back(
-        sm1->data_service_request_unidirectional(app_2_->id_, SEND_DATA, cli_buf).deferValue([](auto e) -> NullResult {
-            EXPECT_TRUE(e.hasValue());
-            return folly::Unit();
-        }));
+    {
+        auto r = sm4_1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, cli_buf).get();
+        EXPECT_TRUE(r);
+        if (r) { test_state_mgr::verify_data(r->response_blob()); }
+    }
+
+    EXPECT_TRUE(sm1->data_service_request_unidirectional(app_2_->id_, SEND_DATA, cli_buf).get());
 
     auto repl_ctx1 = sm1->get_repl_context();
     for (auto svr : repl_ctx1->_server->get_config()->get_servers()) {
         if (svr->get_endpoint() == to_string(app_1_->id_)) continue;
         LOGINFO("Sending request to server [{}]", svr->get_id())
-        results.push_back(sm1->data_service_request_bidirectional(svr->get_id(), REQUEST_DATA, cli_buf)
-                              .deferValue([](auto e) -> NullResult {
-                                  EXPECT_TRUE(e.hasValue());
-                                  return folly::Unit();
-                              }));
+        EXPECT_TRUE(sm1->data_service_request_bidirectional(svr->get_id(), REQUEST_DATA, cli_buf).get());
     }
-
-    folly::collectAll(results).via(folly::getGlobalCPUExecutor()).get();
 
     // test big message
     LOGINFO("Starting large object write test")
     io_blob_list_t big_cli_buf;
     test_state_mgr::fill_data_vec_big(big_cli_buf, 4 * 1024 * 1024);
-    sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, big_cli_buf)
-        .deferValue([](auto e) -> NullResult {
-            EXPECT_TRUE(e.hasValue());
-            return folly::Unit();
-        })
-        .get();
+    EXPECT_TRUE(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, big_cli_buf).get());
     LOGINFO("End large object write test")
     LOGINFO("Starting large object read test")
-
-    sm4_1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, big_cli_buf)
-        .deferValue([](auto e) -> NullResult {
-            EXPECT_TRUE(e.hasValue());
-            test_state_mgr::verify_data(e.value().response_blob());
-            return folly::Unit();
-        })
-        .get();
+    {
+        auto r = sm4_1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, big_cli_buf).get();
+        EXPECT_TRUE(r);
+        if (r) { test_state_mgr::verify_data(r->response_blob()); }
+    }
     LOGINFO("End large object read test")
     for (auto& buf : big_cli_buf) {
         buf.buf_free();
@@ -158,12 +132,7 @@ TEST_F(DataServiceFixture, BasicTest1) {
     auto add_3 = app_4->instance_->add_member(data_group, app_3_->id_);
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(std::move(add_3).get());
-    sm4->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, cli_buf)
-        .deferValue([](auto e) -> folly::Unit {
-            EXPECT_TRUE(e.hasValue());
-            return folly::Unit();
-        })
-        .get();
+    EXPECT_TRUE(sm4->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, cli_buf).get());
 
     // TODO REVIEW THIS
     // test_group: 4 (2 * 1 SEND_DATA) + 6 (1 REQUEST_DATA) + 1 (SEND_DATA to a peer) = 15
@@ -226,107 +195,86 @@ TEST_F(DataServiceFixture, BasicTest2) {
 TEST_F(DataServiceFixture, NegativeTests) {
     auto sm1 = app_1_->state_mgr_map_[group_id_];
     auto sm2 = app_2_->state_mgr_map_[group_id_];
-    std::vector< NullAsyncResult > results;
 
-    // invalid request name
-    results.push_back(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, "invalid_request", cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              // unidirectional request to ALL is fire and forget, dosen't return an error
-                              EXPECT_TRUE(e.hasValue());
-                              return folly::Unit();
-                          }));
+    // invalid request name — unidirectional to ALL is fire-and-forget, no error
+    EXPECT_TRUE(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, "invalid_request", cli_buf).get());
 
-    results.push_back(
-        sm2->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, "invalid_request", cli_buf)
-            .deferValue([](auto e) -> NullResult {
-                EXPECT_TRUE(e.hasError());
-                EXPECT_EQ(nuraft::cmd_result_code::BAD_REQUEST, e.error());
-                return folly::Unit();
-            }));
+    {
+        auto r = sm2->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, "invalid_request", cli_buf).get();
+        EXPECT_FALSE(r);
+        EXPECT_EQ(nuraft::cmd_result_code::BAD_REQUEST, r.error());
+    }
 
     // Leader calling data request for a leader
-    results.push_back(sm1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, SEND_DATA, cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasError());
-                              EXPECT_EQ(nuraft::cmd_result_code::BAD_REQUEST, e.error());
-                              return folly::Unit();
-                          }));
+    {
+        auto r = sm1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, SEND_DATA, cli_buf).get();
+        EXPECT_FALSE(r);
+        EXPECT_EQ(nuraft::cmd_result_code::BAD_REQUEST, r.error());
+    }
 
-    results.push_back(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::LEADER, SEND_DATA, cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasError());
-                              EXPECT_EQ(nuraft::cmd_result_code::BAD_REQUEST, e.error());
-                              return folly::Unit();
-                          }));
+    {
+        auto r = sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::LEADER, SEND_DATA, cli_buf).get();
+        EXPECT_FALSE(r);
+        EXPECT_EQ(nuraft::cmd_result_code::BAD_REQUEST, r.error());
+    }
 
     // invalid peer id
-    results.push_back(
-        sm1->data_service_request_unidirectional(boost::uuids::random_generator()(), REQUEST_DATA, cli_buf)
-            .deferValue([](auto e) -> NullResult {
-                EXPECT_TRUE(e.hasError());
-                EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, e.error());
-                return folly::Unit();
-            }));
+    {
+        auto r = sm1->data_service_request_unidirectional(boost::uuids::random_generator()(), REQUEST_DATA, cli_buf).get();
+        EXPECT_FALSE(r);
+        EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, r.error());
+    }
 
-    results.push_back(sm1->data_service_request_bidirectional(boost::uuids::random_generator()(), REQUEST_DATA, cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasError());
-                              EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, e.error());
-                              return folly::Unit();
-                          }));
+    {
+        auto r = sm1->data_service_request_bidirectional(boost::uuids::random_generator()(), REQUEST_DATA, cli_buf).get();
+        EXPECT_FALSE(r);
+        EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, r.error());
+    }
 
     // invalid svr id
-    results.push_back(
-        sm1->data_service_request_unidirectional(-1, REQUEST_DATA, cli_buf).deferValue([](auto e) -> NullResult {
-            EXPECT_TRUE(e.hasError());
-            EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, e.error());
-            return folly::Unit();
-        }));
+    {
+        auto r = sm1->data_service_request_unidirectional(-1, REQUEST_DATA, cli_buf).get();
+        EXPECT_FALSE(r);
+        EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, r.error());
+    }
 
     // unimplemented methods
-    results.push_back(sm1->data_service_request_bidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasError());
-                              EXPECT_EQ(nuraft::cmd_result_code::BAD_REQUEST, e.error());
-                              return folly::Unit();
-                          }));
+    {
+        auto r = sm1->data_service_request_bidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf).get();
+        EXPECT_FALSE(r);
+        EXPECT_EQ(nuraft::cmd_result_code::BAD_REQUEST, r.error());
+    }
 
-    results.push_back(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::FOLLOWER, REQUEST_DATA, cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasError());
-                              EXPECT_EQ(nuraft::cmd_result_code::BAD_REQUEST, e.error());
-                              return folly::Unit();
-                          }));
+    {
+        auto r = sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::FOLLOWER, REQUEST_DATA, cli_buf).get();
+        EXPECT_FALSE(r);
+        EXPECT_EQ(nuraft::cmd_result_code::BAD_REQUEST, r.error());
+    }
 
     // This should be the last test, this sets the raft server and mesg_factory to nullptr
     auto repl_ctx = sm2->get_repl_context();
 
     // raft server nullptr
     repl_ctx->_server = nullptr;
-    results.push_back(sm2->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasError());
-                              EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, e.error());
-                              return folly::Unit();
-                          }));
+    {
+        auto r = sm2->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf).get();
+        EXPECT_FALSE(r);
+        EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, r.error());
+    }
 
     // mesg factory nullptr
     sm2->make_repl_ctx(nullptr, nullptr);
-    results.push_back(sm2->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasError());
-                              EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, e.error());
-                              return folly::Unit();
-                          }));
+    {
+        auto r = sm2->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf).get();
+        EXPECT_FALSE(r);
+        EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, r.error());
+    }
 
-    results.push_back(sm2->data_service_request_bidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasError());
-                              EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, e.error());
-                              return folly::Unit();
-                          }));
-
-    folly::collectAll(results).via(folly::getGlobalCPUExecutor()).get();
+    {
+        auto r = sm2->data_service_request_bidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf).get();
+        EXPECT_FALSE(r);
+        EXPECT_EQ(nuraft::cmd_result_code::SERVER_NOT_FOUND, r.error());
+    }
 }
 
 TEST_F(DataServiceFixture, AutoCreateClientTest) {
@@ -357,8 +305,6 @@ TEST_F(DataServiceFixture, AutoCreateClientTest) {
     auto sm4 = app_4->state_mgr_map_[group_id_];
     RELEASE_ASSERT(sm4, "Bad pointer for app_4!");
 
-    std::vector< NullAsyncResult > results;
-
     // Key test: app_4 sends to app_1
     // At this point, app_4's factory might not have a client to app_1
     // because app_4 was passively added to the group
@@ -366,21 +312,13 @@ TEST_F(DataServiceFixture, AutoCreateClientTest) {
 
     // Test 1: data_service_request_unidirectional with auto-created client
     LOGINFO("Testing unidirectional request - should auto-create client if needed");
-    results.push_back(sm4->data_service_request_unidirectional(app_1_->id_, SEND_DATA, cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasValue()) << "Unidirectional request should succeed with auto-created client";
-                              return folly::Unit();
-                          }));
+    EXPECT_TRUE(sm4->data_service_request_unidirectional(app_1_->id_, SEND_DATA, cli_buf).get())
+        << "Unidirectional request should succeed with auto-created client";
 
     // Test 2: data_service_request_bidirectional with auto-created client
     LOGINFO("Testing bidirectional request - client should already exist from test 1");
-    results.push_back(sm4->data_service_request_bidirectional(app_1_->id_, REQUEST_DATA, cli_buf)
-                          .deferValue([](auto e) -> NullResult {
-                              EXPECT_TRUE(e.hasValue()) << "Bidirectional request should succeed";
-                              return folly::Unit();
-                          }));
-
-    folly::collectAll(results).via(folly::getGlobalCPUExecutor()).get();
+    EXPECT_TRUE(sm4->data_service_request_bidirectional(app_1_->id_, REQUEST_DATA, cli_buf).get())
+        << "Bidirectional request should succeed";
 
     LOGINFO("Auto-create client test passed");
 

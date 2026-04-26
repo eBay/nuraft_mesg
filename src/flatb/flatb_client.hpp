@@ -28,8 +28,8 @@ class Offset;
 
 namespace nuraft_mesg {
 
-class Request;
-class Response;
+struct Request;
+struct Response;
 
 class grpc_flatb_client : public grpc_base_client {
 public:

@@ -6,7 +6,7 @@ from conan.tools.files import copy
 from conan.tools.files import copy
 from os.path import join
 
-required_conan_version = ">=1.60.0"
+required_conan_version = ">=1.66.0"
 
 
 class NuRaftMesgConan(ConanFile):
@@ -24,7 +24,7 @@ class NuRaftMesgConan(ConanFile):
         "shared": ['True', 'False'],
         "fPIC": ['True', 'False'],
         "coverage": ['True', 'False'],
-        "sanitize": ['True', 'False'],
+        "sanitize": ['address', 'thread', 'False'],
     }
     default_options = {
         'shared': False,
@@ -39,6 +39,7 @@ class NuRaftMesgConan(ConanFile):
         "cmake/*",
         "include/*",
         "src/*",
+        "tsan.supp",
     )
 
     def _min_cppstd(self):
@@ -52,10 +53,10 @@ class NuRaftMesgConan(ConanFile):
         if self.options.shared:
             self.options.rm_safe("fPIC")
         if self.settings.build_type == "Debug":
-            if self.options.coverage and self.options.sanitize:
+            if self.options.coverage and self.options.sanitize != "False":
                 raise ConanInvalidConfiguration("Sanitizer does not work with Code Coverage!")
             if self.conf.get("tools.build:skip_test", default=False):
-                if self.options.coverage or self.options.sanitize:
+                if self.options.coverage or self.options.sanitize != "False":
                     raise ConanInvalidConfiguration("Coverage/Sanitizer requires Testing!")
 
     def build_requirements(self):
@@ -64,13 +65,13 @@ class NuRaftMesgConan(ConanFile):
         self.test_requires("jungle/cci.20250316")
 
     def requirements(self):
-        self.requires("sisl/[^13.2]", transitive_headers=True)
+        self.requires("sisl/[^14.0]@oss/dev", transitive_headers=True)
         self.requires("nuraft/[^2.4]", transitive_headers=True)
 
     def layout(self):
         self.folders.source = "."
-        if self.options.get_safe("sanitize"):
-            self.folders.build = join("build", "Sanitized")
+        if self.options.get_safe("sanitize") and self.options.sanitize != "False":
+            self.folders.build = join("build", f"Sanitized-{self.options.sanitize}")
         elif self.options.get_safe("coverage"):
             self.folders.build = join("build", "Coverage")
         else:
@@ -96,10 +97,16 @@ class NuRaftMesgConan(ConanFile):
         if self.settings.build_type == "Debug":
             if self.options.get_safe("coverage"):
                 tc.variables['BUILD_COVERAGE'] = 'ON'
-            elif self.options.get_safe("sanitize"):
-                tc.variables['MEMORY_SANITIZER_ON'] = 'ON'
+            elif self.options.get_safe("sanitize") and self.options.sanitize != "False":
+                if self.options.sanitize == "thread":
+                    tc.variables['THREAD_SANITIZER_ON'] = 'ON'
+                else:
+                    tc.variables['ADDRESS_SANITIZER_ON'] = 'ON'
         tc.variables["CONAN_PACKAGE_NAME"] = self.name
         tc.variables["CONAN_PACKAGE_VERSION"] = self.version
+        protoc_path = join(self.dependencies["protobuf"].package_folder, "bin", "protoc")
+        tc.cache_variables["PROTOC_PROGRAM"] = protoc_path
+        tc.cache_variables["Protobuf_PROTOC_EXECUTABLE"] = protoc_path
         tc.generate()
 
         # This generates "boost-config.cmake" and "grpc-config.cmake" etc in self.generators_folder
@@ -111,7 +118,7 @@ class NuRaftMesgConan(ConanFile):
         cmake.configure()
         cmake.build()
         if not self.conf.get("tools.build:skip_test", default=False):
-            cmake.test()
+            self.run(f"ctest --test-dir '{self.build_folder}' --output-on-failure")
 
     def package(self):
         lib_dir = join(self.package_folder, "lib")
@@ -131,11 +138,15 @@ class NuRaftMesgConan(ConanFile):
         ])
 
         for component in self.cpp_info.components.values():
-            if self.options.get_safe("sanitize"):
-                component.sharedlinkflags.append("-fsanitize=address")
-                component.exelinkflags.append("-fsanitize=address")
-                component.sharedlinkflags.append("-fsanitize=undefined")
-                component.exelinkflags.append("-fsanitize=undefined")
+            if self.options.get_safe("sanitize") and self.options.sanitize != "False":
+                if self.options.sanitize == "thread":
+                    component.sharedlinkflags.append("-fsanitize=thread")
+                    component.exelinkflags.append("-fsanitize=thread")
+                else:
+                    component.sharedlinkflags.append("-fsanitize=address")
+                    component.exelinkflags.append("-fsanitize=address")
+                    component.sharedlinkflags.append("-fsanitize=undefined")
+                    component.exelinkflags.append("-fsanitize=undefined")
 
         self.cpp_info.set_property("cmake_file_name", "NuraftMesg")
         self.cpp_info.set_property("cmake_target_name", "NuraftMesg::NuraftMesg")

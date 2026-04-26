@@ -60,10 +60,10 @@ public:
     void get_cluster_config(std::list< replica_config >& cluster_config) const;
 
     // data service api client calls
-    virtual NullAsyncResult data_service_request_unidirectional(destination_t const& dest,
-                                                                std::string const& request_name,
-                                                                io_blob_list_t const& cli_buf) = 0;
-    virtual AsyncResult< sisl::GenericClientResponse >
+    [[nodiscard]] virtual NullAsyncResult data_service_request_unidirectional(destination_t const& dest,
+                                                                              std::string const& request_name,
+                                                                              io_blob_list_t const& cli_buf) = 0;
+    [[nodiscard]] virtual AsyncResult< sisl::GenericClientResponse >
     data_service_request_bidirectional(destination_t const& dest, std::string const& request_name,
                                        io_blob_list_t const& cli_buf) = 0;
 

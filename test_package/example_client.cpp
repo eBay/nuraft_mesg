@@ -1,4 +1,4 @@
-#include <folly/Expected.h>
+#include <expected>
 #include <iostream>
 #include <cassert>
 
@@ -51,7 +51,7 @@ int send_message(uint32_t leader_id, nuraft_mesg::group_id_t const& group_id, st
     buf->put(message.c_str());
     buf->pos(0);
 
-    auto result = nuraft_mesg::NullResult(folly::makeUnexpected(nuraft::SERVER_IS_JOINING));
+    auto result = nuraft_mesg::NullResult(std::unexpected(nuraft::SERVER_IS_JOINING));
     while (!result && (nuraft::SERVER_IS_JOINING == result.error() || nuraft::CONFIG_CHANGING == result.error())) {
         auto sf = factory->append_entry(buf, dest_cfg);
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -67,7 +67,7 @@ int add_new_server(uint32_t leader_id, uint32_t srv_id, nuraft_mesg::group_id_t 
     auto factory = std::make_shared< mesg_factory >(g_factory, group_id, "test_package");
     auto const dest_cfg = srv_config(leader_id, uuids[leader_id]);
 
-    auto result = nuraft_mesg::NullResult(folly::makeUnexpected(nuraft::SERVER_IS_JOINING));
+    auto result = nuraft_mesg::NullResult(std::unexpected(nuraft::SERVER_IS_JOINING));
     while (!result && (nuraft::SERVER_IS_JOINING == result.error() || nuraft::CONFIG_CHANGING == result.error())) {
         auto srv_addr = boost::uuids::string_generator()(uuids[srv_id]);
         auto sf = factory->add_server(srv_id, srv_addr, dest_cfg);
@@ -84,7 +84,7 @@ int remove_server(uint32_t leader_id, nuraft_mesg::group_id_t const& group_id, u
     auto factory = std::make_shared< mesg_factory >(g_factory, group_id, "test_package");
     auto const dest_cfg = srv_config(leader_id, uuids[leader_id]);
 
-    auto result = nuraft_mesg::NullResult(folly::makeUnexpected(nuraft::SERVER_IS_JOINING));
+    auto result = nuraft_mesg::NullResult(std::unexpected(nuraft::SERVER_IS_JOINING));
     while (!result && (nuraft::SERVER_IS_JOINING == result.error() || nuraft::CONFIG_CHANGING == result.error())) {
         auto sf = factory->rem_server(srv_id, dest_cfg);
         std::this_thread::sleep_for(std::chrono::milliseconds(200));

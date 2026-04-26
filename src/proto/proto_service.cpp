@@ -1,5 +1,4 @@
 #include <boost/uuid/string_generator.hpp>
-#include <folly/Expected.h>
 #include <grpcpp/impl/codegen/status_code_enum.h>
 #include <boost/asio.hpp>
 #include <libnuraft/async.hxx>
@@ -57,6 +56,7 @@ public:
 
     void associate(sisl::GrpcServer* server) override;
     void bind(sisl::GrpcServer* server) override;
+    void shutdown() override;
 
     // Incomming gRPC message
     bool raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
@@ -81,6 +81,15 @@ void proto_service::bind(::sisl::GrpcServer* server) {
         LOGE("Could not bind gRPC ::RaftStep to routine!");
         abort();
     }
+}
+
+void proto_service::shutdown() {
+    // Drain in-flight lambdas while RAFT groups are still reachable so they take the
+    // success path (Finish). This also avoids FinishWithError→StatusCreate touching
+    // gRPC-poisoned stack frames on shutdown (the primary ASan guard is allow_user_poisoning=0).
+    _raft_thread_pool.stop();
+    _raft_thread_pool.join();
+    msg_service::shutdown();
 }
 
 ::grpc::Status proto_service::step(nuraft::raft_server& server, const RaftMessage& request, RaftMessage& reply,
@@ -148,21 +157,31 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
         auto& request = rpc_data->request();
         auto& response = rpc_data->response();
         auto const& group_id = request.group_id();
+        // Hold lock only to extract reference-counted pointers; release before step()
+        // to avoid lock inversion with _manager_lock (step() can trigger raft callbacks
+        // that acquire _manager_lock, while add_member holds _manager_lock and needs
+        // _raft_servers_mutex via get_srv_config_all).
+        std::shared_ptr< nuraft::raft_server > raft_srv;
+        std::shared_ptr< group_metrics > metrics;
         {
+            std::shared_lock lk(_raft_servers_mutex);
             if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
-                if (it->second.m_metrics) COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
-                try {
-                    rpc_data->set_status(step(*it->second.m_server->raft_server(), request.msg(),
-                                              *response.mutable_msg(), it->second.m_metrics));
-                } catch (std::runtime_error& rte) {
-                    LOGE("Caught exception during step(): {}", rte.what());
-                    rpc_data->set_status(
-                        ::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
-                }
-            } else {
-                LOGD("Missing [group={}]", group_id);
-                rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
+                raft_srv = it->second.m_server->raft_server();
+                metrics = it->second.m_metrics;
             }
+        }
+        if (raft_srv) {
+            if (metrics) COUNTER_INCREMENT(*metrics, group_steps, 1);
+            try {
+                rpc_data->set_status(step(*raft_srv, request.msg(), *response.mutable_msg(), metrics));
+            } catch (std::runtime_error& rte) {
+                LOGE("Caught exception during step(): {}", rte.what());
+                rpc_data->set_status(
+                    ::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
+            }
+        } else {
+            LOGD("Missing [group={}]", group_id);
+            rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
         }
         rpc_data->send_response();
     });

@@ -1,5 +1,8 @@
 #include "service.hpp"
 
+#include <future>
+#include <shared_mutex>
+
 #include <boost/functional/hash.hpp>
 #include <grpcpp/impl/codegen/status_code_enum.h>
 #include <libnuraft/async.hxx>
@@ -17,20 +20,25 @@ SISL_OPTION_GROUP(nuraft_mesg,
 #define CONTINUE_RESP(resp)                                                                                            \
     try {                                                                                                              \
         if (auto r = (resp)->get_result_code(); r != nuraft::RESULT_NOT_EXIST_YET) {                                   \
-            if (nuraft::OK == r) return folly::Unit();                                                                 \
-            return folly::makeUnexpected(r);                                                                           \
+            std::promise< NullResult > _p;                                                                             \
+            if (nuraft::OK == r)                                                                                       \
+                _p.set_value({});                                                                                      \
+            else                                                                                                       \
+                _p.set_value(std::unexpected(r));                                                                      \
+            return _p.get_future();                                                                                    \
         }                                                                                                              \
-        auto [p, sf] = folly::makePromiseContract< NullResult >();                                                     \
+        auto _p = std::make_shared< std::promise< NullResult > >();                                                    \
+        auto _sf = _p->get_future();                                                                                   \
         (resp)->when_ready(                                                                                            \
-            [p = std::make_shared< decltype(p) >(std::move(p))](                                                       \
+            [p = std::move(_p)](                                                                                       \
                 nuraft::cmd_result< nuraft::ptr< nuraft::buffer >, nuraft::ptr< std::exception > >& result,            \
                 auto&) mutable {                                                                                       \
                 if (nuraft::cmd_result_code::OK != result.get_result_code())                                           \
-                    p->setValue(folly::makeUnexpected(result.get_result_code()));                                      \
+                    p->set_value(std::unexpected(result.get_result_code()));                                           \
                 else                                                                                                   \
-                    p->setValue(folly::Unit());                                                                        \
+                    p->set_value({});                                                                                  \
             });                                                                                                        \
-        return std::move(sf);                                                                                          \
+        return _sf;                                                                                                    \
     } catch (std::runtime_error & rte) { LOGE("Caught exception: [group={}] {}", group_id, rte.what()); }
 
 namespace nuraft_mesg {
@@ -67,20 +75,27 @@ bool msg_service::bind_data_service_request(std::string const& request_name, gro
 }
 
 NullAsyncResult msg_service::add_member(group_id_t const& group_id, nuraft::srv_config const& cfg) {
+    std::shared_lock lk(_raft_servers_mutex);
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         CONTINUE_RESP(it->second.m_server->add_srv(cfg))
     }
-    return folly::makeUnexpected(nuraft::SERVER_NOT_FOUND);
+    std::promise< NullResult > p;
+    p.set_value(std::unexpected(nuraft::SERVER_NOT_FOUND));
+    return p.get_future();
 }
 
 NullAsyncResult msg_service::rem_member(group_id_t const& group_id, int const member_id) {
+    std::shared_lock lk(_raft_servers_mutex);
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         CONTINUE_RESP(it->second.m_server->rem_srv(member_id))
     }
-    return folly::makeUnexpected(nuraft::SERVER_NOT_FOUND);
+    std::promise< NullResult > p;
+    p.set_value(std::unexpected(nuraft::SERVER_NOT_FOUND));
+    return p.get_future();
 }
 
 bool msg_service::become_leader(group_id_t const& group_id) {
+    std::shared_lock lk(_raft_servers_mutex);
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         try {
             return it->second.m_server->request_leadership();
@@ -92,6 +107,7 @@ bool msg_service::become_leader(group_id_t const& group_id) {
 
 void msg_service::get_srv_config_all(group_id_t const& group_id,
                                      std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) {
+    std::shared_lock lk(_raft_servers_mutex);
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         try {
             it->second.m_server->get_srv_config_all(configs_out);
@@ -103,10 +119,13 @@ void msg_service::get_srv_config_all(group_id_t const& group_id,
 
 NullAsyncResult msg_service::append_entries(group_id_t const& group_id,
                                             std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
+    std::shared_lock lk(_raft_servers_mutex);
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         CONTINUE_RESP(it->second.m_server->append_entries(logs))
     }
-    return folly::makeUnexpected(nuraft::SERVER_NOT_FOUND);
+    std::promise< NullResult > p;
+    p.set_value(std::unexpected(nuraft::SERVER_NOT_FOUND));
+    return p.get_future();
 }
 
 class msg_group_listner : public nuraft::rpc_listener {
@@ -125,6 +144,7 @@ public:
 };
 
 void msg_service::shutdown_for(group_id_t const& group_id) {
+    std::unique_lock lk(_raft_servers_mutex);
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         LOGD("Shutting down [group={}]", group_id);
         _raft_servers.erase(it);
@@ -146,7 +166,10 @@ nuraft::cmd_result_code msg_service::joinRaftGroup(int32_t const srv_id, group_i
     auto const g_type = group_type.empty() ? _default_group_type : group_type;
     // Quick check for duplicate, this will not guarantee we do not instantiate
     // more than one state_mgr, but it will quickly be destroyed
-    if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) return nuraft::cmd_result_code::OK;
+    {
+        std::shared_lock lk(_raft_servers_mutex);
+        if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) return nuraft::cmd_result_code::OK;
+    }
 
     auto metrics = std::shared_ptr< group_metrics >();
     if (0 < SISL_OPTIONS.count("msg_metrics")) { metrics = std::make_shared< group_metrics >(group_id); }
@@ -161,7 +184,10 @@ nuraft::cmd_result_code msg_service::joinRaftGroup(int32_t const srv_id, group_i
     auto new_listner = std::make_shared< msg_group_listner >(shared_from_this(), group_id);
     ctx->rpc_listener_ = std::static_pointer_cast< nuraft::rpc_listener >(new_listner);
     auto server = std::make_shared< nuraft::raft_server >(ctx);
-    if (auto [it, happened] = _raft_servers.try_emplace(group_id, metrics, std::make_unique< grpc_server >(server));
+
+    std::unique_lock lk(_raft_servers_mutex);
+    if (auto [it, happened] =
+            _raft_servers.try_emplace(group_id, metrics, std::make_unique< grpc_server >(server));
         happened) {
         if (_data_service_enabled) {
             auto smgr = std::dynamic_pointer_cast< mesg_state_mgr >(ctx->state_mgr_);
@@ -175,17 +201,29 @@ nuraft::cmd_result_code msg_service::joinRaftGroup(int32_t const srv_id, group_i
 }
 
 void msg_service::leave_group(group_id_t const& group_id) {
-    if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
-        it->second.m_server->raft_server()->stop_server();
-        it->second.m_server->raft_server()->shutdown();
-    } else {
-        LOGW("Unknown [group={}] cannot part.", group_id);
+    std::shared_ptr< nuraft::raft_server > raft_srv;
+    {
+        std::unique_lock lk(_raft_servers_mutex);
+        if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
+            raft_srv = it->second.m_server->raft_server();
+            _raft_servers.erase(it);
+        } else {
+            LOGW("Unknown [group={}] cannot part.", group_id);
+            return;
+        }
     }
+    raft_srv->stop_server();
+    raft_srv->shutdown();
 }
 
 void msg_service::shutdown() {
     LOGI("MessagingService shutdown started.");
-    for (auto& [k, v] : _raft_servers) {
+    decltype(_raft_servers) servers_copy;
+    {
+        std::unique_lock lk(_raft_servers_mutex);
+        servers_copy = std::move(_raft_servers);
+    }
+    for (auto& [k, v] : servers_copy) {
         v.m_server->raft_server()->stop_server();
         v.m_server->raft_server()->shutdown();
     }

@@ -12,14 +12,10 @@
  * specific language governing permissions and limitations under the License.
  *
  *********************************************************************************/
-#include <libnuraft/async.hxx>
+#include <future>
 #include <string>
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wuninitialized"
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-#include <folly/futures/Future.h>
-#pragma GCC diagnostic pop
+#include <libnuraft/async.hxx>
 
 #include "nuraft_mesg/mesg_factory.hpp"
 #include "lib/client.hpp"
@@ -68,19 +64,19 @@ static nuraft::cmd_result_code grpc_status_to_nuraft_code(::grpc::Status const& 
 static constexpr bool is_powerof2(uint64_t v) { return v && ((v & (v - 1)) == 0); }
 
 static void log_every_nth(std::string const& addr, ::grpc::Status const& status, std::string const& msg_type) {
-    static thread_local std::unordered_map< std::string, std::pair< uint64_t, Clock::time_point > > t_errors;
+    static thread_local std::unordered_map< std::string, std::pair< uint64_t, sisl::Clock::time_point > > t_errors;
     static constexpr uint64_t every_nth_sec = 60;
     std::string msg = addr + "-" + status.error_message();
 
     uint64_t failed_count{1ul};
     if (auto const it = t_errors.find(msg); it != t_errors.end()) {
         if (get_elapsed_time_sec(it->second.second) > every_nth_sec) {
-            it->second = std::pair(1ul, Clock::now()); // Reset
+            it->second = std::pair(1ul, sisl::Clock::now()); // Reset
         } else {
             failed_count = ++(it->second.first);
         }
     } else {
-        t_errors[msg] = std::pair(1ul, Clock::now());
+        t_errors[msg] = std::pair(1ul, sisl::Clock::now());
     }
 
     if (is_powerof2(failed_count)) {
@@ -133,34 +129,39 @@ public:
 
     NullAsyncResult data_service_request_unidirectional(std::string const& request_name,
                                                         io_blob_list_t const& cli_buf) {
-        return _generic_stub
-            ->call_unary(cli_buf, request_name, NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs))
-            .deferValue(
-                [weak_this = std::weak_ptr< messaging_client >(shared_from_this())](auto&& response) -> NullResult {
-                    if (response.hasError()) {
-                        auto mc = weak_this.lock();
-                        LOGD("Failed to send unidirectional data_service_request to {}, error: {}",
-                             mc ? mc->_addr : "unknown", response.error().error_message());
-                        return folly::makeUnexpected(grpc_status_to_nuraft_code(response.error()));
-                    }
-                    return folly::unit;
-                });
+        return std::async(
+            std::launch::async,
+            [fut = _generic_stub->call_unary(cli_buf, request_name,
+                                             NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs)),
+             weak_this = std::weak_ptr< messaging_client >(shared_from_this())]() mutable -> NullResult {
+                auto response = fut.get();
+                if (!response.has_value()) {
+                    auto mc = weak_this.lock();
+                    LOGD("Failed to send unidirectional data_service_request to {}, error: {}",
+                         mc ? mc->_addr : "unknown", response.error().error_message());
+                    return std::unexpected(grpc_status_to_nuraft_code(response.error()));
+                }
+                return {};
+            });
     }
 
     AsyncResult< sisl::GenericClientResponse > data_service_request_bidirectional(std::string const& request_name,
                                                                                   io_blob_list_t const& cli_buf) {
-        return _generic_stub
-            ->call_unary(cli_buf, request_name, NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs))
-            .deferValue([weak_this = std::weak_ptr< messaging_client >(shared_from_this())](
-                            auto&& response) -> Result< sisl::GenericClientResponse > {
-                if (response.hasError()) {
+        return std::async(
+            std::launch::async,
+            [fut = _generic_stub->call_unary(cli_buf, request_name,
+                                             NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs)),
+             weak_this = std::weak_ptr< messaging_client >(shared_from_this())]() mutable
+            -> Result< sisl::GenericClientResponse > {
+                auto response = fut.get();
+                if (!response.has_value()) {
                     std::string addr = "unknown";
                     if (auto mc = weak_this.lock(); mc) {
                         mc->bad_service.fetch_add(1, std::memory_order_relaxed);
                         addr = mc->_addr;
                     }
                     log_every_nth(addr, response.error(), "bidirectional");
-                    return folly::makeUnexpected(grpc_status_to_nuraft_code(response.error()));
+                    return std::unexpected(grpc_status_to_nuraft_code(response.error()));
                 }
                 return std::move(response.value());
             });
@@ -180,7 +181,7 @@ class grpc_proto_client : public grpc_base_client {
 public:
     grpc_proto_client(std::shared_ptr< messaging_client > client, peer_id_t const& client_addr,
                       group_id_t const& grp_name, group_type_t const& grp_type,
-                      std::shared_ptr< sisl::MetricsGroupWrapper > metrics) :
+                      std::shared_ptr< sisl::MetricsGroup > metrics) :
             grpc_base_client(),
             _client(client),
             _group_id(grp_name),
@@ -247,7 +248,11 @@ NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional<
                                                                   std::string const& request_name,
                                                                   io_blob_list_t const& cli_buf) {
     if (dest) {
-        if (dest->hasError()) return folly::makeUnexpected(dest->error());
+        if (!dest->has_value()) {
+            std::promise< NullResult > p;
+            p.set_value(std::unexpected(dest->error()));
+            return p.get_future();
+        }
 
         // Try to find existing client with read lock
         {
@@ -265,34 +270,46 @@ NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional<
         auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(client);
         if (!g_client) {
             LOGE("Failed to create client for [{}], request name [{}]", dest->value(), request_name);
-            return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+            std::promise< NullResult > p;
+            p.set_value(std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND));
+            return p.get_future();
         }
         return g_client->data_service_request_unidirectional(get_generic_method_name(request_name, _group_id),
                                                              cli_buf);
     }
 
-    // else - send to all clients
+    // else - send to all clients; errors per-peer are intentionally ignored
     auto calls = std::vector< NullAsyncResult >();
-    std::shared_lock< client_factory_lock_type > rl(_client_lock);
-    for (auto& nuraft_client : _clients) {
-        auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(nuraft_client.second);
-        calls.push_back(
-            g_client->data_service_request_unidirectional(get_generic_method_name(request_name, _group_id), cli_buf));
+    {
+        std::shared_lock< client_factory_lock_type > rl(_client_lock);
+        for (auto& nuraft_client : _clients) {
+            auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(nuraft_client.second);
+            calls.push_back(g_client->data_service_request_unidirectional(
+                get_generic_method_name(request_name, _group_id), cli_buf));
+        }
     }
-    // We ignore the vector of future response from collect all and st the value as folly::unit.
-    // This is because we do not have a use case to handle the errors that happen during the unidirectional call to
-    // all the peers.
-    return folly::collectAll(calls).deferValue([](auto&&) -> NullResult { return folly::unit; });
+    return std::async(std::launch::async, [calls = std::move(calls)]() mutable -> NullResult {
+        for (auto& f : calls) {
+            f.get();
+        }
+        return {};
+    });
 }
 
 AsyncResult< sisl::GenericClientResponse >
 mesg_factory::data_service_request_bidirectional(std::optional< Result< peer_id_t > > const& dest,
                                                  std::string const& request_name, io_blob_list_t const& cli_buf) {
+    auto make_error = [](nuraft::cmd_result_code code) {
+        std::promise< Result< sisl::GenericClientResponse > > p;
+        p.set_value(std::unexpected(code));
+        return p.get_future();
+    };
+
     if (!dest) {
         LOGE("Cannot send request to all the peers, not implemented yet!. Request name [{}]", request_name);
-        return folly::makeUnexpected(nuraft::cmd_result_code::BAD_REQUEST);
+        return make_error(nuraft::cmd_result_code::BAD_REQUEST);
     }
-    if (dest->hasError()) return folly::makeUnexpected(dest->error());
+    if (!dest->has_value()) return make_error(dest->error());
 
     {
         std::shared_lock< client_factory_lock_type > rl(_client_lock);
@@ -311,7 +328,7 @@ mesg_factory::data_service_request_bidirectional(std::optional< Result< peer_id_
     auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(client);
     if (!g_client) {
         LOGE("Failed to create/reinit client for [{}], request name [{}]", dest->value(), request_name);
-        return folly::makeUnexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+        return make_error(nuraft::cmd_result_code::SERVER_NOT_FOUND);
     }
     return g_client->data_service_request_bidirectional(get_generic_method_name(request_name, _group_id), cli_buf);
 }

@@ -3,6 +3,8 @@
 #include "manager_impl.hpp"
 
 #include <chrono>
+#include <future>
+#include <thread>
 
 #include <boost/uuid/string_generator.hpp>
 #include <ios>
@@ -261,50 +263,88 @@ NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, peer_id_t co
 
 NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, nuraft::srv_config const& srv_config) {
     auto str_id = srv_config.get_endpoint();
-    return _mesg_service->add_member(group_id, srv_config)
-        .deferValue([this, g_id = group_id, n_id = std::move(str_id)](auto cmd_result) mutable -> NullResult {
-            if (!cmd_result) return folly::makeUnexpected(cmd_result.error());
-            // TODO This should not block, but attach a new promise!
-            auto lk = std::unique_lock< std::mutex >(_manager_lock);
-            if (!_config_change.wait_for(
-                    lk, std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms)),
-                    [this, g_id = std::move(g_id), n_id = std::move(n_id)]() {
-                        std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
-                        _mesg_service->get_srv_config_all(g_id, srv_list);
-                        return std::find_if(srv_list.begin(), srv_list.end(),
-                                            [n_id = std::move(n_id)](const std::shared_ptr< nuraft::srv_config >& cfg) {
-                                                return n_id == cfg->get_endpoint();
-                                            }) != srv_list.end();
-                    })) {
-                return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+    return std::async(
+        std::launch::async,
+        [this, g_id = group_id, n_id = std::move(str_id),
+         fut = _mesg_service->add_member(group_id, srv_config)]() mutable -> NullResult {
+            if (fut.wait_for(std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms))) !=
+                std::future_status::ready)
+                return std::unexpected(nuraft::cmd_result_code::TIMEOUT);
+            auto cmd_result = fut.get();
+            if (!cmd_result.has_value()) return std::unexpected(cmd_result.error());
+            // Check membership outside _manager_lock to avoid lock-order-inversion:
+            // get_srv_config_all acquires _raft_servers_mutex, but nuraft callbacks
+            // hold _raft_servers_mutex and then notify _config_change under _manager_lock,
+            // creating a cycle if we hold _manager_lock while calling get_srv_config_all.
+            auto check_member = [this, &g_id, &n_id]() {
+                std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
+                _mesg_service->get_srv_config_all(g_id, srv_list);
+                return std::ranges::any_of(srv_list, [&n_id](auto const& cfg) {
+                    return n_id == cfg->get_endpoint();
+                });
+            };
+            if (check_member()) return {};
+            auto const deadline = std::chrono::steady_clock::now() +
+                std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms));
+            {
+                auto lk = std::unique_lock< std::mutex >(_manager_lock);
+                while (std::chrono::steady_clock::now() < deadline) {
+                    _config_change.wait_until(lk, deadline);
+                    lk.unlock();
+                    if (check_member()) return {};
+                    lk.lock();
+                }
             }
-            return folly::Unit();
+            return std::unexpected(nuraft::cmd_result_code::CANCELLED);
         });
 }
 
 NullAsyncResult ManagerImpl::rem_member(group_id_t const& group_id, peer_id_t const& old_id) {
-    return _mesg_service->rem_member(group_id, to_server_id(old_id));
+    auto timeout = std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms));
+    return std::async(
+        std::launch::async,
+        [timeout, fut = _mesg_service->rem_member(group_id, to_server_id(old_id))]() mutable -> NullResult {
+            if (fut.wait_for(timeout) != std::future_status::ready)
+                return std::unexpected(nuraft::cmd_result_code::TIMEOUT);
+            return fut.get();
+        });
 }
 
 NullAsyncResult ManagerImpl::become_leader(group_id_t const& group_id) {
     {
         auto lk = std::unique_lock< std::mutex >(_manager_lock);
         if (_is_leader[group_id]) {
-            return folly::Unit();
+            std::promise< NullResult > p;
+            p.set_value({});
+            return p.get_future();
         }
     }
 
-    return folly::makeSemiFuture< folly::Unit >(folly::Unit())
-        .deferValue([this, g_id = group_id](auto) mutable -> NullResult {
-            if (!_mesg_service->become_leader(g_id)) return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+    if (!lookup_state_manager(group_id)) {
+        std::promise< NullResult > p;
+        p.set_value(std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND));
+        return p.get_future();
+    }
 
-            auto lk = std::unique_lock< std::mutex >(_manager_lock);
-            if (!_config_change.wait_for(lk,
-                                         std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms)),
-                                         [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; }))
-                return folly::makeUnexpected(nuraft::cmd_result_code::TIMEOUT);
-            return folly::Unit();
-        });
+    return std::async(std::launch::async, [this, g_id = group_id]() mutable -> NullResult {
+        // request_leadership() returns false when the raft group doesn't yet know
+        // who the leader is (e.g. shortly after a node restarts). Retry until it
+        // succeeds or the timeout expires.
+        auto const deadline = std::chrono::steady_clock::now() +
+                              std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms));
+        while (!_mesg_service->become_leader(g_id)) {
+            if (std::chrono::steady_clock::now() >= deadline)
+                return std::unexpected(nuraft::cmd_result_code::TIMEOUT);
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+
+        auto lk = std::unique_lock< std::mutex >(_manager_lock);
+        if (!_config_change.wait_for(lk,
+                                     std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms)),
+                                     [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; }))
+            return std::unexpected(nuraft::cmd_result_code::TIMEOUT);
+        return {};
+    });
 }
 
 NullAsyncResult ManagerImpl::append_entries(group_id_t const& group_id,
@@ -324,20 +364,21 @@ NullAsyncResult ManagerImpl::create_group(group_id_t const& group_id, std::strin
         _is_leader.insert(std::make_pair(group_id, false));
     }
     if (auto const err = _mesg_service->joinRaftGroup(_srv_id, group_id, group_type_name); err) {
-        return folly::makeUnexpected(err);
+        std::promise< NullResult > p;
+        p.set_value(std::unexpected(err));
+        return p.get_future();
     }
 
     // Wait for the leader election timeout to make us the leader
-    return folly::makeSemiFuture< folly::Unit >(folly::Unit())
-        .deferValue([this, g_id = group_id](auto) mutable -> NullResult {
-            auto lk = std::unique_lock< std::mutex >(_manager_lock);
-            if (!_config_change.wait_for(lk,
-                                         std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms)),
-                                         [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; })) {
-                return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
-            }
-            return folly::Unit();
-        });
+    return std::async(std::launch::deferred, [this, g_id = group_id]() mutable -> NullResult {
+        auto lk = std::unique_lock< std::mutex >(_manager_lock);
+        if (!_config_change.wait_for(lk,
+                                     std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms)),
+                                     [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; })) {
+            return std::unexpected(nuraft::cmd_result_code::CANCELLED);
+        }
+        return {};
+    });
 }
 
 NullResult ManagerImpl::join_group(group_id_t const& group_id, group_type_t const& group_type,
@@ -345,14 +386,14 @@ NullResult ManagerImpl::join_group(group_id_t const& group_id, group_type_t cons
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         auto [it, happened] = _state_managers.emplace(group_id, smgr);
-        if (_state_managers.end() == it) return folly::makeUnexpected(nuraft::cmd_result_code::CANCELLED);
+        if (_state_managers.end() == it) return std::unexpected(nuraft::cmd_result_code::CANCELLED);
     }
     if (auto const err = _mesg_service->joinRaftGroup(_srv_id, group_id, group_type); err) {
         std::lock_guard< std::mutex > lg(_manager_lock);
         _state_managers.erase(group_id);
-        return folly::makeUnexpected(err);
+        return std::unexpected(err);
     }
-    return folly::Unit();
+    return {};
 }
 
 void ManagerImpl::append_peers(group_id_t const& group_id, std::list< peer_id_t >& servers) const {
