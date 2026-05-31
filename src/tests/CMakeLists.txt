@@ -42,3 +42,17 @@ target_link_libraries (data_service_test
 )
 add_test(NAME DataServiceTest COMMAND data_service_test -cv 1)
 set_property(TEST DataServiceTest PROPERTY RUN_SERIAL 1)
+
+add_executable(thread_pool_test)
+target_sources(thread_pool_test PRIVATE
+  thread_pool_tests.cpp
+  $<TARGET_OBJECTS:test_fixture>
+  $<TARGET_OBJECTS:jungle_logstore>
+)
+target_link_libraries (thread_pool_test
+  ${PROJECT_NAME}_proto
+  jungle::jungle
+  GTest::gmock
+)
+add_test(NAME ThreadPoolTest COMMAND thread_pool_test -cv 2)
+set_property(TEST ThreadPoolTest PROPERTY RUN_SERIAL 1)
