@@ -151,8 +151,8 @@ public:
             std::launch::async,
             [fut = _generic_stub->call_unary(cli_buf, request_name,
                                              NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs)),
-             weak_this = std::weak_ptr< messaging_client >(shared_from_this())]() mutable
-            -> Result< sisl::GenericClientResponse > {
+             weak_this = std::weak_ptr< messaging_client >(
+                 shared_from_this())]() mutable -> Result< sisl::GenericClientResponse > {
                 auto response = fut.get();
                 if (!response.has_value()) {
                     std::string addr = "unknown";
@@ -274,8 +274,7 @@ NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional<
             p.set_value(std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND));
             return p.get_future();
         }
-        return g_client->data_service_request_unidirectional(get_generic_method_name(request_name, _group_id),
-                                                             cli_buf);
+        return g_client->data_service_request_unidirectional(get_generic_method_name(request_name, _group_id), cli_buf);
     }
 
     // else - send to all clients; errors per-peer are intentionally ignored
@@ -290,7 +289,7 @@ NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional<
     }
     return std::async(std::launch::async, [calls = std::move(calls)]() mutable -> NullResult {
         for (auto& f : calls) {
-            f.get();
+            std::ignore = f.get();
         }
         return {};
     });
