@@ -65,7 +65,7 @@ class NuRaftMesgConan(ConanFile):
         self.test_requires("jungle/cci.20250316")
 
     def requirements(self):
-        self.requires("sisl/[^14.0]@oss/dev", transitive_headers=True)
+        self.requires("sisl/[^14.4]@oss/dev", transitive_headers=True)
         self.requires("nuraft/[^2.4]", transitive_headers=True)
 
     def layout(self):
@@ -91,7 +91,6 @@ class NuRaftMesgConan(ConanFile):
         # This generates "conan_toolchain.cmake" in self.generators_folder
         tc = CMakeToolchain(self)
         tc.variables["CMAKE_EXPORT_COMPILE_COMMANDS"] = "ON"
-        tc.variables["CONAN_CMAKE_SILENT_OUTPUT"] = "ON"
         tc.variables["CTEST_OUTPUT_ON_FAILURE"] = "ON"
         tc.variables["PACKAGE_VERSION"] = self.version
         if self.settings.build_type == "Debug":

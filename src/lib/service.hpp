@@ -79,11 +79,14 @@ public:
 
     virtual void shutdown();
 
-    NullAsyncResult add_member(group_id_t const& group_id, nuraft::srv_config const& cfg);
-    NullAsyncResult rem_member(group_id_t const& group_id, int const member_id);
+    // These return the RAW nuraft cmd_result_code (an internal currency): ManagerImpl makes the
+    // retry/idempotency decisions on the raw code, then collapses to the public std::error_condition
+    // surface. Only ManagerImpl consumes these.
+    sisl::async::task< nuraft::cmd_result_code > add_member(group_id_t const& group_id, nuraft::srv_config const& cfg);
+    sisl::async::task< nuraft::cmd_result_code > rem_member(group_id_t const& group_id, int const member_id);
     bool become_leader(group_id_t const& group_id);
-    NullAsyncResult append_entries(group_id_t const& group_id,
-                                   std::vector< nuraft::ptr< nuraft::buffer > > const& logs);
+    sisl::async::task< nuraft::cmd_result_code > append_entries(group_id_t const& group_id,
+                                                               std::vector< nuraft::ptr< nuraft::buffer > > const& logs);
 
     void get_srv_config_all(group_id_t const& group_id,
                             std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out);

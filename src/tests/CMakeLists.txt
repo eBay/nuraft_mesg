@@ -39,7 +39,7 @@ set_property(TEST RaftServiceTest PROPERTY RUN_SERIAL 1)
 # gRPC's std containers.
 set_tests_properties(RaftServiceTest PROPERTIES
   ENVIRONMENT
-    "ASAN_OPTIONS=allow_user_poisoning=0:detect_container_overflow=0;TSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/tsan.supp")
+    "ASAN_OPTIONS=allow_user_poisoning=0:detect_container_overflow=0;TSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/tsan.supp;LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/lsan.supp")
 
 add_executable(data_service_test)
 target_sources(data_service_test PRIVATE
@@ -57,4 +57,4 @@ add_test(NAME DataServiceTest COMMAND data_service_test -cv 1)
 set_property(TEST DataServiceTest PROPERTY RUN_SERIAL 1)
 set_tests_properties(DataServiceTest PROPERTIES
   ENVIRONMENT
-    "ASAN_OPTIONS=allow_user_poisoning=0:detect_container_overflow=0;TSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/tsan.supp")
+    "ASAN_OPTIONS=allow_user_poisoning=0:detect_container_overflow=0;TSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/tsan.supp;LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/lsan.supp")

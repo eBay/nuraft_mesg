@@ -85,7 +85,10 @@ race:grpc_resolved_address
 # gRPC event_engine internal copy: two event_engine threads race on std::copy over
 # gRPC's internal int arrays (fd sets, pollset arrays). The stack is too shallow to
 # show the grpc_event_engine::experimental frames that carry the actual synchronization.
+# libstdc++ routes this through __copy_move or __copy_n_a depending on the call site /
+# toolchain (gcc 16.1 lands on __copy_n_a), so suppress both helpers.
 race:std::__copy_move
+race:std::__copy_n_a
 
 # gRPC transport layer: made_transport_op is constructed and destroyed by different
 # event_engine threads; gRPC's internal ref-counting provides the happens-before

@@ -20,7 +20,8 @@
 #include <libnuraft/async.hxx>
 
 #include "client.hpp"
-#include "nuraft_mesg/mesg_factory.hpp"
+#include "lib/mesg_factory.hpp"
+#include "async_helpers.hpp"
 
 namespace nuraft_mesg {
 
@@ -35,21 +36,17 @@ struct client_ctx {
 
     Payload payload() const { return _payload; }
     std::shared_ptr< grpc_factory > cli_factory() const { return _cli_factory; }
-    NullAsyncResult future() {
-        _promise = std::make_shared< std::promise< NullResult > >();
-        return _promise->get_future();
-    }
-    void set(nuraft::cmd_result_code const code) {
-        if (nuraft::OK == code)
-            _promise->set_value({});
-        else
-            _promise->set_value(std::unexpected(code));
-    }
+    // The co_await-able result. respHandler (running on a gRPC/nuraft thread) calls set() to complete the
+    // shared value_awaitable; this task resumes the awaiting consumer. ctx and the task frame both hold the
+    // shared awaitable, so it outlives whichever side finishes last.
+    null_async_task task() { return await_value(_completion); }
+    void set(nuraft::cmd_result_code const code) { _completion->complete(to_null_result(code)); }
 
 private:
     Payload const _payload;
     std::shared_ptr< grpc_factory > _cli_factory;
-    std::shared_ptr< std::promise< NullResult > > _promise;
+    std::shared_ptr< sisl::async::value_awaitable< null_result > > _completion{
+        std::make_shared< sisl::async::value_awaitable< null_result > >()};
 };
 
 template < typename PayloadType >
@@ -128,15 +125,15 @@ grpc_factory::grpc_factory(int const cli_thread_count, std::string const& name) 
 grpc_factory::grpc_factory(int const raft_cli_thread_count, int const data_cli_thread_count, std::string const& name) :
         rpc_client_factory(), _worker_name(name) {
     if (0 < raft_cli_thread_count) {
-        sisl::GrpcAsyncClientWorker::create_worker(raftWorkerName(), raft_cli_thread_count);
+        sisl::GrpcAsyncClientWorker::create_worker(raft_worker_name(), raft_cli_thread_count);
     }
     if (0 < data_cli_thread_count) {
-        sisl::GrpcAsyncClientWorker::create_worker(dataWorkerName(), data_cli_thread_count);
+        sisl::GrpcAsyncClientWorker::create_worker(data_worker_name(), data_cli_thread_count);
     }
 }
 
-std::string const grpc_factory::raftWorkerName() const { return fmt::format("raft_{}", _worker_name); }
-std::string const grpc_factory::dataWorkerName() const { return fmt::format("data_{}", _worker_name); }
+std::string const grpc_factory::raft_worker_name() const { return fmt::format("raft_{}", _worker_name); }
+std::string const grpc_factory::data_worker_name() const { return fmt::format("data_{}", _worker_name); }
 
 class grpc_error_client : public grpc_base_client {
     void send(std::shared_ptr< nuraft::req_msg >& req, nuraft::rpc_handler& complete, uint64_t) override {
@@ -181,14 +178,10 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(peer_id_t const& c
     return new_client;
 }
 
-NullAsyncResult grpc_factory::add_server(uint32_t const srv_id, peer_id_t const& srv_addr,
-                                         nuraft::srv_config const& dest_cfg) {
+null_async_task grpc_factory::add_server(uint32_t const srv_id, peer_id_t const& srv_addr,
+                                       nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
-    if (!client) {
-        std::promise< NullResult > p;
-        p.set_value(std::unexpected(nuraft::CANCELLED));
-        return p.get_future();
-    }
+    if (!client) { return make_ready< null_result >(to_null_result(nuraft::CANCELLED)); }
 
     auto ctx = std::make_shared< client_ctx< uint32_t > >(srv_id, shared_from_this(), dest_cfg.get_id(), srv_addr);
     auto handler = static_cast< nuraft::rpc_handler >(
@@ -198,16 +191,12 @@ NullAsyncResult grpc_factory::add_server(uint32_t const srv_id, peer_id_t const&
 
     auto msg = createMessage(srv_id, srv_addr);
     client->send(msg, handler);
-    return ctx->future();
+    return ctx->task();
 }
 
-NullAsyncResult grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg) {
+null_async_task grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
-    if (!client) {
-        std::promise< NullResult > p;
-        p.set_value(std::unexpected(nuraft::CANCELLED));
-        return p.get_future();
-    }
+    if (!client) { return make_ready< null_result >(to_null_result(nuraft::CANCELLED)); }
 
     auto ctx = std::make_shared< client_ctx< int32_t > >(srv_id, shared_from_this(), dest_cfg.get_id());
     auto handler = static_cast< nuraft::rpc_handler >(
@@ -217,16 +206,12 @@ NullAsyncResult grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_conf
 
     auto msg = createMessage(static_cast< int32_t >(srv_id));
     client->send(msg, handler);
-    return ctx->future();
+    return ctx->task();
 }
 
-NullAsyncResult grpc_factory::append_entry(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg) {
+null_async_task grpc_factory::append_entry(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg) {
     auto client = create_client(dest_cfg.get_endpoint());
-    if (!client) {
-        std::promise< NullResult > p;
-        p.set_value(std::unexpected(nuraft::CANCELLED));
-        return p.get_future();
-    }
+    if (!client) { return make_ready< null_result >(to_null_result(nuraft::CANCELLED)); }
 
     auto ctx =
         std::make_shared< client_ctx< std::shared_ptr< nuraft::buffer > > >(buf, shared_from_this(), dest_cfg.get_id());
@@ -237,7 +222,7 @@ NullAsyncResult grpc_factory::append_entry(std::shared_ptr< nuraft::buffer > buf
 
     auto msg = createMessage(buf);
     client->send(msg, handler);
-    return ctx->future();
+    return ctx->task();
 }
 
 } // namespace nuraft_mesg

@@ -28,10 +28,20 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <stdexec/execution.hpp>
+
+// Drive a coroutine control-plane / data task (sisl::async::task) to completion synchronously and return
+// its result. The manager/factory/data-service APIs are now coroutine-native (null_async_task / async_task);
+// tests consume them on the calling thread via stdexec::sync_wait.
+template < typename TaskT >
+static auto sync_get(TaskT&& task) {
+    return std::get< 0 >(stdexec::sync_wait(std::forward< TaskT >(task)).value());
+}
+
 #include "libnuraft/cluster_config.hxx"
 #include "libnuraft/state_machine.hxx"
 #include "nuraft_mesg/nuraft_mesg.hpp"
-#include "nuraft_mesg/mesg_factory.hpp"
+#include "lib/mesg_factory.hpp"
 
 #include "test_state_manager.h"
 
@@ -46,12 +56,12 @@ constexpr auto elect_to_high = elect_to_low * 2;
 
 namespace nuraft_mesg {
 
-class TestApplication : public MessagingApplication, public std::enable_shared_from_this< TestApplication > {
+class TestApplication : public messaging_application, public std::enable_shared_from_this< TestApplication > {
 public:
     std::string name_;
     uint32_t port_;
     boost::uuids::uuid id_;
-    std::shared_ptr< Manager > instance_;
+    std::shared_ptr< manager > instance_;
     bool data_svc_;
 
     std::map< group_id_t, std::shared_ptr< test_state_mgr > > state_mgr_map_;
@@ -83,7 +93,7 @@ public:
 
     void start(bool data_svc_enabled = false) {
         data_svc_ = data_svc_enabled;
-        auto params = Manager::Params();
+        auto params = manager::params();
         params.server_uuid_ = id_;
         params.mesg_port_ = port_;
         params.default_group_type_ = "test_type";
@@ -111,7 +121,7 @@ struct custom_factory : public nuraft_mesg::group_factory {
     custom_factory(int const raft_threads, int const data_threads, nuraft_mesg::group_id_t const& name) :
             nuraft_mesg::group_factory::group_factory(raft_threads, data_threads, name, nullptr) {}
 
-    std::string lookupEndpoint(nuraft_mesg::peer_id_t const& peer) override {
+    std::string lookup_endpoint(nuraft_mesg::peer_id_t const& peer) override {
         auto lg = std::scoped_lock(lookup_lock_);
         return (lookup_map_.count(peer) > 0) ? lookup_map_[peer] : std::string();
     }
@@ -183,13 +193,13 @@ protected:
 
         group_id_ = boost::uuids::random_generator()();
 
-        EXPECT_TRUE(app_1_->instance_->create_group(group_id_, "test_type").get());
+        EXPECT_TRUE(sync_get(app_1_->instance_->create_group(group_id_, "test_type")));
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
         // Use app1 to add Server 3
         auto add2 = app_1_->instance_->add_member(group_id_, nuraft::srv_config(to_server_id(app_2_->id_), to_string(app_2_->id_)));
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        EXPECT_TRUE(std::move(add2).get());
+        EXPECT_TRUE(sync_get(std::move(add2)));
 
         custom_factory_ = std::make_shared< custom_factory >(2, 2, group_id_);
         custom_factory_->map_peers(lookup_map);
@@ -197,7 +207,7 @@ protected:
         // Use custom factory to add Server 3
         auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
         auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_),to_string(app_1_->id_));
-        EXPECT_TRUE(factory->add_server(to_server_id(app_3_->id_), app_3_->id_, dest_cfg).get());
+        EXPECT_TRUE(sync_get(factory->add_server(to_server_id(app_3_->id_), app_3_->id_, dest_cfg)));
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 };

@@ -30,7 +30,7 @@ TEST_F(MessagingFixture, BasicTests) {
     EXPECT_TRUE(repl_ctx1->is_raft_leader());
 
     // Basic resiliency test (append_entries)
-    EXPECT_TRUE(app_1_->instance_->append_entries(group_id_, {buf}).get());
+    EXPECT_TRUE(sync_get(app_1_->instance_->append_entries(group_id_, {buf})));
 
     // Simulate a Member crash
     auto our_id = app_3_->id_;
@@ -43,8 +43,8 @@ TEST_F(MessagingFixture, BasicTests) {
     auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
     auto const dest_cfg_1 = nuraft::srv_config(to_server_id(app_1_->id_), to_string(app_1_->id_));
     auto const dest_cfg_2 = nuraft::srv_config(to_server_id(app_2_->id_), to_string(app_2_->id_));
-    EXPECT_TRUE(factory->append_entry(buf, dest_cfg_1).get());
-    EXPECT_TRUE(factory->append_entry(buf, dest_cfg_2).get());
+    EXPECT_TRUE(sync_get(factory->append_entry(buf, dest_cfg_1)));
+    EXPECT_TRUE(sync_get(factory->append_entry(buf, dest_cfg_2)));
 
     app_3_ = std::make_shared< TestApplication >("sm3", ports[2]);
     app_3_->set_id(our_id);
@@ -53,17 +53,17 @@ TEST_F(MessagingFixture, BasicTests) {
     auto sm3 = std::make_shared< test_state_mgr >(nuraft_mesg::to_server_id(our_id), our_id, group_id_);
     ASSERT_TRUE(app_3_->instance_->join_group(group_id_, "test_type", sm3));
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    EXPECT_FALSE(app_3_->instance_->become_leader(bogus_uuid).get());
-    EXPECT_TRUE(app_3_->instance_->become_leader(group_id_).get());
+    EXPECT_FALSE(sync_get(app_3_->instance_->become_leader(bogus_uuid)));
+    EXPECT_TRUE(sync_get(app_3_->instance_->become_leader(group_id_)));
     // now app_3 is the leader via explicity reqeust
     {
         auto repl_ctx3 = sm3->get_repl_context();
         EXPECT_TRUE(repl_ctx3->is_raft_leader());
     }
-    EXPECT_TRUE(app_3_->instance_->append_entries(group_id_, {buf}).get());
+    EXPECT_TRUE(sync_get(app_3_->instance_->append_entries(group_id_, {buf})));
 
     // Test sending a message for a group the messaging service is not aware of.
-    EXPECT_FALSE(app_1_->instance_->add_member(bogus_uuid, bogus_uuid).get());
+    EXPECT_FALSE(sync_get(app_1_->instance_->add_member(bogus_uuid, bogus_uuid)));
 
     // Simulate app_3 crash again
     app_3_.reset();
@@ -84,7 +84,7 @@ TEST_F(MessagingFixture, BasicTests) {
     // leader shoud still on app_1
     EXPECT_TRUE(repl_ctx1->is_raft_leader());
     // app_3 take over leadership
-    EXPECT_TRUE(app_3_->instance_->become_leader(group_id_).get());
+    EXPECT_TRUE(sync_get(app_3_->instance_->become_leader(group_id_)));
     std::this_thread::sleep_for(std::chrono::seconds(1));
     // now app_3 is the leader via explicity reqeust
     {
@@ -108,7 +108,7 @@ TEST_F(MessagingFixture, BasicTests) {
     app_4->start();
 
     // Add the member and wait
-    EXPECT_TRUE(app_3_->instance_->add_member(group_id_, app_4->id_).get());
+    EXPECT_TRUE(sync_get(app_3_->instance_->add_member(group_id_, app_4->id_)));
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // New member should appear in config now
@@ -117,19 +117,19 @@ TEST_F(MessagingFixture, BasicTests) {
     EXPECT_EQ(srv_list.size(), 4u);
 
     // Remove a member now
-    EXPECT_TRUE(app_3_->instance_->rem_member(group_id_, app_1_->id_).get());
+    EXPECT_TRUE(sync_get(app_3_->instance_->rem_member(group_id_, app_1_->id_)));
 
     // Unknown Group Tests
     app_1_->instance_->leave_group(bogus_uuid);
 
-    EXPECT_FALSE(app_1_->instance_->append_entries(bogus_uuid, {buf}).get());
+    EXPECT_FALSE(sync_get(app_1_->instance_->append_entries(bogus_uuid, {buf})));
 
     // Expect failure trying to remove unknown member
     auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_), to_string(app_1_->id_));
-    EXPECT_FALSE(factory->rem_server(1000, dest_cfg).get());
+    EXPECT_FALSE(sync_get(factory->rem_server(1000, dest_cfg)));
 
     // Expect failure trying to remove unknown group
-    EXPECT_FALSE(app_2_->instance_->rem_member(bogus_uuid, app_3_->id_).get());
+    EXPECT_FALSE(sync_get(app_2_->instance_->rem_member(bogus_uuid, app_3_->id_)));
 
     // Needed since app_4 is not part of TearDown
     app_4->instance_->leave_group(group_id_);

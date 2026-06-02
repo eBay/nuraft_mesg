@@ -1,0 +1,14 @@
+# LeakSanitizer suppression file for nuraft_mesg
+# Add suppressions here as LSan identifies known/benign leaks in dependencies.
+# Format: leak:<function_name substring>
+
+# sisl gRPC async-server shutdown race. A raft group's grpc_server is shut down repeatedly over a
+# process' life (every group join/leave/destroy), not just at exit. The async server pre-allocates
+# the *next* listener RpcData via RpcData::create_new() and enqueue_call_request()s it; if
+# GrpcServer::shutdown() -> m_server->Shutdown() races that enqueue, gRPC silently drops the pending
+# request tag (see sisl rpc_server.cpp:133-137), so the tag never fires and the pre-listener RpcData
+# (plus its protobuf-arena RaftGroupMsg and request deque) is stranded at ref=1. The leak is flaky,
+# bounded per shutdown, and reclaimed on process restart -- it never crashes. The real fix is to reap
+# stranded pre-listeners in sisl's GrpcServer::shutdown() after the completion queue drains.
+leak:sisl::RpcData
+leak:sisl::GrpcServer::handle_rpcs

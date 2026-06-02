@@ -177,33 +177,33 @@ void test_state_mgr::leave() {}
 
 ///// data service api helpers
 
-nuraft_mesg::AsyncResult< sisl::GenericClientResponse >
+nuraft_mesg::async_task< sisl::GenericClientResponse >
 test_state_mgr::data_service_request_bidirectional(nuraft_mesg::destination_t const& dest,
                                                    std::string const& request_name,
                                                    nuraft_mesg::io_blob_list_t const& cli_buf) {
-    return m_repl_svc_ctx->data_service_request_bidirectional(dest, request_name, cli_buf);
+    return repl_ctx()->data_service_request_bidirectional(dest, request_name, cli_buf);
 }
 
-nuraft_mesg::NullAsyncResult
+nuraft_mesg::null_async_task
 test_state_mgr::data_service_request_unidirectional(nuraft_mesg::destination_t const& dest,
                                                     std::string const& request_name,
                                                     nuraft_mesg::io_blob_list_t const& cli_buf) {
-    return m_repl_svc_ctx->data_service_request_unidirectional(dest, request_name, cli_buf);
+    return repl_ctx()->data_service_request_unidirectional(dest, request_name, cli_buf);
 }
 
-bool test_state_mgr::register_data_service_apis(nuraft_mesg::Manager* messaging) {
+bool test_state_mgr::register_data_service_apis(nuraft_mesg::manager* messaging) {
     return messaging->bind_data_service_request(
                SEND_DATA, _group_id,
                [this](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
                    rpc_data->set_comp_cb([](boost::intrusive_ptr< sisl::GenericRpcData >&) { server_counter++; });
                    verify_data(rpc_data->request_blob());
-                   m_repl_svc_ctx->send_data_service_response(nuraft_mesg::io_blob_list_t{rpc_data->request_blob()},
+                   repl_ctx()->send_data_service_response(nuraft_mesg::io_blob_list_t{rpc_data->request_blob()},
                                                               rpc_data);
                }) &&
         messaging->bind_data_service_request(
             REQUEST_DATA, _group_id, [this](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
                 rpc_data->set_comp_cb([](boost::intrusive_ptr< sisl::GenericRpcData >&) { server_counter++; });
-                m_repl_svc_ctx->send_data_service_response(nuraft_mesg::io_blob_list_t{rpc_data->request_blob()},
+                repl_ctx()->send_data_service_response(nuraft_mesg::io_blob_list_t{rpc_data->request_blob()},
                                                            rpc_data);
             });
 }

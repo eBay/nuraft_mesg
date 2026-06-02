@@ -20,7 +20,7 @@
 class test_state_machine;
 
 namespace nuraft_mesg {
-class Manager;
+class manager;
 class service;
 } // namespace nuraft_mesg
 
@@ -46,20 +46,23 @@ public:
     void leave() override;
 
     ///// data service helper apis
-    nuraft_mesg::AsyncResult< sisl::GenericClientResponse >
+    nuraft_mesg::async_task< sisl::GenericClientResponse >
     data_service_request_bidirectional(nuraft_mesg::destination_t const& dest, std::string const& request_name,
                                        nuraft_mesg::io_blob_list_t const& cli_buf);
-    nuraft_mesg::NullAsyncResult data_service_request_unidirectional(nuraft_mesg::destination_t const& dest,
-                                                                     std::string const& request_name,
-                                                                     nuraft_mesg::io_blob_list_t const& cli_buf);
+    nuraft_mesg::null_async_task data_service_request_unidirectional(nuraft_mesg::destination_t const& dest,
+                                                                   std::string const& request_name,
+                                                                   nuraft_mesg::io_blob_list_t const& cli_buf);
 
-    bool register_data_service_apis(nuraft_mesg::Manager* messaging);
+    bool register_data_service_apis(nuraft_mesg::manager* messaging);
     static void fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf, uint32_t size_bytes);
     static void fill_data_vec_big(nuraft_mesg::io_blob_list_t& cli_buf, uint32_t size_bytes);
     static uint16_t get_random_num();
     static uint32_t get_server_counter();
     static void verify_data(sisl::io_blob const& buf);
-    nuraft_mesg::repl_service_ctx* get_repl_context() { return m_repl_svc_ctx.get(); }
+    nuraft_mesg::repl_service_ctx* get_repl_context() { return repl_ctx(); }
+    // Re-expose the (now protected) internal setup so the white-box tests can rebuild the ctx with null
+    // server/factory to exercise failure paths.
+    using nuraft_mesg::mesg_state_mgr::make_repl_ctx;
 
 private:
 private:

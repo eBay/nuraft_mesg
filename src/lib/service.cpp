@@ -9,39 +9,38 @@
 #include <libnuraft/rpc_listener.hxx>
 #include <sisl/options/options.h>
 
-#include "nuraft_mesg/mesg_factory.hpp"
+#include "lib/mesg_factory.hpp"
 #include "nuraft_mesg/mesg_state_mgr.hpp"
 #include "nuraft_mesg/nuraft_mesg.hpp"
+#include "async_helpers.hpp"
 
 SISL_OPTION_GROUP(nuraft_mesg,
                   (messaging_metrics, "", "msg_metrics", "Gather metrics from SD Messaging", cxxopts::value< bool >(),
                    ""))
 
-#define CONTINUE_RESP(resp)                                                                                            \
-    try {                                                                                                              \
-        if (auto r = (resp)->get_result_code(); r != nuraft::RESULT_NOT_EXIST_YET) {                                   \
-            std::promise< NullResult > _p;                                                                             \
-            if (nuraft::OK == r)                                                                                       \
-                _p.set_value({});                                                                                      \
-            else                                                                                                       \
-                _p.set_value(std::unexpected(r));                                                                      \
-            return _p.get_future();                                                                                    \
-        }                                                                                                              \
-        auto _p = std::make_shared< std::promise< NullResult > >();                                                    \
-        auto _sf = _p->get_future();                                                                                   \
-        (resp)->when_ready(                                                                                            \
-            [p = std::move(_p)](                                                                                       \
-                nuraft::cmd_result< nuraft::ptr< nuraft::buffer >, nuraft::ptr< std::exception > >& result,            \
-                auto&) mutable {                                                                                       \
-                if (nuraft::cmd_result_code::OK != result.get_result_code())                                           \
-                    p->set_value(std::unexpected(result.get_result_code()));                                           \
-                else                                                                                                   \
-                    p->set_value({});                                                                                  \
-            });                                                                                                        \
-        return _sf;                                                                                                    \
-    } catch (std::runtime_error & rte) { LOGE("Caught exception: [group={}] {}", group_id, rte.what()); }
-
 namespace nuraft_mesg {
+
+// Deliver the RAW nuraft result code (immediate or via the when_ready callback on a nuraft thread) as a
+// co_await-able task. ManagerImpl interprets the code (retry on CONFIG_CHANGING/SERVER_IS_JOINING,
+// idempotency on ALREADY_EXISTS/NOT_FOUND) and then collapses it to the public std::error_condition
+// surface. RESULT_NOT_EXIST_YET means "still pending" -> wait via when_ready.
+template < typename CmdResultPtr >
+static sisl::async::task< nuraft::cmd_result_code > continue_resp(CmdResultPtr resp, group_id_t const& group_id) {
+    auto av = std::make_shared< sisl::async::value_awaitable< nuraft::cmd_result_code > >();
+    try {
+        if (auto r = resp->get_result_code(); r != nuraft::RESULT_NOT_EXIST_YET) {
+            av->complete(r);
+        } else {
+            resp->when_ready(
+                [av](nuraft::cmd_result< nuraft::ptr< nuraft::buffer >, nuraft::ptr< std::exception > >& result,
+                     auto&) mutable { av->complete(result.get_result_code()); });
+        }
+    } catch (std::runtime_error& rte) {
+        LOGE("Caught exception: [group={}] {}", group_id, rte.what());
+        return make_ready< nuraft::cmd_result_code >(nuraft::FAILED);
+    }
+    return await_value(av);
+}
 
 msg_service::msg_service(std::shared_ptr< ManagerImpl > const& manager, group_id_t const& service_address,
                          std::string const& default_group_type, bool const enable_data_service) :
@@ -74,24 +73,21 @@ bool msg_service::bind_data_service_request(std::string const& request_name, gro
     return _data_service.bind(request_name, group_id, request_handler);
 }
 
-NullAsyncResult msg_service::add_member(group_id_t const& group_id, nuraft::srv_config const& cfg) {
+sisl::async::task< nuraft::cmd_result_code > msg_service::add_member(group_id_t const& group_id,
+                                                                     nuraft::srv_config const& cfg) {
     std::shared_lock lk(_raft_servers_mutex);
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
-        CONTINUE_RESP(it->second.m_server->add_srv(cfg))
+        return continue_resp(it->second.m_server->add_srv(cfg), group_id);
     }
-    std::promise< NullResult > p;
-    p.set_value(std::unexpected(nuraft::SERVER_NOT_FOUND));
-    return p.get_future();
+    return make_ready< nuraft::cmd_result_code >(nuraft::FAILED);
 }
 
-NullAsyncResult msg_service::rem_member(group_id_t const& group_id, int const member_id) {
+sisl::async::task< nuraft::cmd_result_code > msg_service::rem_member(group_id_t const& group_id, int const member_id) {
     std::shared_lock lk(_raft_servers_mutex);
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
-        CONTINUE_RESP(it->second.m_server->rem_srv(member_id))
+        return continue_resp(it->second.m_server->rem_srv(member_id), group_id);
     }
-    std::promise< NullResult > p;
-    p.set_value(std::unexpected(nuraft::SERVER_NOT_FOUND));
-    return p.get_future();
+    return make_ready< nuraft::cmd_result_code >(nuraft::FAILED);
 }
 
 bool msg_service::become_leader(group_id_t const& group_id) {
@@ -117,15 +113,13 @@ void msg_service::get_srv_config_all(group_id_t const& group_id,
     }
 }
 
-NullAsyncResult msg_service::append_entries(group_id_t const& group_id,
-                                            std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
+sisl::async::task< nuraft::cmd_result_code > msg_service::append_entries(group_id_t const& group_id,
+                                                                         std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
     std::shared_lock lk(_raft_servers_mutex);
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
-        CONTINUE_RESP(it->second.m_server->append_entries(logs))
+        return continue_resp(it->second.m_server->append_entries(logs), group_id);
     }
-    std::promise< NullResult > p;
-    p.set_value(std::unexpected(nuraft::SERVER_NOT_FOUND));
-    return p.get_future();
+    return make_ready< nuraft::cmd_result_code >(nuraft::FAILED);
 }
 
 class msg_group_listner : public nuraft::rpc_listener {

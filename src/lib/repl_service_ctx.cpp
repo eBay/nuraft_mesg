@@ -5,8 +5,9 @@
 #include <sisl/grpc/generic_service.hpp>
 #include <sisl/grpc/rpc_client.hpp>
 #include <libnuraft/cluster_config.hxx>
+#include <libnuraft/raft_params.hxx> // get_current_params() returns raft_params by value
 
-#include "nuraft_mesg/mesg_factory.hpp"
+#include "lib/mesg_factory.hpp"
 #include "grpc_server.hpp"
 #include "common_lib.hpp"
 
@@ -18,62 +19,55 @@ const std::string repl_service_ctx_grpc::id_to_str(int32_t const id) const {
     return (srv_config) ? srv_config->get_endpoint() : std::string();
 }
 
-const std::optional< Result< peer_id_t > > repl_service_ctx_grpc::get_peer_id(destination_t const& dest) const {
-    if (std::holds_alternative< peer_id_t >(dest)) return std::get< peer_id_t >(dest);
+resolved_dest repl_service_ctx_grpc::resolve_dest(destination_t const& dest) const {
+    if (std::holds_alternative< peer_id_t >(dest)) return std::optional< peer_id_t >{std::get< peer_id_t >(dest)};
 
     if (!_server) {
         LOGW("server not initialized");
-        return std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+        return std::unexpected(to_condition(nuraft::cmd_result_code::SERVER_NOT_FOUND));
     }
 
     if (std::holds_alternative< svr_id_t >(dest)) {
         if (auto const id_str = id_to_str(std::get< svr_id_t >(dest)); !id_str.empty()) {
-            return boost::uuids::string_generator()(id_str);
+            return std::optional< peer_id_t >{boost::uuids::string_generator()(id_str)};
         }
-        return std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
+        return std::unexpected(to_condition(nuraft::cmd_result_code::SERVER_NOT_FOUND));
     }
 
     if (std::holds_alternative< role_regex >(dest)) {
         switch (std::get< role_regex >(dest)) {
         case role_regex::LEADER: {
-            if (is_raft_leader()) return std::unexpected(nuraft::cmd_result_code::BAD_REQUEST);
+            if (is_raft_leader()) return std::unexpected(to_condition(nuraft::cmd_result_code::BAD_REQUEST));
             auto const leader = _server->get_leader();
-            if (leader == -1) return std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND);
-            return boost::uuids::string_generator()(id_to_str(leader));
+            if (leader == -1) return std::unexpected(to_condition(nuraft::cmd_result_code::SERVER_NOT_FOUND));
+            return std::optional< peer_id_t >{boost::uuids::string_generator()(id_to_str(leader))};
         } break;
         case role_regex::ALL: {
-            return std::nullopt;
+            return std::optional< peer_id_t >{}; // broadcast to every peer
         } break;
         default: {
             LOGE("Method not implemented");
-            return std::unexpected(nuraft::cmd_result_code::BAD_REQUEST);
+            return std::unexpected(to_condition(nuraft::cmd_result_code::BAD_REQUEST));
         } break;
         }
     }
     DEBUG_ASSERT(false, "Unknown destination type");
-    return std::unexpected(nuraft::cmd_result_code::BAD_REQUEST);
+    return std::unexpected(to_condition(nuraft::cmd_result_code::BAD_REQUEST));
 }
 
-NullAsyncResult repl_service_ctx_grpc::data_service_request_unidirectional(destination_t const& dest,
-                                                                           std::string const& request_name,
-                                                                           io_blob_list_t const& cli_buf) {
-    if (!m_mesg_factory) {
-        std::promise< NullResult > p;
-        p.set_value(std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND));
-        return p.get_future();
-    }
-    return m_mesg_factory->data_service_request_unidirectional(get_peer_id(dest), request_name, cli_buf);
+null_async_task repl_service_ctx_grpc::data_service_request_unidirectional(destination_t dest, std::string request_name,
+                                                                        io_blob_list_t cli_buf) {
+    if (!m_mesg_factory) { co_return std::unexpected(to_condition(nuraft::cmd_result_code::SERVER_NOT_FOUND)); }
+    co_return co_await m_mesg_factory->data_service_request_unidirectional(resolve_dest(dest), std::move(request_name),
+                                                                           std::move(cli_buf));
 }
 
-AsyncResult< sisl::GenericClientResponse >
-repl_service_ctx_grpc::data_service_request_bidirectional(destination_t const& dest, std::string const& request_name,
-                                                          io_blob_list_t const& cli_buf) {
-    if (!m_mesg_factory) {
-        std::promise< Result< sisl::GenericClientResponse > > p;
-        p.set_value(std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND));
-        return p.get_future();
-    }
-    return m_mesg_factory->data_service_request_bidirectional(get_peer_id(dest), request_name, cli_buf);
+async_task< sisl::GenericClientResponse >
+repl_service_ctx_grpc::data_service_request_bidirectional(destination_t dest, std::string request_name,
+                                                          io_blob_list_t cli_buf) {
+    if (!m_mesg_factory) { co_return std::unexpected(to_condition(nuraft::cmd_result_code::SERVER_NOT_FOUND)); }
+    co_return co_await m_mesg_factory->data_service_request_bidirectional(resolve_dest(dest), std::move(request_name),
+                                                                          std::move(cli_buf));
 }
 
 repl_service_ctx::repl_service_ctx(nuraft::raft_server* server) : _server(server) {}

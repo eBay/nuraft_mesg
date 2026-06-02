@@ -48,17 +48,17 @@ class mesg_state_mgr;
 // called by the server after it receives the request
 using data_service_request_handler_t = std::function< void(boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) >;
 
-class MessagingApplication {
+class messaging_application {
 public:
-    virtual ~MessagingApplication() = default;
-    MessagingApplication();
+    virtual ~messaging_application() = default;
+    messaging_application();
     virtual std::string lookup_peer(peer_id_t const&) = 0;
     virtual std::shared_ptr< mesg_state_mgr > create_state_mgr(int32_t const srv_id, group_id_t const& group_id) = 0;
 };
 
-class Manager {
+class manager {
 public:
-    struct Params {
+    struct params {
         boost::uuids::uuid server_uuid_;
         uint16_t mesg_port_;
         group_type_t default_group_type_;
@@ -72,25 +72,24 @@ public:
         bool enable_console_log_{false};
     };
     using group_params = nuraft::raft_params;
-    virtual ~Manager() = default;
+    virtual ~manager() = default;
 
     // Register a new group type
     virtual void register_mgr_type(group_type_t const& group_type, group_params const&) = 0;
 
     virtual std::shared_ptr< mesg_state_mgr > lookup_state_manager(group_id_t const& group_id) const = 0;
-    [[nodiscard]] virtual NullAsyncResult create_group(group_id_t const& group_id,
-                                                        group_type_t const& group_type) = 0;
-    [[nodiscard]] virtual NullResult join_group(group_id_t const& group_id, group_type_t const& group_type,
+    [[nodiscard]] virtual null_async_task create_group(group_id_t const& group_id, group_type_t const& group_type) = 0;
+    [[nodiscard]] virtual null_result join_group(group_id_t const& group_id, group_type_t const& group_type,
                                                 std::shared_ptr< mesg_state_mgr >) = 0;
 
     // Send a client request to the cluster
-    [[nodiscard]] virtual NullAsyncResult add_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
-    [[nodiscard]] virtual NullAsyncResult add_member(group_id_t const& group_id,
-                                                     nuraft::srv_config const& srv_config) = 0;
-    [[nodiscard]] virtual NullAsyncResult rem_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
-    [[nodiscard]] virtual NullAsyncResult become_leader(group_id_t const& group_id) = 0;
-    [[nodiscard]] virtual NullAsyncResult append_entries(group_id_t const& group_id,
-                                                         std::vector< std::shared_ptr< nuraft::buffer > > const&) = 0;
+    [[nodiscard]] virtual null_async_task add_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
+    [[nodiscard]] virtual null_async_task add_member(group_id_t const& group_id,
+                                                   nuraft::srv_config const& srv_config) = 0;
+    [[nodiscard]] virtual null_async_task rem_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
+    [[nodiscard]] virtual null_async_task become_leader(group_id_t const& group_id) = 0;
+    [[nodiscard]] virtual null_async_task append_entries(group_id_t const& group_id,
+                                                       std::vector< std::shared_ptr< nuraft::buffer > > const&) = 0;
 
     // Misc Mgmt
     virtual void get_srv_config_all(group_id_t const& group_id,
@@ -108,7 +107,7 @@ public:
 
 extern int32_t to_server_id(peer_id_t const& server_addr);
 
-extern std::shared_ptr< Manager > init_messaging(Manager::Params const&, std::weak_ptr< MessagingApplication >,
+extern std::shared_ptr< manager > init_messaging(manager::params const&, std::weak_ptr< messaging_application >,
                                                  bool with_data_svc = false);
 
 } // namespace nuraft_mesg

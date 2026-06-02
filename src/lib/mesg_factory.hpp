@@ -23,7 +23,7 @@
 #include <libnuraft/rpc_cli_factory.hxx>
 #include <libnuraft/srv_config.hxx>
 
-#include "common.hpp"
+#include <nuraft_mesg/common.hpp>
 
 namespace sisl {
 struct io_blob;
@@ -49,8 +49,8 @@ public:
     grpc_factory(int const raft_cli_thread_count, int const data_cli_thread_count, std::string const& name);
     ~grpc_factory() override = default;
 
-    std::string const raftWorkerName() const;
-    std::string const dataWorkerName() const;
+    std::string const raft_worker_name() const;
+    std::string const data_worker_name() const;
 
     nuraft::ptr< nuraft::rpc_client > create_client(const std::string& client) override;
     nuraft::ptr< nuraft::rpc_client > create_client(peer_id_t const& client);
@@ -60,15 +60,15 @@ public:
     virtual nuraft::cmd_result_code reinit_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 
     // Construct and send an AddServer message to the cluster
-    [[nodiscard]] NullAsyncResult add_server(uint32_t const srv_id, peer_id_t const& srv_addr,
-                                             nuraft::srv_config const& dest_cfg);
+    [[nodiscard]] null_async_task add_server(uint32_t const srv_id, peer_id_t const& srv_addr,
+                                           nuraft::srv_config const& dest_cfg);
 
     // Send a client request to the cluster
-    [[nodiscard]] NullAsyncResult append_entry(std::shared_ptr< nuraft::buffer > buf,
-                                               nuraft::srv_config const& dest_cfg);
+    [[nodiscard]] null_async_task append_entry(std::shared_ptr< nuraft::buffer > buf,
+                                             nuraft::srv_config const& dest_cfg);
 
     // Construct and send a RemoveServer message to the cluster
-    [[nodiscard]] NullAsyncResult rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);
+    [[nodiscard]] null_async_task rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);
 };
 
 class group_factory : public grpc_factory {
@@ -90,7 +90,7 @@ public:
     nuraft::cmd_result_code reinit_client(peer_id_t const& client,
                                           std::shared_ptr< nuraft::rpc_client >& raft_client) override;
 
-    virtual std::string lookupEndpoint(peer_id_t const& client) = 0;
+    virtual std::string lookup_endpoint(peer_id_t const& client) = 0;
 };
 
 class mesg_factory final : public grpc_factory {
@@ -116,13 +116,13 @@ public:
     nuraft::cmd_result_code reinit_client(peer_id_t const& client,
                                           std::shared_ptr< nuraft::rpc_client >& raft_client) override;
 
-    [[nodiscard]] NullAsyncResult
-    data_service_request_unidirectional(std::optional< Result< peer_id_t > > const& dest,
-                                        std::string const& request_name, io_blob_list_t const& cli_buf);
+    // params by value: these return lazy coroutines that may be started after the caller's argument
+    // full-expression ends (e.g. collected for a fan-out), so references would dangle.
+    [[nodiscard]] null_async_task data_service_request_unidirectional(resolved_dest dest, std::string request_name,
+                                                                      io_blob_list_t cli_buf);
 
-    [[nodiscard]] AsyncResult< sisl::GenericClientResponse >
-    data_service_request_bidirectional(std::optional< Result< peer_id_t > > const&, std::string const&,
-                                       io_blob_list_t const&);
+    [[nodiscard]] async_task< sisl::GenericClientResponse >
+    data_service_request_bidirectional(resolved_dest dest, std::string request_name, io_blob_list_t cli_buf);
 };
 
 } // namespace nuraft_mesg

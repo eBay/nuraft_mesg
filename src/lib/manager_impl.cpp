@@ -12,11 +12,17 @@
 #include <spdlog/details/registry.h>
 
 #include <libnuraft/async.hxx>
+#include <algorithm>
+#include <ranges>
+
+#include <stdexec/execution.hpp>
+#include <exec/timed_scheduler.hpp>
+
 #include <sisl/options/options.h>
 #include <sisl/grpc/rpc_server.hpp>
 #include <sisl/grpc/generic_service.hpp>
 
-#include "nuraft_mesg/mesg_factory.hpp"
+#include "lib/mesg_factory.hpp"
 #include "nuraft_mesg/mesg_state_mgr.hpp"
 #include "nuraft_mesg/nuraft_mesg.hpp"
 
@@ -34,22 +40,22 @@ int32_t to_server_id(peer_id_t const& server_addr) {
     return uuid_hasher(server_addr) >> 33;
 }
 
-MessagingApplication::MessagingApplication() {
+messaging_application::messaging_application() {
     sisl::VersionMgr::addVersion(PACKAGE_NAME, version::Semver200_version(PACKAGE_VERSION));
 }
 
 class engine_factory : public group_factory {
 public:
-    std::weak_ptr< MessagingApplication > application_;
+    std::weak_ptr< messaging_application > application_;
 
-    engine_factory(int const raft_threads, int const data_threads, Manager::Params const& start_params,
-                   std::weak_ptr< MessagingApplication > app) :
+    engine_factory(int const raft_threads, int const data_threads, manager::params const& start_params,
+                   std::weak_ptr< messaging_application > app) :
             group_factory::group_factory(raft_threads, data_threads, start_params.server_uuid_,
                                          start_params.token_client_, start_params.ssl_ca_,
                                          start_params.max_receive_message_size_, start_params.max_send_message_size_),
             application_(app) {}
 
-    std::string lookupEndpoint(peer_id_t const& client) override {
+    std::string lookup_endpoint(peer_id_t const& client) override {
         LOGT("[peer={}]", client);
         if (auto a = application_.lock(); a) return a->lookup_peer(client);
         return std::string();
@@ -65,7 +71,7 @@ ManagerImpl::~ManagerImpl() {
     }
 }
 
-ManagerImpl::ManagerImpl(Manager::Params const& start_params, std::weak_ptr< MessagingApplication > app) :
+ManagerImpl::ManagerImpl(manager::params const& start_params, std::weak_ptr< messaging_application > app) :
         start_params_(start_params), _srv_id(to_server_id(start_params_.server_uuid_)), application_(app) {
     _g_factory =
         std::make_shared< engine_factory >(NURAFT_MESG_CONFIG(grpc_raft_client_thread_cnt),
@@ -160,7 +166,7 @@ void ManagerImpl::generic_raft_event_handler(group_id_t const& group_id, nuraft:
     case nuraft::cb_func::NewConfig: {
         LOGD("[srv_id={}] saw cluster change: [group={}, leader_id:{}, my_id:{}]", start_params_.server_uuid_, group_id,
              leader_id, my_id);
-        _config_change.notify_all();
+        signal_waiters(group_id);
     } break;
     case nuraft::cb_func::BecomeLeader: {
         LOGI("[srv_id={}] became leader: [group={}, leader_id:{}, my_id:{}]!", start_params_.server_uuid_, group_id,
@@ -169,7 +175,7 @@ void ManagerImpl::generic_raft_event_handler(group_id_t const& group_id, nuraft:
             std::lock_guard< std::mutex > lg(_manager_lock);
             _is_leader[group_id] = true;
         }
-        _config_change.notify_all();
+        signal_waiters(group_id);
     } break;
     case nuraft::cb_func::BecomeFollower: {
         LOGI("[srv_id={}] following: [group={}, leader_id:{}, my_id:{}]!", start_params_.server_uuid_, group_id,
@@ -222,7 +228,7 @@ nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t
         if (it != _state_managers.end()) {
             if (happened) {
                 // A new logstore!
-                LOGD("Creating new State Manager for: [group={}], type: {}", group_id, group_type);
+                LOGD("Creating new State manager for: [group={}], type: {}", group_id, group_type);
                 it->second = application_.lock()->create_state_mgr(srv_id, group_id);
             }
             smgr = it->second;
@@ -255,101 +261,153 @@ nuraft::cmd_result_code ManagerImpl::group_init(int32_t const srv_id, group_id_t
     return nuraft::cmd_result_code::OK;
 }
 
-NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, peer_id_t const& new_id) {
+void ManagerImpl::signal_waiters(group_id_t const& group_id) {
+    std::vector< std::shared_ptr< wakeup_event > > to_signal;
+    {
+        std::lock_guard< std::mutex > lg(_manager_lock);
+        if (auto it = _waiters.find(group_id); it != _waiters.end()) { to_signal = it->second; }
+    }
+    // Signal outside the lock: signal() may resume the waiting coroutine, which re-acquires _manager_lock to
+    // re-check its predicate.
+    for (auto& ev : to_signal) { ev->signal(true); }
+}
+
+null_async_task ManagerImpl::wait_for_condition(group_id_t group_id, std::function< bool() > pred,
+                                              std::chrono::steady_clock::time_point deadline,
+                                              nuraft::cmd_result_code timeout_code) {
+    auto sched = _timer_ctx.get_scheduler();
+    for (;;) {
+        // Run the waiter bookkeeping and pred() on the timer thread, never inline on whoever signalled us.
+        // signal_waiters() fires from inside a nuraft raft_server callback while nuraft holds the raft_server
+        // lock; if value_awaitable::complete() resumed this coroutine inline there, pred() ->
+        // get_srv_config_all() would take _raft_servers_mutex under the raft_server lock -- inverting the order
+        // every msg_service method uses (_raft_servers_mutex first, then the raft_server lock) and risking a
+        // deadlock. Hopping to the timer thread first keeps pred()'s locks off the nuraft callback thread.
+        co_await exec::schedule_after(sched, std::chrono::milliseconds(0));
+        // Register the wakeup BEFORE checking pred so a config change cannot slip between the check and the
+        // wait: signal_waiters and the _is_leader writes share _manager_lock, so once we are registered any
+        // later change either updates state our pred() then observes, or signals this event.
+        auto ev = std::make_shared< wakeup_event >();
+        {
+            std::lock_guard< std::mutex > lg(_manager_lock);
+            _waiters[group_id].push_back(ev);
+        }
+        bool const satisfied = pred();
+        bool const expired = std::chrono::steady_clock::now() >= deadline;
+        if (satisfied || expired) {
+            std::lock_guard< std::mutex > lg(_manager_lock);
+            std::erase(_waiters[group_id], ev);
+            if (satisfied) co_return null_result{};
+            co_return std::unexpected(to_condition(timeout_code));
+        }
+        // Arm the deadline timer to also wake us (first-wins with a real config-change signal).
+        stdexec::start_detached(exec::schedule_at(sched, deadline) |
+                                stdexec::then([ev]() noexcept { ev->signal(false); }));
+        co_await ev->_av;
+        {
+            std::lock_guard< std::mutex > lg(_manager_lock);
+            std::erase(_waiters[group_id], ev);
+        }
+    }
+}
+
+null_async_task ManagerImpl::add_member(group_id_t const& group_id, peer_id_t const& new_id) {
     auto str_id = to_string(new_id);
     auto srv_config = nuraft::srv_config(to_server_id(new_id), str_id);
     return add_member(group_id, srv_config);
 }
 
-NullAsyncResult ManagerImpl::add_member(group_id_t const& group_id, nuraft::srv_config const& srv_config) {
-    auto str_id = srv_config.get_endpoint();
-    return std::async(
-        std::launch::async,
-        [this, g_id = group_id, n_id = std::move(str_id),
-         fut = _mesg_service->add_member(group_id, srv_config)]() mutable -> NullResult {
-            if (fut.wait_for(std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms))) !=
-                std::future_status::ready)
-                return std::unexpected(nuraft::cmd_result_code::TIMEOUT);
-            auto cmd_result = fut.get();
-            if (!cmd_result.has_value()) return std::unexpected(cmd_result.error());
-            // Check membership outside _manager_lock to avoid lock-order-inversion:
-            // get_srv_config_all acquires _raft_servers_mutex, but nuraft callbacks
-            // hold _raft_servers_mutex and then notify _config_change under _manager_lock,
-            // creating a cycle if we hold _manager_lock while calling get_srv_config_all.
-            auto check_member = [this, &g_id, &n_id]() {
-                std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
-                _mesg_service->get_srv_config_all(g_id, srv_list);
-                return std::ranges::any_of(srv_list, [&n_id](auto const& cfg) {
-                    return n_id == cfg->get_endpoint();
-                });
-            };
-            if (check_member()) return {};
-            auto const deadline = std::chrono::steady_clock::now() +
-                std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms));
-            {
-                auto lk = std::unique_lock< std::mutex >(_manager_lock);
-                while (std::chrono::steady_clock::now() < deadline) {
-                    _config_change.wait_until(lk, deadline);
-                    lk.unlock();
-                    if (check_member()) return {};
-                    lk.lock();
-                }
-            }
-            return std::unexpected(nuraft::cmd_result_code::CANCELLED);
-        });
+sisl::async::task< nuraft::cmd_result_code >
+ManagerImpl::retry_config_changing(std::function< sisl::async::task< nuraft::cmd_result_code >() > dispatch,
+                                   std::chrono::steady_clock::time_point deadline) {
+    auto sched = _timer_ctx.get_scheduler();
+    for (;;) {
+        auto const code = co_await dispatch();
+        if ((code == nuraft::CONFIG_CHANGING || code == nuraft::SERVER_IS_JOINING) &&
+            std::chrono::steady_clock::now() < deadline) {
+            co_await exec::schedule_after(sched, std::chrono::milliseconds(500));
+            continue;
+        }
+        co_return code;
+    }
 }
 
-NullAsyncResult ManagerImpl::rem_member(group_id_t const& group_id, peer_id_t const& old_id) {
-    auto timeout = std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms));
-    return std::async(
-        std::launch::async,
-        [timeout, fut = _mesg_service->rem_member(group_id, to_server_id(old_id))]() mutable -> NullResult {
-            if (fut.wait_for(timeout) != std::future_status::ready)
-                return std::unexpected(nuraft::cmd_result_code::TIMEOUT);
-            return fut.get();
-        });
+null_async_task ManagerImpl::add_member(group_id_t const& group_id, nuraft::srv_config const& srv_config) {
+    // Clone srv_config eagerly (it is non-copyable and the coroutine below is lazy; a const& would dangle
+    // once co_awaited later). serialize() runs now, while srv_config is alive.
+    return add_member_impl(group_id, srv_config.serialize());
 }
 
-NullAsyncResult ManagerImpl::become_leader(group_id_t const& group_id) {
+null_async_task ManagerImpl::add_member_impl(group_id_t group_id, nuraft::ptr< nuraft::buffer > cfg_buf) {
+    cfg_buf->pos(0);
+    auto const cfg = nuraft::srv_config::deserialize(*cfg_buf); // ptr<srv_config> owned by this frame
+    auto const endpoint = cfg->get_endpoint();
+    auto sched = _timer_ctx.get_scheduler();
+    auto const deadline =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms));
+    // Retry the local add_srv while the config is changing (this used to be the consumer's
+    // retry_when_config_changing loop). ALREADY_EXISTS is idempotent success; any other non-OK code fails.
+    nuraft::cmd_result_code code;
+    for (;;) {
+        code = co_await _mesg_service->add_member(group_id, *cfg);
+        if ((code == nuraft::CONFIG_CHANGING || code == nuraft::SERVER_IS_JOINING) &&
+            std::chrono::steady_clock::now() < deadline) {
+            co_await exec::schedule_after(sched, std::chrono::milliseconds(500));
+            continue;
+        }
+        break;
+    }
+    if (code != nuraft::OK && code != nuraft::SERVER_ALREADY_EXISTS) co_return std::unexpected(to_condition(code));
+    // Confirm the new member appears in config. check_member reads raft state WITHOUT _manager_lock:
+    // get_srv_config_all takes _raft_servers_mutex, and the nuraft callback path holds _raft_servers_mutex
+    // then _manager_lock, so holding _manager_lock here would invert the order.
+    co_return co_await wait_for_condition(
+        group_id,
+        [this, group_id, endpoint]() {
+            std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
+            _mesg_service->get_srv_config_all(group_id, srv_list);
+            return std::ranges::any_of(srv_list, [&](auto const& cfg) { return endpoint == cfg->get_endpoint(); });
+        },
+        deadline, nuraft::cmd_result_code::CANCELLED);
+}
+
+null_async_task ManagerImpl::rem_member(group_id_t const& group_id, peer_id_t const& old_id) {
+    auto const deadline =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms));
+    auto const member_id = to_server_id(old_id);
+    auto const code = co_await retry_config_changing(
+        [this, group_id, member_id]() { return _mesg_service->rem_member(group_id, member_id); }, deadline);
+    // SERVER_NOT_FOUND is idempotent success (the member is already gone).
+    if (code == nuraft::OK || code == nuraft::SERVER_NOT_FOUND) co_return null_result{};
+    co_return std::unexpected(to_condition(code));
+}
+
+null_async_task ManagerImpl::become_leader(group_id_t const& group_id) {
     {
-        auto lk = std::unique_lock< std::mutex >(_manager_lock);
-        if (_is_leader[group_id]) {
-            std::promise< NullResult > p;
-            p.set_value({});
-            return p.get_future();
-        }
+        std::lock_guard< std::mutex > lg(_manager_lock);
+        if (_is_leader[group_id]) co_return null_result{};
     }
+    if (!lookup_state_manager(group_id))
+        co_return std::unexpected(to_condition(nuraft::cmd_result_code::SERVER_NOT_FOUND));
 
-    if (!lookup_state_manager(group_id)) {
-        std::promise< NullResult > p;
-        p.set_value(std::unexpected(nuraft::cmd_result_code::SERVER_NOT_FOUND));
-        return p.get_future();
+    auto sched = _timer_ctx.get_scheduler();
+    auto const deadline =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms));
+    // request_leadership() returns false when the group doesn't yet know its leader (e.g. just after a
+    // restart). Retry with a short async delay until it is accepted or the deadline passes.
+    while (!_mesg_service->become_leader(group_id)) {
+        if (std::chrono::steady_clock::now() >= deadline)
+            co_return std::unexpected(to_condition(nuraft::cmd_result_code::TIMEOUT));
+        co_await exec::schedule_after(sched, std::chrono::milliseconds(50));
     }
-
-    return std::async(std::launch::async, [this, g_id = group_id]() mutable -> NullResult {
-        // request_leadership() returns false when the raft group doesn't yet know
-        // who the leader is (e.g. shortly after a node restarts). Retry until it
-        // succeeds or the timeout expires.
-        auto const deadline = std::chrono::steady_clock::now() +
-                              std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms));
-        while (!_mesg_service->become_leader(g_id)) {
-            if (std::chrono::steady_clock::now() >= deadline)
-                return std::unexpected(nuraft::cmd_result_code::TIMEOUT);
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        }
-
-        auto lk = std::unique_lock< std::mutex >(_manager_lock);
-        if (!_config_change.wait_for(lk,
-                                     std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms)),
-                                     [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; }))
-            return std::unexpected(nuraft::cmd_result_code::TIMEOUT);
-        return {};
-    });
+    co_return co_await wait_for_condition(
+        group_id, [this, group_id]() { std::lock_guard< std::mutex > lg(_manager_lock); return _is_leader[group_id]; },
+        deadline, nuraft::cmd_result_code::TIMEOUT);
 }
 
-NullAsyncResult ManagerImpl::append_entries(group_id_t const& group_id,
-                                            std::vector< std::shared_ptr< nuraft::buffer > > const& buf) {
-    return _mesg_service->append_entries(group_id, buf);
+null_async_task ManagerImpl::append_entries(group_id_t const& group_id,
+                                          std::vector< std::shared_ptr< nuraft::buffer > > const& buf) {
+    co_return to_null_result(co_await _mesg_service->append_entries(group_id, buf));
 }
 
 std::shared_ptr< mesg_state_mgr > ManagerImpl::lookup_state_manager(group_id_t const& group_id) const {
@@ -358,40 +416,34 @@ std::shared_ptr< mesg_state_mgr > ManagerImpl::lookup_state_manager(group_id_t c
     return nullptr;
 }
 
-NullAsyncResult ManagerImpl::create_group(group_id_t const& group_id, std::string const& group_type_name) {
+null_async_task ManagerImpl::create_group(group_id_t const& group_id, std::string const& group_type_name) {
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         _is_leader.insert(std::make_pair(group_id, false));
     }
+    // joinRaftGroup is dispatched eagerly here (a dropped result still creates the group); the returned task
+    // only carries the wait for this node to win the election.
     if (auto const err = _mesg_service->joinRaftGroup(_srv_id, group_id, group_type_name); err) {
-        std::promise< NullResult > p;
-        p.set_value(std::unexpected(err));
-        return p.get_future();
+        return make_ready< null_result >(std::unexpected(to_condition(err)));
     }
-
-    // Wait for the leader election timeout to make us the leader
-    return std::async(std::launch::deferred, [this, g_id = group_id]() mutable -> NullResult {
-        auto lk = std::unique_lock< std::mutex >(_manager_lock);
-        if (!_config_change.wait_for(lk,
-                                     std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms)),
-                                     [this, g_id = std::move(g_id)]() { return _is_leader[g_id]; })) {
-            return std::unexpected(nuraft::cmd_result_code::CANCELLED);
-        }
-        return {};
-    });
+    auto const deadline =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms));
+    return wait_for_condition(
+        group_id, [this, group_id]() { std::lock_guard< std::mutex > lg(_manager_lock); return _is_leader[group_id]; },
+        deadline, nuraft::cmd_result_code::CANCELLED);
 }
 
-NullResult ManagerImpl::join_group(group_id_t const& group_id, group_type_t const& group_type,
+null_result ManagerImpl::join_group(group_id_t const& group_id, group_type_t const& group_type,
                                    std::shared_ptr< mesg_state_mgr > smgr) {
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         auto [it, happened] = _state_managers.emplace(group_id, smgr);
-        if (_state_managers.end() == it) return std::unexpected(nuraft::cmd_result_code::CANCELLED);
+        if (_state_managers.end() == it) return std::unexpected(to_condition(nuraft::cmd_result_code::CANCELLED));
     }
     if (auto const err = _mesg_service->joinRaftGroup(_srv_id, group_id, group_type); err) {
         std::lock_guard< std::mutex > lg(_manager_lock);
         _state_managers.erase(group_id);
-        return std::unexpected(err);
+        return std::unexpected(to_condition(err));
     }
     return {};
 }
@@ -462,10 +514,10 @@ nuraft::cb_func::ReturnCode mesg_state_mgr::internal_raft_event_handler(group_id
         sp->generic_raft_event_handler(group_id, type, param);
     else
         return nuraft::cb_func::ReturnNull;
-    return handle_raft_event(type, param).second;
+    return raft_event(type, param);
 }
 
-std::shared_ptr< Manager > init_messaging(Manager::Params const& p, std::weak_ptr< MessagingApplication > w,
+std::shared_ptr< manager > init_messaging(manager::params const& p, std::weak_ptr< messaging_application > w,
                                           bool with_data_svc) {
     RELEASE_ASSERT(w.lock(), "Could not acquire application!");
     auto m = std::make_shared< ManagerImpl >(p, w);

@@ -50,6 +50,9 @@ pipeline {
                     slackSend color: '#9B59B6', channel: "${SLACK_THREAD}", message: "⛽ *${PROJECT}* `${BRANCH_NAME}` build #${BUILD_NUMBER} \nAll systems Go...going somewhere anyways...\nLet's light this 🕯️... 3... 2... 1...!"
                 }
                 sh "conan create -s:h build_type=Debug ${CONAN_FLAGS} ."
+                script {
+                    slackSend color: '#E67E22', channel: "${SLACK_THREAD}", message: "🧑‍🚀 *${PROJECT}* `${BRANCH_NAME}`\n*Debug: green.* One more build between us and home.\nI've been in here long enough to start naming the compiler warnings. Don't ask.\nRelWithDebInfo... *please don't fail me now.*"
+                }
                 sh "conan create -s:h build_type=RelWithDebInfo -o sisl/*:malloc_impl=tcmalloc ${CONAN_FLAGS} ."
             }
         }
@@ -80,7 +83,7 @@ pipeline {
             }
         }
         success {
-            slackSend color: '#85B717', channel: "${SLACK_THREAD}", replyBroadcast: true, message: "🧑‍🚀 *${PROJECT}* `${VER}` (`${BRANCH_NAME}`) build #${BUILD_NUMBER} — it actually worked\nEveryone survived after _${currentBuild.durationString}_\n<${BUILD_URL}|Full report>\n🍾 Mission successful!"
+            slackSend color: '#85B717', channel: "${SLACK_THREAD}", replyBroadcast: true, message: "✅ *${PROJECT}* `${VER}` (`${BRANCH_NAME}`) build #${BUILD_NUMBER} — it actually worked\nDebug + RelWithDebInfo both green in _${currentBuild.durationString}_\n<${BUILD_URL}|Full report>\n🍾 Mission successful!"
         }
     }
 }
