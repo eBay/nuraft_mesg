@@ -18,7 +18,7 @@
 #include <libnuraft/async.hxx>
 #include <sisl/async/when_all.hpp>
 
-#include "lib/mesg_factory.hpp"
+#include "nuraft_mesg/mesg_factory.hpp"
 #include "lib/client.hpp"
 #include "lib/service.hpp"
 #include "lib/nuraft_mesg_config.hpp"

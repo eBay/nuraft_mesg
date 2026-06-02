@@ -20,7 +20,7 @@
 #include <libnuraft/async.hxx>
 
 #include "client.hpp"
-#include "lib/mesg_factory.hpp"
+#include "nuraft_mesg/mesg_factory.hpp"
 #include "async_helpers.hpp"
 
 namespace nuraft_mesg {

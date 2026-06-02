@@ -9,6 +9,9 @@
 #include <sisl/grpc/rpc_client.hpp>
 #include <sisl/utility/thread_buffer.hpp>
 #include <nuraft_mesg/mesg_factory.hpp>
+#include <stdexec/execution.hpp>
+
+#include <system_error>
 
 #include "uuids.h"
 
@@ -28,11 +31,33 @@ void cleanup(const std::string& prefix) { auto r = system(fmt::format(FMT_STRING
 using nuraft_mesg::mesg_factory;
 using namespace nuraft;
 
+// The factory control calls are coroutines (null_async_task); a non-coroutine client drives one to
+// completion with stdexec::sync_wait.
+static nuraft_mesg::null_result sync_get(nuraft_mesg::null_async_task task) {
+    auto done = stdexec::sync_wait(std::move(task));
+    if (!done) { return std::unexpected(std::make_error_condition(std::errc::operation_canceled)); }
+    return std::get< 0 >(std::move(*done));
+}
+
+// Retry a control call while it keeps failing (the cluster may still be forming or reconfiguring), up to
+// a bounded number of attempts. The error surface no longer exposes the specific transient raft codes, so
+// we simply re-issue on any failure.
+template < typename MakeTask >
+static int retry_until_ok(MakeTask&& make_task) {
+    nuraft_mesg::null_result result =
+        std::unexpected(std::make_error_condition(std::errc::resource_unavailable_try_again));
+    for (int attempt = 0; !result && attempt < 25; ++attempt) {
+        if (attempt) { std::this_thread::sleep_for(std::chrono::milliseconds(200)); }
+        result = sync_get(make_task());
+    }
+    return result ? 0 : -1;
+}
+
 struct example_factory : public nuraft_mesg::group_factory {
     example_factory(int const threads, nuraft_mesg::group_id_t const& name) :
             nuraft_mesg::group_factory::group_factory(threads, name, nullptr) {}
 
-    std::string lookupEndpoint(nuraft_mesg::peer_id_t const& client) override {
+    std::string lookup_endpoint(nuraft_mesg::peer_id_t const& client) override {
         auto id_str = to_string(client);
         for (auto i = 0u; i < 5; ++i) {
             if (uuids[i] == id_str) { return fmt::format(FMT_STRING("127.0.0.1:{}"), 9000 + i); }
@@ -51,13 +76,7 @@ int send_message(uint32_t leader_id, nuraft_mesg::group_id_t const& group_id, st
     buf->put(message.c_str());
     buf->pos(0);
 
-    auto result = nuraft_mesg::NullResult(std::unexpected(nuraft::SERVER_IS_JOINING));
-    while (!result && (nuraft::SERVER_IS_JOINING == result.error() || nuraft::CONFIG_CHANGING == result.error())) {
-        auto sf = factory->append_entry(buf, dest_cfg);
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        result = std::move(sf).get();
-    }
-    int ret = (!!result) ? 0 : -1;
+    int ret = retry_until_ok([&] { return factory->append_entry(buf, dest_cfg); });
     sisl::GrpcAsyncClientWorker::shutdown_all();
     return ret;
 }
@@ -67,14 +86,8 @@ int add_new_server(uint32_t leader_id, uint32_t srv_id, nuraft_mesg::group_id_t 
     auto factory = std::make_shared< mesg_factory >(g_factory, group_id, "test_package");
     auto const dest_cfg = srv_config(leader_id, uuids[leader_id]);
 
-    auto result = nuraft_mesg::NullResult(std::unexpected(nuraft::SERVER_IS_JOINING));
-    while (!result && (nuraft::SERVER_IS_JOINING == result.error() || nuraft::CONFIG_CHANGING == result.error())) {
-        auto srv_addr = boost::uuids::string_generator()(uuids[srv_id]);
-        auto sf = factory->add_server(srv_id, srv_addr, dest_cfg);
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        result = std::move(sf).get();
-    }
-    int ret = (!!result) ? 0 : -1;
+    auto const srv_addr = boost::uuids::string_generator()(uuids[srv_id]);
+    int ret = retry_until_ok([&] { return factory->add_server(srv_id, srv_addr, dest_cfg); });
     sisl::GrpcAsyncClientWorker::shutdown_all();
     return ret;
 }
@@ -84,13 +97,7 @@ int remove_server(uint32_t leader_id, nuraft_mesg::group_id_t const& group_id, u
     auto factory = std::make_shared< mesg_factory >(g_factory, group_id, "test_package");
     auto const dest_cfg = srv_config(leader_id, uuids[leader_id]);
 
-    auto result = nuraft_mesg::NullResult(std::unexpected(nuraft::SERVER_IS_JOINING));
-    while (!result && (nuraft::SERVER_IS_JOINING == result.error() || nuraft::CONFIG_CHANGING == result.error())) {
-        auto sf = factory->rem_server(srv_id, dest_cfg);
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        result = std::move(sf).get();
-    }
-    int ret = (!!result) ? 0 : -1;
+    int ret = retry_until_ok([&] { return factory->rem_server(srv_id, dest_cfg); });
     sisl::GrpcAsyncClientWorker::shutdown_all();
     return ret;
 }

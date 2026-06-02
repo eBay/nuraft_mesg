@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build System
 
-This project uses **Conan 2 + CMake** (C++20). There is no standalone Makefile.
+This project uses **Conan 2 + CMake** (C++23). There is no standalone Makefile.
 
 ### One-time setup
 ```sh
@@ -27,7 +27,7 @@ conan install -o sisl/*:malloc_impl=libc -s:h build_type=Debug -c tools.build:sk
 
 ### Sanitizers (ASan + UBSan)
 ```sh
-conan create -o sisl/*:malloc_impl=libc -o nuraft_mesg/*:sanitize=True -s:h build_type=Debug --build missing .
+conan create -o sisl/*:malloc_impl=libc -o nuraft_mesg/*:sanitize=address -s:h build_type=Debug --build missing .
 ```
 
 ### Coverage
@@ -65,19 +65,19 @@ Both test binaries accept `-cv <level>` for console logging verbosity and standa
 
 ### Core Abstractions
 
-**`Manager`** (`include/nuraft_mesg/nuraft_mesg.hpp`) — the public facade. Obtained via:
+**`manager`** (`include/nuraft_mesg/nuraft_mesg.hpp`) — the public facade. Obtained via:
 ```cpp
-std::shared_ptr<Manager> init_messaging(Manager::Params const&, std::weak_ptr<MessagingApplication>, bool with_data_svc = false);
+std::shared_ptr<manager> init_messaging(manager::params const&, std::weak_ptr<messaging_application>, bool with_data_svc = false);
 ```
-Key operations: `create_group`, `join_group`, `add_member`, `rem_member`, `append_entries`, `bind_data_service_request`, `leave_group`.
+Control operations (`create_group`, `add_member`, `rem_member`, `become_leader`, `append_entries`) return `null_async_task` and are `co_await`-ed; plus `bind_data_service_request`, `leave_group`.
 
-**`MessagingApplication`** (user implements) — Strategy interface:
-- `lookup_peer(peer_id_t)` → address string
+**`messaging_application`** (user implements) — Strategy interface:
+- `lookup_peer(peer_id_t)` → endpoint string
 - `create_state_mgr(srv_id, group_id)` → `std::shared_ptr<mesg_state_mgr>`
 
-**`mesg_state_mgr`** (user extends, `include/nuraft_mesg/mesg_state_mgr.hpp`) — extends `nuraft::state_mgr` with RAFT lifecycle callbacks (`raft_event()`), data service access via an injected `repl_service_ctx`, and required persistence hooks (`load_config`, `save_config`, `load_log_store`, `get_state_machine`, etc.).
+**`mesg_state_mgr`** (user extends, `include/nuraft_mesg/mesg_state_mgr.hpp`) — extends `nuraft::state_mgr` with RAFT lifecycle callbacks (`raft_event()`), `get_state_machine()`, and the persistence hooks (`load_config`, `save_config`, `load_log_store`, etc.). The per-group session is reached via `repl_ctx()`; the internal wiring (`make_repl_ctx`, `set_manager_impl`, `internal_raft_event_handler`) is private.
 
-**`repl_service_ctx`** — injected into each state manager by the library; provides `is_raft_leader()`, `data_service_request_unidirectional/bidirectional()`, `send_data_service_response()`.
+**`repl_service_ctx`** — the per-group session the library provides; `is_raft_leader()`, `data_service_request_unidirectional/bidirectional()`, `send_data_service_response()`, `get_cluster_config()`, `get_raft_status()`, and `raft_server()` for direct nuraft access.
 
 ### Key Types (`include/nuraft_mesg/common.hpp`)
 ```cpp
@@ -85,16 +85,16 @@ using peer_id_t   = boost::uuids::uuid;
 using group_id_t  = boost::uuids::uuid;
 using group_type_t = std::string;
 
-template<typename T> using Result      = std::expected<T, nuraft::cmd_result_code>;
-template<typename T> using AsyncResult = std::future<Result<T>>;
+template<typename T> using result     = std::expected<T, std::error_condition>;  // errors.hpp: errc domain
+template<typename T> using async_task  = sisl::async::task<result<T>>;            // exec::task coroutine
 
-using NullResult      = Result<void>;
-using NullAsyncResult = AsyncResult<void>;
+using null_result     = result<void>;
+using null_async_task = async_task<void>;
 
 using destination_t = std::variant<peer_id_t, role_regex, svr_id_t>;
 ENUM(role_regex, uint8_t, LEADER, FOLLOWER, ALL, ANY);
 ```
-All async paths use `std::future`/`std::expected` (C++23) — no exceptions in the hot path.
+All async paths are coroutines (`sisl::async::task` over stdexec); failures surface as `std::error_condition`, not exceptions or `std::future`.
 
 ### Internal Structure
 
@@ -118,7 +118,7 @@ src/tests/        # GTest tests; shared fixture in test_fixture.ipp (3-node clus
 ```
 nuraft::rpc_client_factory
   └── grpc_factory          (client cache, worker threads)
-        └── group_factory   (SSL, auth, endpoint lookup via MessagingApplication)
+        └── group_factory   (SSL, auth, endpoint lookup via messaging_application)
               └── mesg_factory (per-group)
 ```
 

@@ -18,7 +18,7 @@
 //
 #pragma once
 
-#include "lib/mesg_factory.hpp"
+#include "nuraft_mesg/mesg_factory.hpp"
 #include "fbschemas/raft_types_generated.h"
 
 #include "lib/common_lib.hpp"

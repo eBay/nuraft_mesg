@@ -41,7 +41,7 @@ static auto sync_get(TaskT&& task) {
 #include "libnuraft/cluster_config.hxx"
 #include "libnuraft/state_machine.hxx"
 #include "nuraft_mesg/nuraft_mesg.hpp"
-#include "lib/mesg_factory.hpp"
+#include "nuraft_mesg/mesg_factory.hpp"
 
 #include "test_state_manager.h"
 

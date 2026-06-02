@@ -9,7 +9,7 @@
 #include <libnuraft/rpc_listener.hxx>
 #include <sisl/options/options.h>
 
-#include "lib/mesg_factory.hpp"
+#include "nuraft_mesg/mesg_factory.hpp"
 #include "nuraft_mesg/mesg_state_mgr.hpp"
 #include "nuraft_mesg/nuraft_mesg.hpp"
 #include "async_helpers.hpp"

@@ -7,7 +7,7 @@
 #include <libnuraft/cluster_config.hxx>
 #include <libnuraft/raft_params.hxx> // get_current_params() returns raft_params by value
 
-#include "lib/mesg_factory.hpp"
+#include "nuraft_mesg/mesg_factory.hpp"
 #include "grpc_server.hpp"
 #include "common_lib.hpp"
 

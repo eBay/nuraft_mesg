@@ -67,6 +67,8 @@ class NuRaftMesgConan(ConanFile):
     def requirements(self):
         self.requires("sisl/[^14.4]@oss/dev", transitive_headers=True)
         self.requires("nuraft/[^2.4]", transitive_headers=True)
+        # stdexec is consumed transitively through sisl::sisl (sisl requires it); find_package(stdexec)
+        # in CMake still resolves it because conan generates configs for the whole dependency graph.
 
     def layout(self):
         self.folders.source = "."

@@ -22,7 +22,7 @@
 #include <sisl/grpc/rpc_server.hpp>
 #include <sisl/grpc/generic_service.hpp>
 
-#include "lib/mesg_factory.hpp"
+#include "nuraft_mesg/mesg_factory.hpp"
 #include "nuraft_mesg/mesg_state_mgr.hpp"
 #include "nuraft_mesg/nuraft_mesg.hpp"
 

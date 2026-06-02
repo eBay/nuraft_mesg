@@ -119,6 +119,23 @@ race:deallocate
 # sequencing provides the happens-before that TSAN cannot model.
 race:ShutdownCleanup
 
+# gRPC chttp2 transport shutdown: tearing down the manager (-> grpc server shutdown) allocates a
+# GracefulGoaway on the main thread (chttp2_transport.cc) while an event_engine thread destroys it;
+# grpc's transport shutdown sequencing provides the happens-before TSAN can't model. GracefulGoaway is
+# a file-local class so race:grpc_core does not match it.
+race:GracefulGoaway
+
+# gRPC POSIX event-engine fd lifecycle at shutdown: the eventfd / epoll wakeup-fd is created and
+# consumed on one thread while another tears it down during shutdown (wakeup_fd_eventfd.cc,
+# ev_epoll1_linux.cc). grpc's internal sequencing provides the happens-before TSAN can't model; these
+# are file-static grpc functions, so the namespace suppressions don't match them.
+race:eventfd_create
+race:eventfd_consume
+race:eventfd_destroy
+race:epoll_set_shutdown
+race:do_epoll_wait
+race:epoll_create_and_cloexec
+
 # Lock-order-inversion: msg_service::add_member holds _raft_servers_mutex (shared) and
 # calls nuraft's add_srv (acquires nuraft's internal lock); nuraft's shutdown holds its
 # lock and calls ~msg_group_listner which calls shutdown_for (write-locks

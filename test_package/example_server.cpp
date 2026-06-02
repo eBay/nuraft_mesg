@@ -48,11 +48,11 @@ void handle(int signal) {
     }
 }
 
-class Application : public nuraft_mesg::MessagingApplication, public std::enable_shared_from_this< Application > {
+class Application : public nuraft_mesg::messaging_application, public std::enable_shared_from_this< Application > {
 public:
     uint32_t port_;
     nuraft_mesg::peer_id_t id_;
-    std::shared_ptr< nuraft_mesg::Manager > manager_;
+    std::shared_ptr< nuraft_mesg::manager > manager_;
 
     Application(nuraft_mesg::peer_id_t const& name, uint32_t port) : port_(port) { id_ = name; }
     ~Application() override = default;
@@ -75,7 +75,7 @@ public:
     }
 
     void start() {
-        auto params = nuraft_mesg::Manager::Params();
+        auto params = nuraft_mesg::manager::params();
         params.server_uuid_ = id_;
         params.mesg_port_ = port_;
         params.default_group_type_ = "test_package";
@@ -122,7 +122,8 @@ int main(int argc, char** argv) {
     // Create a new group with ourself as the only member
     if (0 < SISL_OPTIONS.count("create")) {
         auto gid = boost::uuids::string_generator()(guids[SISL_OPTIONS["create"].as< uint32_t >()]);
-        app->manager_->create_group(gid, "test_package");
+        // create_group dispatches eagerly; we don't await the election-wait task in this short-lived demo.
+        (void)app->manager_->create_group(gid, "test_package");
     }
 
     // Just prevent main() from exiting, require a SIGNAL
