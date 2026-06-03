@@ -5,6 +5,7 @@
 #include <libnuraft/async.hxx>
 #include <libnuraft/rpc_listener.hxx>
 #include <sisl/options/options.h>
+#include <sisl/utility/enum.hpp>
 
 #include "nuraft_mesg/mesg_factory.hpp"
 #include "nuraft_mesg/nuraft_mesg.hpp"
@@ -35,9 +36,6 @@ public:
     ~service_metrics() { deregister_me_from_farm(); }
 };
 
-inline int64_t get_elapsed_time_us(std::chrono::steady_clock::time_point start) {
-    return std::chrono::duration_cast< std::chrono::microseconds >(std::chrono::steady_clock::now() - start).count();
-}
 
 // Simple RAII guard for atomic counter
 struct atomic_counter_guard {
@@ -144,6 +142,11 @@ int64_t proto_service::execute_step(std::shared_ptr< nuraft::raft_server > const
 
     auto exec_start = std::chrono::steady_clock::now();
 
+    // Track per-group message count
+    if (metrics) {
+        COUNTER_INCREMENT(*metrics, group_steps, 1);
+    }
+
     try {
         response.set_group_id(group_id);
         rpc_data->set_status(step(*server, request.msg(), *response.mutable_msg(), metrics));
@@ -181,6 +184,7 @@ int64_t proto_service::execute_step(std::shared_ptr< nuraft::raft_server > const
 
 bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data) {
     auto& request = rpc_data->request();
+    auto& response = rpc_data->response();
     auto const& group_id = request.group_id();
     auto const& intended_addr = request.intended_addr();
 
@@ -215,64 +219,54 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
     // should emplace a corresponding server in the _raft_servers member.
     if (nuraft::join_cluster_request == base.type()) { joinRaftGroup(base.dest(), gid, request.group_type()); }
 
-    auto raft_post_time = std::chrono::steady_clock::now();
-    boost::asio::post(_raft_thread_pool, [this, rpc_data, raft_post_time]() {
-        // Track Raft pool metrics
-        auto raft_wait_time_us = get_elapsed_time_us(raft_post_time);
-        auto raft_guard = atomic_counter_guard(_raft_pool_active_threads);
+    // Server lookup on gRPC thread (before routing to pools)
+    auto it = _raft_servers.find(gid);
+    if (it == _raft_servers.end()) {
+        LOGD("Missing [group={}]", group_id);
+        response.set_group_id(group_id);  // Set group_id in error response
+        rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND,
+            fmt::format("Missing RAFT group {}", group_id)));
+        return true;  // Send response immediately, don't queue work
+    }
 
-        auto gid = boost::uuids::string_generator()(rpc_data->request().group_id());
-        auto& request = rpc_data->request();
-        auto const& group_id = request.group_id();
-        auto const& base = request.msg().base();
+    auto raft_server = it->second.m_server->raft_server();
+    auto metrics = it->second.m_metrics;
+    auto msg_type = static_cast< nuraft::msg_type >(base.type());
 
-        // Lookup server
-        auto it = _raft_servers.find(gid);
-        if (it == _raft_servers.end()) {
-            LOGD("Missing [group={}]", group_id);
-            rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND,
-                fmt::format("Missing RAFT group {}", group_id)));
-            rpc_data->send_response();
-            return;
-        }
+    // Route to appropriate pool based on message type
+    if (is_slow_message(msg_type)) {
+        // SLOW PATH: Route directly to I/O pool, bypassing Raft pool
+        COUNTER_INCREMENT(_service_metrics, io_pool_msg_count, 1);
+        auto io_post_time = std::chrono::steady_clock::now();
+        boost::asio::post(_io_thread_pool, [this, raft_server, metrics, rpc_data,
+                                              io_post_time, group_id, msg_type]() {
+            auto io_wait_time_us = get_elapsed_time_us(io_post_time);
+            auto io_guard = atomic_counter_guard(_io_pool_active_threads);
 
-        // Record Raft pool wait time and active threads in service-level metrics
-        HISTOGRAM_OBSERVE(_service_metrics, raft_pool_wait_time_us, raft_wait_time_us);
-        GAUGE_UPDATE(_service_metrics, raft_pool_active_threads, _raft_pool_active_threads.load());
+            // Record I/O pool metrics in service-level metrics
+            HISTOGRAM_OBSERVE(_service_metrics, io_pool_wait_time_us, io_wait_time_us);
+            GAUGE_UPDATE(_service_metrics, io_pool_active_threads, _io_pool_active_threads.load());
 
-        // Record per-group metrics
-        if (it->second.m_metrics) {
-            COUNTER_INCREMENT(*it->second.m_metrics, group_steps, 1);
-        }
+            auto exec_time_us = execute_step(raft_server, rpc_data, metrics);
 
-        // Route based on message type
-        auto msg_type = static_cast< nuraft::msg_type >(base.type());
-        auto raft_server = it->second.m_server->raft_server();
-        auto metrics = it->second.m_metrics;
-        if (is_slow_message(msg_type)) {
-            // SLOW PATH: Post to I/O pool
-            COUNTER_INCREMENT(_service_metrics, io_pool_msg_count, 1);
-            auto io_post_time = std::chrono::steady_clock::now();
-            boost::asio::post(_io_thread_pool, [this, raft_server, metrics,
-                                                  rpc_data, io_post_time, group_id, msg_type]() {
-                auto io_wait_time_us = get_elapsed_time_us(io_post_time);
-                auto io_guard = atomic_counter_guard(_io_pool_active_threads);
+            LOGT("I/O pool executed [group={}] [type={}] wait={}us exec={}us",
+                 group_id, nuraft::msg_type_to_string(msg_type), io_wait_time_us, exec_time_us);
+        });
+    } else {
+        // FAST PATH: Route to Raft pool
+        COUNTER_INCREMENT(_service_metrics, raft_pool_msg_count, 1);
+        auto raft_post_time = std::chrono::steady_clock::now();
+        boost::asio::post(_raft_thread_pool, [this, raft_server, metrics, rpc_data, raft_post_time]() {
+            auto raft_wait_time_us = get_elapsed_time_us(raft_post_time);
+            auto raft_guard = atomic_counter_guard(_raft_pool_active_threads);
 
-                auto exec_time_us = execute_step(raft_server, rpc_data, metrics);
+            // Record Raft pool wait time and active threads in service-level metrics
+            HISTOGRAM_OBSERVE(_service_metrics, raft_pool_wait_time_us, raft_wait_time_us);
+            GAUGE_UPDATE(_service_metrics, raft_pool_active_threads, _raft_pool_active_threads.load());
 
-                // Record I/O pool metrics in service-level metrics
-                HISTOGRAM_OBSERVE(_service_metrics, io_pool_wait_time_us, io_wait_time_us);
-                GAUGE_UPDATE(_service_metrics, io_pool_active_threads, _io_pool_active_threads.load());
-
-                LOGT("I/O pool executed [group={}] [type={}] wait={}us exec={}us",
-                     group_id, nuraft::msg_type_to_string(msg_type), io_wait_time_us, exec_time_us);
-            });
-        } else {
-            // FAST PATH: Process on Raft thread
-            COUNTER_INCREMENT(_service_metrics, raft_pool_msg_count, 1);
             execute_step(raft_server, rpc_data, metrics);
-        }
-    });
+        });
+    }
     return false;
 }
 
