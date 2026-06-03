@@ -60,6 +60,9 @@ public:
     static uint32_t get_server_counter();
     static void verify_data(sisl::io_blob const& buf);
     nuraft_mesg::repl_service_ctx* get_repl_context() { return m_repl_svc_ctx.get(); }
+    std::shared_ptr<test_state_machine> get_sm() { return _state_machine; }
+
+    nuraft::cb_func::ReturnCode raft_event(nuraft::cb_func::Type type, nuraft::cb_func::Param* param) override;
 
 private:
 private:

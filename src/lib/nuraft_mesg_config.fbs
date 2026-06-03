@@ -27,6 +27,9 @@ table NuraftMesgConfig {
     raft_scheduler_thread_cnt: uint16 = 2;
 
     raft_append_entries_thread_cnt: uint16 = 2;
+
+    // Size of I/O thread pool for blocking Raft operations. 0 = auto (set to 4 as of now).
+    io_thread_pool_size: uint32 = 0;
 }
 
 root_type NuraftMesgConfig;

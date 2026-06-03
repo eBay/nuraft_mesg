@@ -246,3 +246,18 @@ uint16_t test_state_mgr::get_random_num() {
 }
 
 uint32_t test_state_mgr::get_server_counter() { return server_counter.load(); }
+
+nuraft::cb_func::ReturnCode test_state_mgr::raft_event(nuraft::cb_func::Type type, nuraft::cb_func::Param* /* param */) {
+    // GotAppendEntryReqFromLeader = 14 (from libnuraft/callback.hxx)
+    // This event fires when follower receives append_entries from leader
+    constexpr int GOT_APPEND_ENTRY_REQ_FROM_LEADER = 14;
+
+    if (_state_machine && _state_machine->append_delay_ms_.load() > 0 &&
+        static_cast<int>(type) == GOT_APPEND_ENTRY_REQ_FROM_LEADER) {
+        auto delay_ms = _state_machine->append_delay_ms_.load();
+        LOGINFO("Injecting append_entries delay: {}ms (simulating slow I/O)", delay_ms);
+        std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+    }
+
+    return nuraft::cb_func::ReturnCode::Ok;
+}
