@@ -343,32 +343,54 @@ null_async_task ManagerImpl::add_member_impl(group_id_t group_id, nuraft::ptr< n
     auto const cfg = nuraft::srv_config::deserialize(*cfg_buf); // ptr<srv_config> owned by this frame
     auto const endpoint = cfg->get_endpoint();
     auto sched = _timer_ctx.get_scheduler();
-    auto const deadline =
-        std::chrono::steady_clock::now() + std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms));
-    // Retry the local add_srv while the config is changing (this used to be the consumer's
-    // retry_when_config_changing loop). ALREADY_EXISTS is idempotent success; any other non-OK code fails.
-    nuraft::cmd_result_code code;
-    for (;;) {
-        code = co_await _mesg_service->add_member(group_id, *cfg);
-        if ((code == nuraft::CONFIG_CHANGING || code == nuraft::SERVER_IS_JOINING) &&
-            std::chrono::steady_clock::now() < deadline) {
-            co_await exec::schedule_after(sched, std::chrono::milliseconds(500));
-            continue;
+
+    // Has the proposed member committed into the active config? Reads raft state WITHOUT _manager_lock:
+    // get_srv_config_all takes _raft_servers_mutex, and the nuraft callback path holds _raft_servers_mutex then
+    // _manager_lock, so holding _manager_lock here would invert the order.
+    auto member_in_config = [this, group_id, endpoint]() {
+        std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
+        _mesg_service->get_srv_config_all(group_id, srv_list);
+        return std::ranges::any_of(srv_list, [&](auto const& c) { return endpoint == c->get_endpoint(); });
+    };
+
+    // Adding a server is a joint-consensus config change: it commits only once the EXISTING quorum acks the new
+    // config. When members are added back-to-back (the bootstrap case), a just-added follower may still be
+    // catching up and briefly lag, so the commit can take longer than one leader-change window. A single
+    // propose+wait that returns CANCELLED on the first timeout is too brittle -- the pre-coroutine consumers
+    // retried add_member on CONFIG_CHANGING indefinitely. So re-propose + re-wait across several windows:
+    // add_srv is idempotent (SERVER_ALREADY_EXISTS once accepted, CONFIG_CHANGING while one is in flight), and
+    // re-proposing also re-initiates the add if leadership changed mid-wait. Bounded so a permanently-down peer
+    // still fails (instead of hanging) with CANCELLED.
+    constexpr int k_add_member_windows = 10;
+    auto const window = std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms));
+    for (int attempt = 0; attempt < k_add_member_windows; ++attempt) {
+        if (member_in_config()) co_return null_result{};
+
+        auto const deadline = std::chrono::steady_clock::now() + window;
+        nuraft::cmd_result_code code;
+        for (;;) {
+            code = co_await _mesg_service->add_member(group_id, *cfg);
+            if ((code == nuraft::CONFIG_CHANGING || code == nuraft::SERVER_IS_JOINING) &&
+                std::chrono::steady_clock::now() < deadline) {
+                if (member_in_config()) co_return null_result{}; // committed while a change was in flight
+                co_await exec::schedule_after(sched, std::chrono::milliseconds(500));
+                continue;
+            }
+            break;
         }
-        break;
+        // OK / SERVER_ALREADY_EXISTS: proposed (or already present). CONFIG_CHANGING / SERVER_IS_JOINING after
+        // exhausting the window: a change is still in flight (possibly ours) -- wait for it. Anything else is a
+        // hard failure.
+        if (code != nuraft::OK && code != nuraft::SERVER_ALREADY_EXISTS && code != nuraft::CONFIG_CHANGING &&
+            code != nuraft::SERVER_IS_JOINING) {
+            co_return std::unexpected(to_condition(code));
+        }
+        if (co_await wait_for_condition(group_id, member_in_config, deadline, nuraft::cmd_result_code::CANCELLED)) {
+            co_return null_result{};
+        }
+        // Not committed within this window: loop to re-propose and wait again.
     }
-    if (code != nuraft::OK && code != nuraft::SERVER_ALREADY_EXISTS) co_return std::unexpected(to_condition(code));
-    // Confirm the new member appears in config. check_member reads raft state WITHOUT _manager_lock:
-    // get_srv_config_all takes _raft_servers_mutex, and the nuraft callback path holds _raft_servers_mutex
-    // then _manager_lock, so holding _manager_lock here would invert the order.
-    co_return co_await wait_for_condition(
-        group_id,
-        [this, group_id, endpoint]() {
-            std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
-            _mesg_service->get_srv_config_all(group_id, srv_list);
-            return std::ranges::any_of(srv_list, [&](auto const& cfg) { return endpoint == cfg->get_endpoint(); });
-        },
-        deadline, nuraft::cmd_result_code::CANCELLED);
+    co_return std::unexpected(to_condition(nuraft::cmd_result_code::CANCELLED));
 }
 
 null_async_task ManagerImpl::rem_member(group_id_t const& group_id, peer_id_t const& old_id) {

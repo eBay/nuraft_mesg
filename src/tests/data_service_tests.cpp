@@ -33,7 +33,6 @@ TEST_F(DataServiceFixture, BasicTest1) {
     app_4->start(true);
     auto add4 =
         app_1_->instance_->add_member(group_id_, nuraft::srv_config(to_server_id(app_4->id_), to_string(app_4->id_)));
-    std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(sync_get(std::move(add4)));
 
     auto app_5 = std::make_shared< TestApplication >("sm5", ports[4]);
@@ -46,7 +45,6 @@ TEST_F(DataServiceFixture, BasicTest1) {
     app_5->start(true);
     auto add5 =
         app_1_->instance_->add_member(group_id_, nuraft::srv_config(to_server_id(app_5->id_), to_string(app_5->id_)));
-    std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(sync_get(std::move(add5)));
 
     // create new group
@@ -57,15 +55,12 @@ TEST_F(DataServiceFixture, BasicTest1) {
 
     auto add1 =
         app_4->instance_->add_member(data_group, nuraft::srv_config(to_server_id(app_1_->id_), 0, to_string(app_1_->id_), "", false, follower_priority));
-    std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(sync_get(std::move(add1)));
     auto add2 =
         app_4->instance_->add_member(data_group, nuraft::srv_config(to_server_id(app_2_->id_), 0, to_string(app_2_->id_), "", false, follower_priority));
-    std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(sync_get(std::move(add2)));
     auto add5_2 =
         app_4->instance_->add_member(data_group, nuraft::srv_config(to_server_id(app_5->id_), 0, to_string(app_5->id_), "", true, follower_priority));
-    std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(sync_get(std::move(add5_2)));
     // check priority
     auto repl_ctx = app_4->state_mgr_map_[data_group]->get_repl_context();
