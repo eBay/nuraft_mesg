@@ -54,4 +54,21 @@ bool data_service_grpc::bind(std::string const& request_name, group_id_t const& 
     return true;
 }
 
+void data_service_grpc::unbind(group_id_t const& group_id) {
+    // Method names are get_generic_method_name(request_name, group_id) == "{request_name}|{group_id}", so a group's
+    // handlers are exactly the entries whose key ends in "|{group_id}". Drop each from our map and from the gRPC
+    // dispatch registry so no further data RPC routes to this group's (soon to be freed) handlers.
+    auto const suffix = fmt::format("|{}", group_id);
+    auto lk = std::unique_lock< data_lock_type >(_req_lock);
+    for (auto it = _request_map.begin(); it != _request_map.end();) {
+        if (it->first.size() >= suffix.size() &&
+            it->first.compare(it->first.size() - suffix.size(), suffix.size(), suffix) == 0) {
+            if (_grpc_server) { _grpc_server->deregister_generic_rpc(it->first); }
+            it = _request_map.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
 } // namespace nuraft_mesg

@@ -34,6 +34,12 @@ public:
     bool bind(std::string const& request_name, group_id_t const& group_id,
               data_service_request_handler_t const& request_cb);
 
+    // Remove every data-service request handler bound for `group_id` (all request names) and deregister them from
+    // the gRPC server, so no further data RPCs are dispatched to that (now departed/destroyed) group. Must be
+    // called when a group leaves -- otherwise the handlers, which capture the consumer's raw repl-dev pointer,
+    // dangle and a late RPC dereferences freed memory.
+    void unbind(group_id_t const& group_id);
+
     void set_grpc_server(sisl::GrpcServer* server);
 };
 

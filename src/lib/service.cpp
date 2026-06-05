@@ -195,6 +195,11 @@ nuraft::cmd_result_code msg_service::joinRaftGroup(int32_t const srv_id, group_i
 }
 
 void msg_service::leave_group(group_id_t const& group_id) {
+    // Stop dispatching data-service RPCs (push/fetch) to this group before tearing it down. The handlers capture
+    // the consumer's raw repl-dev pointer; leaving them bound past the group's lifetime lets a late RPC dereference
+    // freed memory (use-after-free). Done unconditionally (even if the raft server is already gone).
+    if (_data_service_enabled) { _data_service.unbind(group_id); }
+
     std::shared_ptr< nuraft::raft_server > raft_srv;
     {
         std::unique_lock lk(_raft_servers_mutex);

@@ -65,7 +65,7 @@ class NuRaftMesgConan(ConanFile):
         self.test_requires("jungle/cci.20250316")
 
     def requirements(self):
-        self.requires("sisl/[^14.4]@oss/dev", transitive_headers=True)
+        self.requires("sisl/[^14.6]@oss/dev", transitive_headers=True)
         self.requires("nuraft/[^2.4]", transitive_headers=True)
         # stdexec is consumed transitively through sisl::sisl (sisl requires it); find_package(stdexec)
         # in CMake still resolves it because conan generates configs for the whole dependency graph.

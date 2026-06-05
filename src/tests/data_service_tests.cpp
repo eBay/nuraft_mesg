@@ -323,3 +323,34 @@ TEST_F(DataServiceFixture, AutoCreateClientTest) {
     // Clean up
     app_4->instance_->leave_group(group_id_);
 }
+
+// Regression test for the data-service handler use-after-free: leave_group must unbind (and grpc-deregister) the
+// group's data-service request handlers. Before the fix, leave_group tore down only the raft server and left the
+// data bindings registered -- and those handlers capture the consumer's raw repl-dev/state-mgr pointer, so once the
+// group's owner was destroyed a late data RPC dispatched into freed memory (UAF; see homestore RemoveReplDev +
+// fetch). The nuraft_mesg suite never tripped it because its handlers are bound to fixture-lifetime objects and no
+// data RPC is sent after leave. Here we assert the binding is actually removed on leave: a (request, group) binds,
+// cannot be re-bound while still registered, and -- only after leave_group -- can be bound again. The final re-bind
+// also exercises the grpc-level deregister, since register_generic_rpc would otherwise reject the duplicate method.
+TEST_F(DataServiceFixture, LeaveGroupUnbindsDataService) {
+    // create_group puts the group into the manager's state so leave_group runs its full teardown path (and it also
+    // registers the group's default data-service handlers via register_data_service_apis).
+    auto const grp = boost::uuids::random_generator()();
+    EXPECT_TRUE(sync_get(app_1_->instance_->create_group(grp, "test_type")));
+
+    std::string const req{"regression_unbind_req"};
+    auto const noop = [](boost::intrusive_ptr< sisl::GenericRpcData >&) {};
+
+    // Bind a fresh data-service request for the group, then prove it is live: a duplicate bind must fail.
+    EXPECT_TRUE(app_1_->instance_->bind_data_service_request(req, grp, noop));
+    EXPECT_FALSE(app_1_->instance_->bind_data_service_request(req, grp, noop));
+
+    // Leaving the group must unbind its data-service handlers...
+    app_1_->instance_->leave_group(grp);
+
+    // ...so the same (request, group) can be bound again. Before the fix this re-bind failed (stale registration).
+    EXPECT_TRUE(app_1_->instance_->bind_data_service_request(req, grp, noop))
+        << "leave_group must remove the group's data-service binding (map + grpc registry)";
+
+    app_1_->instance_->leave_group(grp);
+}
