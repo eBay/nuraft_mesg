@@ -14,10 +14,9 @@
  *********************************************************************************/
 #pragma once
 
-#include <list>
+#include <functional>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <libnuraft/raft_params.hxx>
@@ -25,13 +24,7 @@
 #include "common.hpp"
 #include <sisl/version.hpp>
 
-namespace grpc {
-class ByteBuffer;
-class Status;
-} // namespace grpc
-
 namespace nuraft {
-class buffer;
 class srv_config;
 } // namespace nuraft
 
@@ -44,6 +37,7 @@ class GrpcTokenClient;
 namespace nuraft_mesg {
 
 class mesg_state_mgr;
+class ManagerImpl;
 
 // called by the server after it receives the request
 using data_service_request_handler_t = std::function< void(boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) >;
@@ -56,6 +50,8 @@ public:
     virtual std::shared_ptr< mesg_state_mgr > create_state_mgr(int32_t const srv_id, group_id_t const& group_id) = 0;
 };
 
+// Opaque handle returned by init_messaging. All methods delegate to the internal ManagerImpl; ManagerImpl
+// is an incomplete type here so the implementation details stay fully hidden from consumers.
 class manager {
 public:
     struct params {
@@ -72,37 +68,35 @@ public:
         bool enable_console_log_{false};
     };
     using group_params = nuraft::raft_params;
-    virtual ~manager() = default;
+
+    explicit manager(std::shared_ptr< ManagerImpl > impl);
+    ~manager();
 
     // Register a new group type
-    virtual void register_mgr_type(group_type_t const& group_type, group_params const&) = 0;
+    void register_mgr_type(group_type_t const& group_type, group_params const&);
 
-    virtual std::shared_ptr< mesg_state_mgr > lookup_state_manager(group_id_t const& group_id) const = 0;
-    [[nodiscard]] virtual null_async_task create_group(group_id_t const& group_id, group_type_t const& group_type) = 0;
-    [[nodiscard]] virtual null_result join_group(group_id_t const& group_id, group_type_t const& group_type,
-                                                std::shared_ptr< mesg_state_mgr >) = 0;
+    std::shared_ptr< mesg_state_mgr > lookup_state_manager(group_id_t const& group_id) const;
+    [[nodiscard]] null_async_task create_group(group_id_t const& group_id, group_type_t const& group_type);
+    [[nodiscard]] null_result join_group(group_id_t const& group_id, group_type_t const& group_type,
+                                        std::shared_ptr< mesg_state_mgr >);
 
     // Send a client request to the cluster
-    [[nodiscard]] virtual null_async_task add_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
-    [[nodiscard]] virtual null_async_task add_member(group_id_t const& group_id,
-                                                   nuraft::srv_config const& srv_config) = 0;
-    [[nodiscard]] virtual null_async_task rem_member(group_id_t const& group_id, peer_id_t const& server_id) = 0;
-    [[nodiscard]] virtual null_async_task become_leader(group_id_t const& group_id) = 0;
-    [[nodiscard]] virtual null_async_task append_entries(group_id_t const& group_id,
-                                                       std::vector< std::shared_ptr< nuraft::buffer > > const&) = 0;
+    [[nodiscard]] null_async_task add_member(group_id_t const& group_id, peer_id_t const& server_id);
+    [[nodiscard]] null_async_task add_member(group_id_t const& group_id, nuraft::srv_config const& srv_config);
+    [[nodiscard]] null_async_task rem_member(group_id_t const& group_id, peer_id_t const& server_id);
+    [[nodiscard]] null_async_task become_leader(group_id_t const& group_id);
 
     // Misc Mgmt
-    virtual void get_srv_config_all(group_id_t const& group_id,
-                                    std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) = 0;
-    virtual void leave_group(group_id_t const& group_id) = 0;
-    virtual void append_peers(group_id_t const& group_id, std::list< peer_id_t >&) const = 0;
-    virtual uint32_t logstore_id(group_id_t const& group_id) const = 0;
-    virtual int32_t server_id() const = 0;
-    virtual void restart_server() = 0;
+    void leave_group(group_id_t const& group_id);
+    int32_t server_id() const;
+    void restart_server();
 
     // data channel APIs
-    virtual bool bind_data_service_request(std::string const& request_name, group_id_t const& group_id,
-                                           data_service_request_handler_t const&) = 0;
+    bool bind_data_service_request(std::string const& request_name, group_id_t const& group_id,
+                                   data_service_request_handler_t const&);
+
+private:
+    std::shared_ptr< ManagerImpl > impl_;
 };
 
 extern int32_t to_server_id(peer_id_t const& server_addr);

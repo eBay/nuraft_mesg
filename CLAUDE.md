@@ -65,17 +65,17 @@ Both test binaries accept `-cv <level>` for console logging verbosity and standa
 
 ### Core Abstractions
 
-**`manager`** (`include/nuraft_mesg/nuraft_mesg.hpp`) — the public facade. Obtained via:
+**`manager`** (`include/nuraft_mesg/nuraft_mesg.hpp`) — opaque pimpl handle; not virtual, not subclassable. Obtained via:
 ```cpp
 std::shared_ptr<manager> init_messaging(manager::params const&, std::weak_ptr<messaging_application>, bool with_data_svc = false);
 ```
-Control operations (`create_group`, `add_member`, `rem_member`, `become_leader`, `append_entries`) return `null_async_task` and are `co_await`-ed; plus `bind_data_service_request`, `leave_group`.
+Control operations (`create_group`, `add_member`, `rem_member`, `become_leader`) return `null_async_task` and are `co_await`-ed; plus `bind_data_service_request`, `leave_group`. All methods delegate to the internal `ManagerImpl` (defined in `src/lib/manager_impl.hpp`, not installed).
 
 **`messaging_application`** (user implements) — Strategy interface:
 - `lookup_peer(peer_id_t)` → endpoint string
 - `create_state_mgr(srv_id, group_id)` → `std::shared_ptr<mesg_state_mgr>`
 
-**`mesg_state_mgr`** (user extends, `include/nuraft_mesg/mesg_state_mgr.hpp`) — extends `nuraft::state_mgr` with RAFT lifecycle callbacks (`raft_event()`), `get_state_machine()`, and the persistence hooks (`load_config`, `save_config`, `load_log_store`, etc.). The per-group session is reached via `repl_ctx()`; the internal wiring (`make_repl_ctx`, `set_manager_impl`, `internal_raft_event_handler`) is private.
+**`mesg_state_mgr`** (user extends, `include/nuraft_mesg/mesg_state_mgr.hpp`) — extends `nuraft::state_mgr` with RAFT lifecycle callbacks (`raft_event()`), `get_state_machine()`, and the persistence hooks (`load_config`, `save_config`, `load_log_store`, etc.). The per-group session is reached via `repl_ctx()`; the internal wiring (`set_repl_ctx`, `set_manager_impl`, `internal_raft_event_handler`) is private.
 
 **`repl_service_ctx`** — the per-group session the library provides; `is_raft_leader()`, `data_service_request_unidirectional/bidirectional()`, `send_data_service_response()`, `get_cluster_config()`, `get_raft_status()`, and `raft_server()` for direct nuraft access.
 
@@ -85,7 +85,7 @@ using peer_id_t   = boost::uuids::uuid;
 using group_id_t  = boost::uuids::uuid;
 using group_type_t = std::string;
 
-template<typename T> using result     = std::expected<T, std::error_condition>;  // errors.hpp: errc domain
+template<typename T> using result     = std::expected<T, std::error_condition>;  // errc domain in common.hpp
 template<typename T> using async_task  = sisl::async::task<result<T>>;            // exec::task coroutine
 
 using null_result     = result<void>;
@@ -114,7 +114,7 @@ src/tests/        # GTest tests; shared fixture in test_fixture.ipp (3-node clus
   jungle_logstore/ # Test-only Jungle-backed log store
 ```
 
-### Factory Hierarchy
+### Factory Hierarchy (internal, `src/lib/mesg_factory.hpp`)
 ```
 nuraft::rpc_client_factory
   └── grpc_factory          (client cache, worker threads)

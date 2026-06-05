@@ -20,8 +20,6 @@ class GenericRpcData;
 
 namespace nuraft_mesg {
 
-class mesg_factory;
-class grpc_server;
 class ManagerImpl;
 
 // config for a replica with after the int32_t id is transformed to a peer_id_t
@@ -104,7 +102,7 @@ public:
 protected:
     // Internal setup, invoked by nuraft_mesg (msg_service) when a group is wired up. Not part of the
     // consumer-facing interface; protected so a test double can re-expose it via a using-declaration.
-    void make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory);
+    void set_repl_ctx(std::unique_ptr< repl_service_ctx > ctx);
 
 private:
     // Internal wiring -- only nuraft_mesg drives these.

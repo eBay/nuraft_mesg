@@ -22,7 +22,7 @@
 #include <sisl/grpc/rpc_server.hpp>
 #include <sisl/grpc/generic_service.hpp>
 
-#include "nuraft_mesg/mesg_factory.hpp"
+#include "mesg_factory.hpp"
 #include "nuraft_mesg/mesg_state_mgr.hpp"
 #include "nuraft_mesg/nuraft_mesg.hpp"
 
@@ -135,7 +135,7 @@ void ManagerImpl::restart_server() {
     _mesg_service->bind(_grpc_server.get());
 }
 
-void ManagerImpl::register_mgr_type(group_type_t const& group_type, group_params const& params) {
+void ManagerImpl::register_mgr_type(group_type_t const& group_type, manager::group_params const& params) {
     std::lock_guard< std::mutex > lg(_manager_lock);
     auto [it, happened] = _state_mgr_types.emplace(std::make_pair(group_type, params));
     DEBUG_ASSERT(_state_mgr_types.end() != it, "Out of memory?");
@@ -524,8 +524,8 @@ bool ManagerImpl::bind_data_service_request(std::string const& request_name, gro
     return _mesg_service->bind_data_service_request(request_name, group_id, request_handler);
 }
 
-void mesg_state_mgr::make_repl_ctx(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory) {
-    m_repl_svc_ctx = std::make_unique< repl_service_ctx_grpc >(server, cli_factory);
+void mesg_state_mgr::set_repl_ctx(std::unique_ptr< repl_service_ctx > ctx) {
+    m_repl_svc_ctx = std::move(ctx);
 }
 
 nuraft::cb_func::ReturnCode mesg_state_mgr::internal_raft_event_handler(group_id_t const& group_id,
@@ -539,12 +539,40 @@ nuraft::cb_func::ReturnCode mesg_state_mgr::internal_raft_event_handler(group_id
     return raft_event(type, param);
 }
 
+// manager pimpl delegation
+manager::manager(std::shared_ptr< ManagerImpl > impl) : impl_(std::move(impl)) {}
+manager::~manager() = default;
+
+void manager::register_mgr_type(group_type_t const& gt, group_params const& gp) { impl_->register_mgr_type(gt, gp); }
+std::shared_ptr< mesg_state_mgr > manager::lookup_state_manager(group_id_t const& id) const {
+    return impl_->lookup_state_manager(id);
+}
+null_async_task manager::create_group(group_id_t const& id, group_type_t const& type) {
+    return impl_->create_group(id, type);
+}
+null_result manager::join_group(group_id_t const& id, group_type_t const& type, std::shared_ptr< mesg_state_mgr > s) {
+    return impl_->join_group(id, type, std::move(s));
+}
+null_async_task manager::add_member(group_id_t const& id, peer_id_t const& sid) { return impl_->add_member(id, sid); }
+null_async_task manager::add_member(group_id_t const& id, nuraft::srv_config const& cfg) {
+    return impl_->add_member(id, cfg);
+}
+null_async_task manager::rem_member(group_id_t const& id, peer_id_t const& sid) { return impl_->rem_member(id, sid); }
+null_async_task manager::become_leader(group_id_t const& id) { return impl_->become_leader(id); }
+void manager::leave_group(group_id_t const& id) { impl_->leave_group(id); }
+int32_t manager::server_id() const { return impl_->server_id(); }
+void manager::restart_server() { impl_->restart_server(); }
+bool manager::bind_data_service_request(std::string const& rn, group_id_t const& gid,
+                                        data_service_request_handler_t const& h) {
+    return impl_->bind_data_service_request(rn, gid, h);
+}
+
 std::shared_ptr< manager > init_messaging(manager::params const& p, std::weak_ptr< messaging_application > w,
                                           bool with_data_svc) {
     RELEASE_ASSERT(w.lock(), "Could not acquire application!");
-    auto m = std::make_shared< ManagerImpl >(p, w);
-    m->start(with_data_svc);
-    return m;
+    auto impl = std::make_shared< ManagerImpl >(p, w);
+    impl->start(with_data_svc);
+    return std::make_shared< manager >(impl);
 }
 
 } // namespace nuraft_mesg

@@ -8,6 +8,9 @@
 
 namespace nuraft_mesg {
 
+class grpc_server;
+class mesg_factory;
+
 class repl_service_ctx_grpc : public repl_service_ctx {
 public:
     repl_service_ctx_grpc(grpc_server* server, std::shared_ptr< mesg_factory > const& cli_factory);

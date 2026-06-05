@@ -24,7 +24,7 @@
 #include <exec/timed_thread_scheduler.hpp>
 
 #include "nuraft_mesg/nuraft_mesg.hpp"
-#include "nuraft_mesg/mesg_factory.hpp"
+#include "mesg_factory.hpp"
 #include <sisl/logging/logging.h>
 #include <libnuraft/nuraft.hxx>
 
@@ -40,7 +40,7 @@ class group_factory;
 class msg_service;
 class group_metrics;
 
-class ManagerImpl : public manager, public std::enable_shared_from_this< ManagerImpl > {
+class ManagerImpl : public std::enable_shared_from_this< ManagerImpl > {
     manager::params start_params_;
     int32_t _srv_id;
 
@@ -90,33 +90,33 @@ class ManagerImpl : public manager, public std::enable_shared_from_this< Manager
 
 public:
     ManagerImpl(manager::params const&, std::weak_ptr< messaging_application >);
-    ~ManagerImpl() override;
+    ~ManagerImpl();
 
-    // Public API
-    void register_mgr_type(group_type_t const& group_type, group_params const&) override;
+    // Public API (called via manager delegation)
+    void register_mgr_type(group_type_t const& group_type, manager::group_params const&);
 
-    std::shared_ptr< mesg_state_mgr > lookup_state_manager(group_id_t const& group_id) const override;
-    null_async_task create_group(group_id_t const& group_id, group_type_t const& group_type) override;
+    std::shared_ptr< mesg_state_mgr > lookup_state_manager(group_id_t const& group_id) const;
+    null_async_task create_group(group_id_t const& group_id, group_type_t const& group_type);
     null_result join_group(group_id_t const& group_id, group_type_t const& group_type,
-                          std::shared_ptr< mesg_state_mgr > smgr) override;
+                          std::shared_ptr< mesg_state_mgr > smgr);
 
-    null_async_task add_member(group_id_t const& group_id, peer_id_t const& server_id) override;
-    null_async_task add_member(group_id_t const& group_id, nuraft::srv_config const& srv_config) override;
-    null_async_task rem_member(group_id_t const& group_id, peer_id_t const& server_id) override;
-    null_async_task become_leader(group_id_t const& group_id) override;
+    null_async_task add_member(group_id_t const& group_id, peer_id_t const& server_id);
+    null_async_task add_member(group_id_t const& group_id, nuraft::srv_config const& srv_config);
+    null_async_task rem_member(group_id_t const& group_id, peer_id_t const& server_id);
+    null_async_task become_leader(group_id_t const& group_id);
     null_async_task append_entries(group_id_t const& group_id,
-                                 std::vector< std::shared_ptr< nuraft::buffer > > const&) override;
+                                 std::vector< std::shared_ptr< nuraft::buffer > > const&);
 
     void get_srv_config_all(group_id_t const& group_id,
-                            std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out) override;
-    void leave_group(group_id_t const& group_id) override;
-    void append_peers(group_id_t const& group_id, std::list< peer_id_t >&) const override;
-    uint32_t logstore_id(group_id_t const& group_id) const override;
-    int32_t server_id() const override { return _srv_id; }
-    void restart_server() override;
+                            std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out);
+    void leave_group(group_id_t const& group_id);
+    void append_peers(group_id_t const& group_id, std::list< peer_id_t >&) const;
+    uint32_t logstore_id(group_id_t const& group_id) const;
+    int32_t server_id() const { return _srv_id; }
+    void restart_server();
 
     bool bind_data_service_request(std::string const& request_name, group_id_t const& group_id,
-                                   data_service_request_handler_t const& request_handler) override;
+                                   data_service_request_handler_t const& request_handler);
     //
 
     /// Internal API

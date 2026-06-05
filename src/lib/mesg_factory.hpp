@@ -23,7 +23,7 @@
 #include <libnuraft/rpc_cli_factory.hxx>
 #include <libnuraft/srv_config.hxx>
 
-#include "common.hpp"
+#include "nuraft_mesg/common.hpp"
 
 namespace sisl {
 struct io_blob;

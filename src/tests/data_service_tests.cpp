@@ -1,4 +1,5 @@
 #include "test_fixture.ipp"
+#include "lib/repl_service_ctx.hpp"
 #include <libnuraft/raft_server_handler.hxx>
 
 class DataServiceFixture : public MessagingFixtureBase {
@@ -253,7 +254,7 @@ TEST_F(DataServiceFixture, NegativeTests) {
     // This should be the last test, this exercises the null-server and null-factory failure paths.
     // Null raft server (factory still present): a make_repl_ctx with a null grpc_server leaves _server null,
     // which the resolve path reports as a failure (no raw _server poke needed -- it's encapsulated now).
-    sm2->make_repl_ctx(nullptr, std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type"));
+    sm2->set_repl_ctx(std::make_unique< nuraft_mesg::repl_service_ctx_grpc >(nullptr, std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type")));
     {
         auto r = sync_get(sm2->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf));
         EXPECT_FALSE(r);
@@ -261,7 +262,7 @@ TEST_F(DataServiceFixture, NegativeTests) {
     }
 
     // mesg factory nullptr
-    sm2->make_repl_ctx(nullptr, nullptr);
+    sm2->set_repl_ctx(std::make_unique< nuraft_mesg::repl_service_ctx_grpc >(nullptr, nullptr));
     {
         auto r = sync_get(sm2->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf));
         EXPECT_FALSE(r);

@@ -21,9 +21,9 @@ As of **v5** the control plane and the data-service path are C++20/23 stackless 
 
 - **Multi-group multiplexing** — N independent RAFT groups share one gRPC server and one cached
   client-connection pool; a join request for an unknown group instantiates that group on demand.
-- **Coroutine control plane** — `create_group` / `add_member` / `rem_member` / `become_leader` /
-  `append_entries` are awaitable (`null_async_task`); transient raft states (`CONFIG_CHANGING`,
-  `SERVER_IS_JOINING`) are retried internally so consumers don't hand-roll retry loops.
+- **Coroutine control plane** — `create_group` / `add_member` / `rem_member` / `become_leader`
+  are awaitable (`null_async_task`); transient raft states (`CONFIG_CHANGING`, `SERVER_IS_JOINING`)
+  are retried internally so consumers don't hand-roll retry loops.
 - **Coroutine data service** — an optional application-level request/response channel between replicas
   (`repl_service_ctx::data_service_request_*`), uni- and bidirectional, addressed by peer / leader / all.
 - **One error type** — `result<T> = std::expected<T, std::error_condition>`; a tiny `errc` domain carries
@@ -84,11 +84,10 @@ nuraft_mesg/
 ├── include/nuraft_mesg/        # Public headers (installed)
 │   ├── nuraft_mesg.hpp           # manager + messaging_application + init_messaging (entry point)
 │   ├── mesg_state_mgr.hpp        # mesg_state_mgr (extension base) + repl_service_ctx (per-group session)
-│   ├── mesg_factory.hpp          # client-side group_factory / mesg_factory (talk to a group directly)
-│   ├── common.hpp                # vocabulary: ids, result<T> / async_task<T>, destination_t
-│   └── errors.hpp                # errc domain + cmd_result_code → std::error_condition mapping
+│   └── common.hpp                # vocabulary: ids, result<T>/async_task<T>, destination_t, errc domain
 ├── src/
-│   ├── lib/                    # Internal: ManagerImpl, msg_service, grpc_server, repl_service_ctx_grpc
+│   ├── lib/                    # Internal: ManagerImpl, msg_service, grpc_server, repl_service_ctx_grpc,
+│   │                           #           mesg_factory (transport — not part of the public API)
 │   ├── proto/                  # gRPC service definition + messaging client
 │   └── tests/                  # GoogleTest suites
 └── test_package/              # consumer smoke test: example_{server,client}.cpp
@@ -99,11 +98,10 @@ nuraft_mesg/
 | Type / entry point | Role |
 |---|---|
 | `init_messaging(params, app, with_data_svc)` | Bring up the `manager` — one gRPC server for every group |
-| `manager` | Multi-group lifecycle: `create_group` / `add_member` / `rem_member` / `become_leader` / `append_entries` (all `null_async_task`) |
+| `manager` | Opaque handle (pimpl): multi-group lifecycle — `create_group` / `add_member` / `rem_member` / `become_leader` (all `null_async_task`). Non-virtual; not meant for subclassing. |
 | `messaging_application` | Consumer node hooks: `lookup_peer(id)` → endpoint, `create_state_mgr(srv_id, group)` → a `mesg_state_mgr` |
 | `mesg_state_mgr` | Consumer's per-group state manager (extends `nuraft::state_mgr`): `get_state_machine`, `raft_event`, lifecycle; `repl_ctx()` for the session |
 | `repl_service_ctx` | Per-group session provided by the library: data-service requests + raft status / config / leader |
-| `mesg_factory` | Client-side factory for sending to a group without joining it |
 | `result<T>` / `null_result` | `std::expected<T, std::error_condition>` — the unified error surface |
 
 ## 🧬 Coroutine API

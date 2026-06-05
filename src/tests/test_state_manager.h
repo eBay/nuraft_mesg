@@ -62,7 +62,7 @@ public:
     nuraft_mesg::repl_service_ctx* get_repl_context() { return repl_ctx(); }
     // Re-expose the (now protected) internal setup so the white-box tests can rebuild the ctx with null
     // server/factory to exercise failure paths.
-    using nuraft_mesg::mesg_state_mgr::make_repl_ctx;
+    using nuraft_mesg::mesg_state_mgr::set_repl_ctx;
 
 private:
 private:

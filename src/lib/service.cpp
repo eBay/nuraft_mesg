@@ -9,7 +9,8 @@
 #include <libnuraft/rpc_listener.hxx>
 #include <sisl/options/options.h>
 
-#include "nuraft_mesg/mesg_factory.hpp"
+#include "mesg_factory.hpp"
+#include "repl_service_ctx.hpp"
 #include "nuraft_mesg/mesg_state_mgr.hpp"
 #include "nuraft_mesg/nuraft_mesg.hpp"
 #include "async_helpers.hpp"
@@ -186,7 +187,7 @@ nuraft::cmd_result_code msg_service::joinRaftGroup(int32_t const srv_id, group_i
         if (_data_service_enabled) {
             auto smgr = std::dynamic_pointer_cast< mesg_state_mgr >(ctx->state_mgr_);
             auto cli_factory = std::dynamic_pointer_cast< mesg_factory >(ctx->rpc_cli_factory_);
-            smgr->make_repl_ctx(it->second.m_server.get(), cli_factory);
+            smgr->set_repl_ctx(std::make_unique< repl_service_ctx_grpc >(it->second.m_server.get(), cli_factory));
         }
     } else {
         RELEASE_ASSERT(_raft_servers.end() != it, "FAILED to add a new raft server!");

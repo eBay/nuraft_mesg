@@ -30,7 +30,7 @@ TEST_F(MessagingFixture, BasicTests) {
     EXPECT_TRUE(repl_ctx1->is_raft_leader());
 
     // Basic resiliency test (append_entries)
-    EXPECT_TRUE(sync_get(app_1_->instance_->append_entries(group_id_, {buf})));
+    EXPECT_TRUE(sync_get(app_1_->impl_inst_->append_entries(group_id_, {buf})));
 
     // Simulate a Member crash
     auto our_id = app_3_->id_;
@@ -60,7 +60,7 @@ TEST_F(MessagingFixture, BasicTests) {
         auto repl_ctx3 = sm3->get_repl_context();
         EXPECT_TRUE(repl_ctx3->is_raft_leader());
     }
-    EXPECT_TRUE(sync_get(app_3_->instance_->append_entries(group_id_, {buf})));
+    EXPECT_TRUE(sync_get(app_3_->impl_inst_->append_entries(group_id_, {buf})));
 
     // Test sending a message for a group the messaging service is not aware of.
     EXPECT_FALSE(sync_get(app_1_->instance_->add_member(bogus_uuid, bogus_uuid)));
@@ -94,7 +94,7 @@ TEST_F(MessagingFixture, BasicTests) {
 
     // Add a 4th Member to the Group
     std::vector< std::shared_ptr< nuraft::srv_config > > srv_list;
-    app_3_->instance_->get_srv_config_all(group_id_, srv_list);
+    app_3_->impl_inst_->get_srv_config_all(group_id_, srv_list);
     EXPECT_EQ(srv_list.size(), 3u);
 
     // Ensure lookup_works for the new member
@@ -113,7 +113,7 @@ TEST_F(MessagingFixture, BasicTests) {
 
     // New member should appear in config now
     srv_list.clear();
-    app_3_->instance_->get_srv_config_all(group_id_, srv_list);
+    app_3_->impl_inst_->get_srv_config_all(group_id_, srv_list);
     EXPECT_EQ(srv_list.size(), 4u);
 
     // Remove a member now
@@ -122,7 +122,7 @@ TEST_F(MessagingFixture, BasicTests) {
     // Unknown Group Tests
     app_1_->instance_->leave_group(bogus_uuid);
 
-    EXPECT_FALSE(sync_get(app_1_->instance_->append_entries(bogus_uuid, {buf})));
+    EXPECT_FALSE(sync_get(app_1_->impl_inst_->append_entries(bogus_uuid, {buf})));
 
     // Expect failure trying to remove unknown member
     auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_), to_string(app_1_->id_));

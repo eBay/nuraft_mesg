@@ -41,7 +41,8 @@ static auto sync_get(TaskT&& task) {
 #include "libnuraft/cluster_config.hxx"
 #include "libnuraft/state_machine.hxx"
 #include "nuraft_mesg/nuraft_mesg.hpp"
-#include "nuraft_mesg/mesg_factory.hpp"
+#include "lib/mesg_factory.hpp"
+#include "lib/manager_impl.hpp"
 
 #include "test_state_manager.h"
 
@@ -62,6 +63,7 @@ public:
     uint32_t port_;
     boost::uuids::uuid id_;
     std::shared_ptr< manager > instance_;
+    std::shared_ptr< ManagerImpl > impl_inst_; // test-only: access to internal methods not on manager
     bool data_svc_;
 
     std::map< group_id_t, std::shared_ptr< test_state_mgr > > state_mgr_map_;
@@ -99,7 +101,9 @@ public:
         params.default_group_type_ = "test_type";
         params.max_send_message_size_ = 65 * 1024 * 1024;
         params.max_receive_message_size_ = 65 * 1024 * 1024;
-        instance_ = init_messaging(params, weak_from_this(), data_svc_enabled);
+        impl_inst_ = std::make_shared< ManagerImpl >(params, weak_from_this());
+        impl_inst_->start(data_svc_enabled);
+        instance_ = std::make_shared< manager >(impl_inst_);
         auto r_params = nuraft::raft_params()
                             .with_election_timeout_lower(elect_to_low)
                             .with_election_timeout_upper(elect_to_high)
