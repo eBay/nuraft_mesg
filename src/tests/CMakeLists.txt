@@ -58,3 +58,21 @@ set_property(TEST DataServiceTest PROPERTY RUN_SERIAL 1)
 set_tests_properties(DataServiceTest PROPERTIES
   ENVIRONMENT
     "ASAN_OPTIONS=allow_user_poisoning=0:detect_container_overflow=0;TSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/tsan.supp;LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/lsan.supp")
+
+add_executable(thread_pool_test)
+target_sources(thread_pool_test PRIVATE
+  thread_pool_tests.cpp
+  $<TARGET_OBJECTS:test_fixture>
+  $<TARGET_OBJECTS:jungle_logstore>
+)
+target_link_libraries (thread_pool_test
+  ${PROJECT_NAME}_proto
+  jungle::jungle
+  LZ4::lz4_static
+  GTest::gmock
+)
+add_test(NAME ThreadPoolTest COMMAND thread_pool_test -cv 2)
+set_property(TEST ThreadPoolTest PROPERTY RUN_SERIAL 1)
+set_tests_properties(ThreadPoolTest PROPERTIES
+  ENVIRONMENT
+    "ASAN_OPTIONS=allow_user_poisoning=0:detect_container_overflow=0;TSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/tsan.supp;LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/lsan.supp")

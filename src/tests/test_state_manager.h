@@ -63,6 +63,9 @@ public:
     // Re-expose the (now protected) internal setup so the white-box tests can rebuild the ctx with null
     // server/factory to exercise failure paths.
     using nuraft_mesg::mesg_state_mgr::set_repl_ctx;
+    std::shared_ptr<test_state_machine> get_sm() { return _state_machine; }
+
+    nuraft::cb_func::ReturnCode raft_event(nuraft::cb_func::Type type, nuraft::cb_func::Param* param) override;
 
 private:
 private:

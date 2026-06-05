@@ -4,6 +4,7 @@
 #include <libnuraft/async.hxx>
 #include <libnuraft/rpc_listener.hxx>
 #include <sisl/options/options.h>
+#include <sisl/utility/enum.hpp>
 
 #include "lib/mesg_factory.hpp"
 #include "nuraft_mesg/nuraft_mesg.hpp"
@@ -15,6 +16,33 @@
 #include "utils.hpp"
 
 namespace nuraft_mesg {
+
+// Service-level metrics (global to the service, not per-group)
+class service_metrics : public sisl::MetricsGroup {
+public:
+    service_metrics() : sisl::MetricsGroup("RAFTService", "global") {
+        REGISTER_HISTOGRAM(raft_pool_wait_time_us, "Time waiting in raft thread pool queue", "raft_service_latency",
+                           {"op", "raft_pool_wait"});
+        REGISTER_HISTOGRAM(io_pool_wait_time_us, "Time waiting in I/O thread pool queue", "raft_service_latency",
+                           {"op", "io_pool_wait"});
+        REGISTER_GAUGE(raft_pool_active_threads, "Number of active threads in Raft pool", "raft_service_gauge");
+        REGISTER_GAUGE(io_pool_active_threads, "Number of active threads in I/O pool", "raft_service_gauge");
+        REGISTER_COUNTER(raft_pool_msg_count, "Messages processed on Raft thread", "raft_service_counter");
+        REGISTER_COUNTER(io_pool_msg_count, "Messages routed to I/O pool", "raft_service_counter");
+        register_me_to_farm();
+    }
+
+    ~service_metrics() { deregister_me_from_farm(); }
+};
+
+// Simple RAII guard for atomic counter
+struct atomic_counter_guard {
+    std::atomic< int >& counter;
+    explicit atomic_counter_guard(std::atomic< int >& c) : counter(c) { ++counter; }
+    ~atomic_counter_guard() { --counter; }
+    atomic_counter_guard(const atomic_counter_guard&) = delete;
+    atomic_counter_guard& operator=(const atomic_counter_guard&) = delete;
+};
 
 static std::shared_ptr< nuraft::req_msg > toRequest(RaftMessage const& raft_msg) {
     assert(raft_msg.has_rc_request());
@@ -40,7 +68,9 @@ static RCResponse* fromRCResponse(nuraft::resp_msg& rcmsg) {
     req->set_batch_size_hint(rcmsg.get_next_batch_size_hint_in_bytes());
     req->set_result_code((ResultCode)(0 - rcmsg.get_result_code()));
     auto ctx = rcmsg.get_ctx();
-    if (ctx) { req->set_context(ctx->data(), ctx->size()); }
+    if (ctx) {
+        req->set_context(ctx->data(), ctx->size());
+    }
     return req;
 }
 
@@ -52,7 +82,8 @@ public:
     template < typename... Args >
     proto_service(Args&&... args) :
             msg_service(std::forward< Args >(args)...),
-            _raft_thread_pool{NURAFT_MESG_CONFIG(raft_append_entries_thread_cnt)} {}
+            _raft_thread_pool{NURAFT_MESG_CONFIG(raft_append_entries_thread_cnt)},
+            _io_thread_pool{calculate_io_pool_size()} {}
 
     void associate(sisl::GrpcServer* server) override;
     void bind(sisl::GrpcServer* server) override;
@@ -62,7 +93,17 @@ public:
     bool raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
 
 private:
+    size_t calculate_io_pool_size();
+    bool is_slow_message(nuraft::msg_type type) const;
+    int64_t execute_step(std::shared_ptr< nuraft::raft_server > const& server,
+                         const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data,
+                         std::shared_ptr< group_metrics > const& metrics);
+
     boost::asio::thread_pool _raft_thread_pool;
+    boost::asio::thread_pool _io_thread_pool;
+    std::atomic< int > _raft_pool_active_threads{0};
+    std::atomic< int > _io_pool_active_threads{0};
+    service_metrics _service_metrics;
 };
 
 void proto_service::associate(::sisl::GrpcServer* server) {
@@ -89,7 +130,44 @@ void proto_service::shutdown() {
     // gRPC-poisoned stack frames on shutdown (the primary ASan guard is allow_user_poisoning=0).
     _raft_thread_pool.stop();
     _raft_thread_pool.join();
+    _io_thread_pool.stop();
+    _io_thread_pool.join();
     msg_service::shutdown();
+}
+
+size_t proto_service::calculate_io_pool_size() {
+    auto config_size = NURAFT_MESG_CONFIG(io_thread_pool_size);
+    return (config_size > 0) ? config_size : 4; // Default to 4 threads
+}
+
+bool proto_service::is_slow_message(nuraft::msg_type type) const {
+    return type == nuraft::msg_type::append_entries_request || type == nuraft::msg_type::install_snapshot_request;
+}
+
+int64_t proto_service::execute_step(std::shared_ptr< nuraft::raft_server > const& server,
+                                    const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data,
+                                    std::shared_ptr< group_metrics > const& metrics) {
+    auto& request = rpc_data->request();
+    auto& response = rpc_data->response();
+    auto const& group_id = request.group_id();
+
+    auto exec_start = std::chrono::steady_clock::now();
+
+    if (metrics) {
+        COUNTER_INCREMENT(*metrics, group_steps, 1);
+    }
+
+    try {
+        response.set_group_id(group_id);
+        rpc_data->set_status(step(*server, request.msg(), *response.mutable_msg(), metrics));
+    } catch (std::runtime_error& rte) {
+        LOGE("Caught exception during step(): {}", rte.what());
+        rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
+    }
+
+    rpc_data->send_response();
+
+    return get_elapsed_time_us(exec_start);
 }
 
 ::grpc::Status proto_service::step(nuraft::raft_server& server, const RaftMessage& request, RaftMessage& reply,
@@ -99,7 +177,9 @@ void proto_service::shutdown() {
     auto rcreq = toRequest(request);
     auto const time_start = std::chrono::steady_clock::now();
     auto resp = nuraft::raft_server_handler::process_req(&server, *rcreq);
-    if (!resp) { return ::grpc::Status(::grpc::StatusCode::CANCELLED, "Server rejected request"); }
+    if (!resp) {
+        return ::grpc::Status(::grpc::StatusCode::CANCELLED, "Server rejected request");
+    }
     if (metrics && rcreq->get_type() == nuraft::msg_type::append_entries_request) {
         HISTOGRAM_OBSERVE(*metrics, append_entries_latency_us, get_elapsed_time_us(time_start));
     }
@@ -108,14 +188,15 @@ void proto_service::shutdown() {
     reply.set_allocated_rc_response(fromRCResponse(*resp));
     if (!resp->get_accepted()) {
         auto const srv_conf = server.get_srv_config(reply.base().dest());
-        if (srv_conf) { reply.mutable_rc_response()->set_dest_addr(srv_conf->get_endpoint()); }
+        if (srv_conf) {
+            reply.mutable_rc_response()->set_dest_addr(srv_conf->get_endpoint());
+        }
     }
     return ::grpc::Status();
 }
 
 bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data) {
     auto& request = rpc_data->request();
-    auto& response = rpc_data->response();
     auto const& group_id = request.group_id();
     auto const& intended_addr = request.intended_addr();
 
@@ -148,43 +229,74 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
     // JoinClusterRequests are expected to be received upon Cluster creation by the current leader. We need
     // to initialize a RaftServer context based on the corresponding type prior to servicing this request. This
     // should emplace a corresponding server in the _raft_servers member.
-    if (nuraft::join_cluster_request == base.type()) { joinRaftGroup(base.dest(), gid, request.group_type()); }
+    if (nuraft::join_cluster_request == base.type()) {
+        joinRaftGroup(base.dest(), gid, request.group_type());
+    }
 
-    // Setup our response and process the request.
-    response.set_group_id(group_id);
-    boost::asio::post(_raft_thread_pool, [this, rpc_data]() {
-        auto gid = boost::uuids::string_generator()(rpc_data->response().group_id());
-        auto& request = rpc_data->request();
-        auto& response = rpc_data->response();
-        auto const& group_id = request.group_id();
-        // Hold lock only to extract reference-counted pointers; release before step()
-        // to avoid lock inversion with _manager_lock (step() can trigger raft callbacks
-        // that acquire _manager_lock, while add_member holds _manager_lock and needs
-        // _raft_servers_mutex via get_srv_config_all).
-        std::shared_ptr< nuraft::raft_server > raft_srv;
-        std::shared_ptr< group_metrics > metrics;
-        {
-            std::shared_lock lk(_raft_servers_mutex);
-            if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
-                raft_srv = it->second.m_server->raft_server();
-                metrics = it->second.m_metrics;
+    auto msg_type = static_cast< nuraft::msg_type >(base.type());
+
+    // Route to appropriate pool; lookup happens under mutex inside each lambda to avoid lock
+    // inversion with _manager_lock (step() triggers callbacks that acquire _manager_lock, while
+    // add_member holds _manager_lock and needs _raft_servers_mutex via get_srv_config_all).
+    if (is_slow_message(msg_type)) {
+        COUNTER_INCREMENT(_service_metrics, io_pool_msg_count, 1);
+        auto io_post_time = std::chrono::steady_clock::now();
+        boost::asio::post(_io_thread_pool, [this, gid, rpc_data, io_post_time, msg_type]() {
+            auto io_wait_time_us = get_elapsed_time_us(io_post_time);
+            auto io_guard = atomic_counter_guard(_io_pool_active_threads);
+            HISTOGRAM_OBSERVE(_service_metrics, io_pool_wait_time_us, io_wait_time_us);
+            GAUGE_UPDATE(_service_metrics, io_pool_active_threads, _io_pool_active_threads.load());
+
+            std::shared_ptr< nuraft::raft_server > raft_srv;
+            std::shared_ptr< group_metrics > metrics;
+            {
+                std::shared_lock lk(_raft_servers_mutex);
+                if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
+                    raft_srv = it->second.m_server->raft_server();
+                    metrics = it->second.m_metrics;
+                }
             }
-        }
-        if (raft_srv) {
-            if (metrics) COUNTER_INCREMENT(*metrics, group_steps, 1);
-            try {
-                rpc_data->set_status(step(*raft_srv, request.msg(), *response.mutable_msg(), metrics));
-            } catch (std::runtime_error& rte) {
-                LOGE("Caught exception during step(): {}", rte.what());
-                rpc_data->set_status(
-                    ::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
+            if (!raft_srv) {
+                auto const& group_id = rpc_data->request().group_id();
+                LOGD("Missing [group={}]", group_id);
+                rpc_data->response().set_group_id(group_id);
+                rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
+                rpc_data->send_response();
+                return;
             }
-        } else {
-            LOGD("Missing [group={}]", group_id);
-            rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
-        }
-        rpc_data->send_response();
-    });
+            [[maybe_unused]] auto exec_time_us = execute_step(raft_srv, rpc_data, metrics);
+            LOGT("I/O pool executed [type={}] wait={}us exec={}us", nuraft::msg_type_to_string(msg_type),
+                 io_wait_time_us, exec_time_us);
+        });
+    } else {
+        COUNTER_INCREMENT(_service_metrics, raft_pool_msg_count, 1);
+        auto raft_post_time = std::chrono::steady_clock::now();
+        boost::asio::post(_raft_thread_pool, [this, gid, rpc_data, raft_post_time]() {
+            auto raft_wait_time_us = get_elapsed_time_us(raft_post_time);
+            auto raft_guard = atomic_counter_guard(_raft_pool_active_threads);
+            HISTOGRAM_OBSERVE(_service_metrics, raft_pool_wait_time_us, raft_wait_time_us);
+            GAUGE_UPDATE(_service_metrics, raft_pool_active_threads, _raft_pool_active_threads.load());
+
+            std::shared_ptr< nuraft::raft_server > raft_srv;
+            std::shared_ptr< group_metrics > metrics;
+            {
+                std::shared_lock lk(_raft_servers_mutex);
+                if (auto it = _raft_servers.find(gid); _raft_servers.end() != it) {
+                    raft_srv = it->second.m_server->raft_server();
+                    metrics = it->second.m_metrics;
+                }
+            }
+            if (!raft_srv) {
+                auto const& group_id = rpc_data->request().group_id();
+                LOGD("Missing [group={}]", group_id);
+                rpc_data->response().set_group_id(group_id);
+                rpc_data->set_status(::grpc::Status(::grpc::NOT_FOUND, fmt::format("Missing RAFT group {}", group_id)));
+                rpc_data->send_response();
+                return;
+            }
+            execute_step(raft_srv, rpc_data, metrics);
+        });
+    }
     return false;
 }
 

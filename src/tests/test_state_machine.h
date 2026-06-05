@@ -19,7 +19,7 @@
 
 using namespace nuraft;
 
-auto unwrap_buffer(nuraft::buffer& data) {
+inline auto unwrap_buffer(nuraft::buffer& data) {
     size_t buffer_len{0};
     auto const buffer_begin = data.get_bytes(buffer_len);
     auto const buffer_end = buffer_begin + buffer_len;
@@ -29,7 +29,7 @@ auto unwrap_buffer(nuraft::buffer& data) {
 
 class test_state_machine : public state_machine {
 public:
-    test_state_machine() : lock_(), last_commit_idx_(0) {}
+    test_state_machine() : append_delay_ms_(0), lock_(), last_commit_idx_(0) {}
 
 public:
     virtual ptr< buffer > commit(const ulong log_idx, buffer& data) {
@@ -59,6 +59,8 @@ public:
 
     virtual int read_snapshot_data(snapshot&, const ulong, buffer&) { return 0; }
 
+    void set_append_delay(int ms) { append_delay_ms_ = ms; }
+
     virtual ptr< snapshot > last_snapshot() { return ptr< snapshot >(); }
 
     virtual void create_snapshot(snapshot&, async_result< bool >::handler_type&) {}
@@ -67,6 +69,8 @@ public:
         auto_lock(lock_);
         return last_commit_idx_;
     }
+
+    std::atomic<int> append_delay_ms_;  // Made public for test_state_mgr access
 
 private:
     std::mutex lock_;
