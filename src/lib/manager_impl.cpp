@@ -41,7 +41,14 @@ int32_t to_server_id(peer_id_t const& server_addr) {
 }
 
 messaging_application::messaging_application() {
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
     sisl::VersionMgr::addVersion(PACKAGE_NAME, version::Semver200_version(PACKAGE_VERSION));
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 }
 
 class engine_factory : public group_factory {
@@ -265,16 +272,20 @@ void ManagerImpl::signal_waiters(group_id_t const& group_id) {
     std::vector< std::shared_ptr< wakeup_event > > to_signal;
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
-        if (auto it = _waiters.find(group_id); it != _waiters.end()) { to_signal = it->second; }
+        if (auto it = _waiters.find(group_id); it != _waiters.end()) {
+            to_signal = it->second;
+        }
     }
     // Signal outside the lock: signal() may resume the waiting coroutine, which re-acquires _manager_lock to
     // re-check its predicate.
-    for (auto& ev : to_signal) { ev->signal(true); }
+    for (auto& ev : to_signal) {
+        ev->signal(true);
+    }
 }
 
 null_async_task ManagerImpl::wait_for_condition(group_id_t group_id, std::function< bool() > pred,
-                                              std::chrono::steady_clock::time_point deadline,
-                                              nuraft::cmd_result_code timeout_code) {
+                                                std::chrono::steady_clock::time_point deadline,
+                                                nuraft::cmd_result_code timeout_code) {
     auto sched = _timer_ctx.get_scheduler();
     for (;;) {
         // Run the waiter bookkeeping and pred() on the timer thread, never inline on whoever signalled us.
@@ -423,12 +434,16 @@ null_async_task ManagerImpl::become_leader(group_id_t const& group_id) {
         co_await exec::schedule_after(sched, std::chrono::milliseconds(50));
     }
     co_return co_await wait_for_condition(
-        group_id, [this, group_id]() { std::lock_guard< std::mutex > lg(_manager_lock); return _is_leader[group_id]; },
+        group_id,
+        [this, group_id]() {
+            std::lock_guard< std::mutex > lg(_manager_lock);
+            return _is_leader[group_id];
+        },
         deadline, nuraft::cmd_result_code::TIMEOUT);
 }
 
 null_async_task ManagerImpl::append_entries(group_id_t const& group_id,
-                                          std::vector< std::shared_ptr< nuraft::buffer > > const& buf) {
+                                            std::vector< std::shared_ptr< nuraft::buffer > > const& buf) {
     co_return to_null_result(co_await _mesg_service->append_entries(group_id, buf));
 }
 
@@ -451,12 +466,16 @@ null_async_task ManagerImpl::create_group(group_id_t const& group_id, std::strin
     auto const deadline =
         std::chrono::steady_clock::now() + std::chrono::milliseconds(NURAFT_MESG_CONFIG(raft_leader_change_timeout_ms));
     return wait_for_condition(
-        group_id, [this, group_id]() { std::lock_guard< std::mutex > lg(_manager_lock); return _is_leader[group_id]; },
+        group_id,
+        [this, group_id]() {
+            std::lock_guard< std::mutex > lg(_manager_lock);
+            return _is_leader[group_id];
+        },
         deadline, nuraft::cmd_result_code::CANCELLED);
 }
 
 null_result ManagerImpl::join_group(group_id_t const& group_id, group_type_t const& group_type,
-                                   std::shared_ptr< mesg_state_mgr > smgr) {
+                                    std::shared_ptr< mesg_state_mgr > smgr) {
     {
         std::lock_guard< std::mutex > lg(_manager_lock);
         auto [it, happened] = _state_managers.emplace(group_id, smgr);
@@ -524,9 +543,7 @@ bool ManagerImpl::bind_data_service_request(std::string const& request_name, gro
     return _mesg_service->bind_data_service_request(request_name, group_id, request_handler);
 }
 
-void mesg_state_mgr::set_repl_ctx(std::unique_ptr< repl_service_ctx > ctx) {
-    m_repl_svc_ctx = std::move(ctx);
-}
+void mesg_state_mgr::set_repl_ctx(std::unique_ptr< repl_service_ctx > ctx) { m_repl_svc_ctx = std::move(ctx); }
 
 nuraft::cb_func::ReturnCode mesg_state_mgr::internal_raft_event_handler(group_id_t const& group_id,
                                                                         nuraft::cb_func::Type type,
