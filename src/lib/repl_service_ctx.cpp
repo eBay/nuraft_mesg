@@ -108,6 +108,7 @@ std::vector< peer_info > repl_service_ctx::get_raft_status() const {
                 }
                 // default priority=1
                 peer.last_log_idx_ = pinfo.last_log_idx_;
+                peer.last_sm_committed_idx_ = pinfo.last_sm_committed_idx_;
                 peer.last_succ_resp_us_ = pinfo.last_succ_resp_us_;
                 peer.priority_ = srv_config->get_priority();
                 peer.is_learner_ = srv_config->is_learner();
@@ -128,8 +129,8 @@ std::vector< peer_info > repl_service_ctx::get_raft_status() const {
 
         // add the peer info of itself(leader or follower) , which is useful for upper layer
         // from the view of a node itself, last_succ_resp_us_ make no sense, so set it to 0
-        peers.emplace_back(my_peer_id, _server->get_last_log_idx(), 0, my_config->get_priority(),
-                           my_config->is_learner(), my_config->is_new_joiner());
+        peers.emplace_back(my_peer_id, _server->get_last_log_idx(), _server->get_committed_log_idx(), 0,
+                           my_config->get_priority(), my_config->is_learner(), my_config->is_new_joiner());
     }
 
     return peers;
