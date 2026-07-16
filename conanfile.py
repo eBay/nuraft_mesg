@@ -11,7 +11,7 @@ required_conan_version = ">=1.66.0"
 
 class NuRaftMesgConan(ConanFile):
     name = "nuraft_mesg"
-    version = "5.0.2"
+    version = "5.0.3"
     homepage = "https://github.com/eBay/nuraft_mesg"
     description = "A gRPC service for NuRAFT"
     topics = ("ebay", "nublox", "raft")
@@ -67,8 +67,6 @@ class NuRaftMesgConan(ConanFile):
     def requirements(self):
         self.requires("sisl/[^14.6]@oss/dev", transitive_headers=True)
         self.requires("nuraft/[^2.4]", transitive_headers=True)
-        # stdexec is consumed transitively through sisl::sisl (sisl requires it); find_package(stdexec)
-        # in CMake still resolves it because conan generates configs for the whole dependency graph.
 
     def layout(self):
         self.folders.source = "."
