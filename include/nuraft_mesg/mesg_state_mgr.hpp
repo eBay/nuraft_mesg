@@ -35,6 +35,10 @@ struct peer_info {
     std::string id_;
     // The last log index that the peer has, from this server's point of view.
     uint64_t last_log_idx_;
+    // The last committed log index that the peer has, from this server's point of view.
+    // It can be smaller than `last_log_idx_` if the peer has appended the log but has not committed it yet.
+    // Meaningful for remote peers only when `raft_params::track_peers_sm_commit_idx_` is enabled.
+    uint64_t last_sm_committed_idx_;
     // The elapsed time since the last successful response from this peer, set to 0 on leader
     uint64_t last_succ_resp_us_;
     // The priority for leader election

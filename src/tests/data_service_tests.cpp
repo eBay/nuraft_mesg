@@ -5,7 +5,12 @@ class DataServiceFixture : public MessagingFixtureBase {
 protected:
     void SetUp() override {
         MessagingFixtureBase::SetUp();
-        start(true);
+        // Enable peer SM commit tracking only here: BasicTest2 validates get_raft_status()
+        // last_sm_committed_idx_. Do not enable in the shared test_fixture default — it alters
+        // NuRaft append_entries/.get() semantics and hangs ThreadPoolTest (slow follower + min
+        // sm_committed wait). Best production approach: track on + custom_commit_quorum_size_
+        // set to cluster majority, or a future NuRaft observation-only flag.
+        start(true, true);
         test_state_mgr::fill_data_vec(cli_buf, 8);
     }
 
@@ -188,11 +193,13 @@ TEST_F(DataServiceFixture, BasicTest2) {
     EXPECT_TRUE(peer_info.size() == 3);
     for (auto const& peer : peer_info) {
         std::cout << "Peer ID: " << peer.id_ << " Last Log Idx: " << peer.last_log_idx_
+                  << " Last SM Committed Idx: " << peer.last_sm_committed_idx_
                   << " Last Succ Resp Us: " << peer.last_succ_resp_us_ << " Priority: " << peer.priority_
                   << " Is Learner: " << peer.is_learner_ << " Is New Joiner: " << peer.is_new_joiner_ << std::endl;
         EXPECT_TRUE(peer.id_ == to_string(app_1_->id_) || peer.id_ == to_string(app_2_->id_) ||
                     peer.id_ == to_string(app_3_->id_));
         EXPECT_TRUE(peer.last_log_idx_ == 3);
+        EXPECT_EQ(peer.last_sm_committed_idx_, peer.last_log_idx_);
         if (peer.id_ == to_string(app_1_->id_)) {
             EXPECT_TRUE(peer.last_succ_resp_us_ == 0);
         } else {

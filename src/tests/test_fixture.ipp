@@ -83,7 +83,7 @@ public:
         lookup_map_ = peers;
     }
 
-    void start(bool data_svc_enabled = false) {
+    void start(bool data_svc_enabled = false, bool track_peers_sm_commit_idx = false) {
         data_svc_ = data_svc_enabled;
         auto params = Manager::Params();
         params.server_uuid_ = id_;
@@ -101,6 +101,12 @@ public:
                             .with_auto_forwarding(false)
                             .with_snapshot_enabled(0);
         r_params.return_method_ = nuraft::raft_params::async_handler;
+        // Default off: track_peers_sm_commit_idx_ changes append_entries completion semantics
+        // (waits on follower SM commit, not just leader/replication quorum) and breaks tests
+        // that rely on slow followers (e.g. ThreadPoolTest). Enable only where get_raft_status
+        // last_sm_committed_idx_ is under test. Best long-term: NuRaft flag for observation-only
+        // peer SM index, or track on in production with custom_commit_quorum_size_ = majority.
+        r_params.track_peers_sm_commit_idx_ = track_peers_sm_commit_idx;
         instance_->register_mgr_type("test_type", r_params);
     }
 
@@ -178,10 +184,10 @@ protected:
         app_1_->instance_->leave_group(group_id_);
     }
 
-    void start(bool data_svc_enabled = false) {
-        app_1_->start(data_svc_enabled);
-        app_2_->start(data_svc_enabled);
-        app_3_->start(data_svc_enabled);
+    void start(bool data_svc_enabled = false, bool track_peers_sm_commit_idx = false) {
+        app_1_->start(data_svc_enabled, track_peers_sm_commit_idx);
+        app_2_->start(data_svc_enabled, track_peers_sm_commit_idx);
+        app_3_->start(data_svc_enabled, track_peers_sm_commit_idx);
 
         group_id_ = boost::uuids::random_generator()();
 
