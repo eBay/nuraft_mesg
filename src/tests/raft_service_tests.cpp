@@ -135,3 +135,116 @@ TEST_F(MessagingFixture, BasicTests) {
     // Needed since app_4 is not part of TearDown
     app_4->instance_->leave_group(group_id_);
 }
+
+// NuRaft peer::recreate_rpc() calls factory->create_client() again and relies on
+// rpc_client::get_id() changing so delayed responses are treated as stale and
+// skip bytes_in_flight_sub(). mesg_factory must mint a new outer wrapper on
+// reinit even when the underlying messaging_client is reused.
+TEST_F(MessagingFixture, RecreateClientChangesRpcId) {
+    auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
+
+    auto first = factory->create_client(to_string(app_2_->id_));
+    ASSERT_NE(first, nullptr);
+    auto const first_id = first->get_id();
+
+    auto second = factory->create_client(to_string(app_2_->id_));
+    ASSERT_NE(second, nullptr);
+
+    EXPECT_NE(first.get(), second.get()) << "recreate must return a new rpc_client object";
+    EXPECT_NE(first_id, second->get_id()) << "recreate must change rpc_client::get_id() for NuRaft stale check";
+}
+
+TEST_F(MessagingFixture, DataPathReinitPreservesRpcClientId) {
+    auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
+    auto const peer = app_2_->id_;
+
+    auto first = factory->create_client(to_string(peer));
+    ASSERT_NE(first, nullptr);
+    auto const first_transport = custom_factory_->cached_transport(peer);
+    ASSERT_NE(first_transport, nullptr);
+
+    custom_factory_->force_recreate(true);
+    auto refreshed = factory->create_or_reinit_client(peer);
+    custom_factory_->force_recreate(false);
+
+    ASSERT_NE(refreshed, nullptr);
+    EXPECT_EQ(refreshed.get(), first.get()) << "data-path reinit must preserve the existing wrapper";
+    EXPECT_EQ(refreshed->get_id(), first->get_id()) << "data-path reinit must preserve rpc_client identity";
+    EXPECT_NE(custom_factory_->cached_transport(peer), first_transport)
+        << "data-path reinit must still refresh the shared messaging_client";
+}
+
+// Two raft groups share one group_factory. Verify the shared messaging_client
+// cache: initial creates share one transport; after group1 replaces it, group2
+// must adopt that same refreshed transport on its next create/reinit.
+TEST_F(MessagingFixture, SharedGroupFactoryReusesReinitTransport) {
+    auto group1 = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
+    auto const group2_id = boost::uuids::random_generator()();
+    auto group2 = std::make_shared< mesg_factory >(custom_factory_, group2_id, "test_type");
+    auto const peer = app_2_->id_;
+
+    ASSERT_NE(group1->create_client(to_string(peer)), nullptr);
+    auto const group1_initial_transport = custom_factory_->cached_transport(peer);
+    ASSERT_NE(group1_initial_transport, nullptr);
+
+    ASSERT_NE(group2->create_or_reinit_client(peer), nullptr);
+    auto const group2_initial_transport = custom_factory_->cached_transport(peer);
+    EXPECT_EQ(group2_initial_transport, group1_initial_transport)
+        << "both groups must initially share one messaging_client";
+
+    // Replace the shared transport once (simulates dead connection / bad_service).
+    custom_factory_->force_recreate(true);
+    ASSERT_NE(group1->create_client(to_string(peer)), nullptr);
+    custom_factory_->force_recreate(false);
+
+    auto const group1_refreshed_transport = custom_factory_->cached_transport(peer);
+    ASSERT_NE(group1_refreshed_transport, nullptr);
+    EXPECT_NE(group1_refreshed_transport, group1_initial_transport)
+        << "group1 reinit must publish a new messaging_client into the shared cache";
+    EXPECT_EQ(group2_initial_transport, group1_initial_transport)
+        << "group2 still observes the original transport until it reinits";
+
+    ASSERT_NE(group2->create_or_reinit_client(peer), nullptr);
+    EXPECT_EQ(custom_factory_->cached_transport(peer), group1_refreshed_transport)
+        << "group2 reinit must reuse group1's refreshed messaging_client, not allocate another";
+}
+
+// Counterpart to SharedGroupFactoryReusesReinitTransport where the DATA PATH
+// (not NuRaft recreate_rpc) is the trigger that replaces the shared transport.
+// After group1's data-path reinit updates group_factory's cache, group2's next
+// reinit must adopt that transport instead of allocating a separate connection.
+TEST_F(MessagingFixture, SharedGroupFactoryDataPathUpdatesCache) {
+    auto group1 = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
+    auto const group2_id = boost::uuids::random_generator()();
+    auto group2 = std::make_shared< mesg_factory >(custom_factory_, group2_id, "test_type");
+    auto const peer = app_2_->id_;
+
+    // raft_held simulates NuRaft's peer._rpc after recreate_rpc().
+    auto raft_held = group1->create_client(to_string(peer));
+    ASSERT_NE(raft_held, nullptr);
+    ASSERT_NE(group2->create_or_reinit_client(peer), nullptr);
+    auto const initial_transport = custom_factory_->cached_transport(peer);
+    ASSERT_NE(initial_transport, nullptr);
+
+    // group1 data-path reinit replaces the shared transport in group_factory.
+    custom_factory_->force_recreate(true);
+    auto data_path_result = group1->create_or_reinit_client(peer);
+    custom_factory_->force_recreate(false);
+
+    ASSERT_NE(data_path_result, nullptr);
+    // data-path reinit calls setClient() on the existing wrapper in place, so the
+    // object NuRaft holds (raft_held) is the same object that now points to the
+    // new transport - no extra send failure needed before NuRaft benefits.
+    EXPECT_EQ(data_path_result.get(), raft_held.get())
+        << "data-path reinit must update NuRaft's held wrapper in place, not replace it";
+
+    auto const refreshed_transport = custom_factory_->cached_transport(peer);
+    ASSERT_NE(refreshed_transport, nullptr);
+    EXPECT_NE(refreshed_transport, initial_transport)
+        << "data-path reinit must publish a new messaging_client into group_factory cache";
+
+    // group2's next reinit must reuse refreshed_transport, not create a third connection.
+    ASSERT_NE(group2->create_or_reinit_client(peer), nullptr);
+    EXPECT_EQ(custom_factory_->cached_transport(peer), refreshed_transport)
+        << "group2 reinit must adopt the transport already in group_factory, not allocate another";
+}

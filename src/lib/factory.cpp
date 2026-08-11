@@ -110,7 +110,7 @@ void respHandler(std::shared_ptr< ContextType > ctx, std::shared_ptr< nuraft::re
     auto gresp = std::dynamic_pointer_cast< grpc_resp >(rsp);
     LOGD("Updating destination from {} to {}[{}]", ctx->_cur_dest, rsp->get_dst(), gresp->dest_addr);
     ctx->_cur_dest = rsp->get_dst();
-    auto client = factory->create_client(gresp->dest_addr);
+    auto client = factory->create_or_reinit_client(gresp->dest_addr);
 
     // We'll try again by forwarding the message
     auto handler = static_cast< nuraft::rpc_handler >(
@@ -149,33 +149,43 @@ class grpc_error_client : public grpc_base_client {
 
 nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(std::string const& client) {
     try {
-        return create_client(boost::uuids::string_generator()(client));
+        // Explicit true: NuRaft is the only caller that must observe a new get_id().
+        return create_or_reinit_client(boost::uuids::string_generator()(client), true);
     } catch (std::runtime_error const& e) { LOGC("Client Endpoint Invalid! [{}]", client); }
     return nullptr;
 }
 
-nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(peer_id_t const& client) {
+nuraft::ptr< nuraft::rpc_client > grpc_factory::create_or_reinit_client(std::string const& client) {
+    try {
+        return create_or_reinit_client(boost::uuids::string_generator()(client));
+    } catch (std::runtime_error const& e) { LOGC("Client Endpoint Invalid! [{}]", client); }
+    return nullptr;
+}
+
+nuraft::ptr< nuraft::rpc_client > grpc_factory::create_or_reinit_client(peer_id_t const& client,
+                                                                        bool const force_recreate) {
     nuraft::ptr< nuraft::rpc_client > new_client;
 
     std::unique_lock< client_factory_lock_type > lk(_client_lock);
     auto [it, happened] = _clients.emplace(client, nullptr);
     if (_clients.end() != it) {
-        if (!happened) {
-            LOGD("Re-creating client for {}", client);
-            if (auto err = reinit_client(client, it->second); nuraft::OK != err) {
-                LOGW("Failed to re-initialize client {}: {}", client, err);
-                new_client = std::make_shared< grpc_error_client >();
+        // New entry (happened) or forced recreate both call create_client to get a fresh wrapper;
+        // existing entries on non-forced paths call reinit_client to preserve the wrapper's identity (get_id())
+        // for NuRaft stale-callback detection.
+        bool const do_create = happened || force_recreate;
+        auto const action = do_create ? "create" : "reinit";
+        LOGD("{} client for {}", action, client);
+        auto const err = do_create ? create_client(client, it->second) : reinit_client(client, it->second);
+        if (nuraft::OK != err) {
+            // First-time creation failure (happened) is louder than a reinit failure.
+            if (happened) {
+                LOGE("Failed to create client {}: {}", client, err);
             } else {
-                new_client = it->second;
+                LOGW("Failed to {} client {}: {}", action, client, err);
             }
+            new_client = std::make_shared< grpc_error_client >();
         } else {
-            LOGD("Creating client for {}", client);
-            if (auto err = create_client(client, it->second); nuraft::OK != err) {
-                LOGE("Failed to create client for {}: {}", client, err);
-                new_client = std::make_shared< grpc_error_client >();
-            } else {
-                new_client = it->second;
-            }
+            new_client = it->second;
         }
         if (!it->second) { _clients.erase(it); }
     }
@@ -184,7 +194,7 @@ nuraft::ptr< nuraft::rpc_client > grpc_factory::create_client(peer_id_t const& c
 
 NullAsyncResult grpc_factory::add_server(uint32_t const srv_id, peer_id_t const& srv_addr,
                                          nuraft::srv_config const& dest_cfg) {
-    auto client = create_client(dest_cfg.get_endpoint());
+    auto client = create_or_reinit_client(dest_cfg.get_endpoint());
     if (!client) { return folly::makeUnexpected(nuraft::CANCELLED); }
 
     auto ctx = std::make_shared< client_ctx< uint32_t > >(srv_id, shared_from_this(), dest_cfg.get_id(), srv_addr);
@@ -199,7 +209,7 @@ NullAsyncResult grpc_factory::add_server(uint32_t const srv_id, peer_id_t const&
 }
 
 NullAsyncResult grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg) {
-    auto client = create_client(dest_cfg.get_endpoint());
+    auto client = create_or_reinit_client(dest_cfg.get_endpoint());
     if (!client) { return folly::makeUnexpected(nuraft::CANCELLED); }
 
     auto ctx = std::make_shared< client_ctx< int32_t > >(srv_id, shared_from_this(), dest_cfg.get_id());
@@ -214,7 +224,7 @@ NullAsyncResult grpc_factory::rem_server(uint32_t const srv_id, nuraft::srv_conf
 }
 
 NullAsyncResult grpc_factory::append_entry(std::shared_ptr< nuraft::buffer > buf, nuraft::srv_config const& dest_cfg) {
-    auto client = create_client(dest_cfg.get_endpoint());
+    auto client = create_or_reinit_client(dest_cfg.get_endpoint());
     if (!client) { return folly::makeUnexpected(nuraft::CANCELLED); }
 
     auto ctx =
