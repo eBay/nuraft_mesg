@@ -25,10 +25,13 @@ public:
                            {"op", "raft_pool_wait"});
         REGISTER_HISTOGRAM(io_pool_wait_time_us, "Time waiting in I/O thread pool queue", "raft_service_latency",
                            {"op", "io_pool_wait"});
-        REGISTER_GAUGE(raft_pool_active_threads, "Number of active threads in Raft pool", "raft_service_gauge");
-        REGISTER_GAUGE(io_pool_active_threads, "Number of active threads in I/O pool", "raft_service_gauge");
-        REGISTER_COUNTER(raft_pool_msg_count, "Messages processed on Raft thread", "raft_service_counter");
-        REGISTER_COUNTER(io_pool_msg_count, "Messages routed to I/O pool", "raft_service_counter");
+        REGISTER_GAUGE(raft_pool_active_threads, "Number of active threads in Raft pool", "raft_service_gauge",
+                       {"op", "raft_pool"});
+        REGISTER_GAUGE(io_pool_active_threads, "Number of active threads in I/O pool", "raft_service_gauge",
+                       {"op", "io_pool"});
+        REGISTER_COUNTER(raft_pool_msg_count, "Messages processed on Raft thread", "raft_service_counter",
+                         {"op", "raft_pool"});
+        REGISTER_COUNTER(io_pool_msg_count, "Messages routed to I/O pool", "raft_service_counter", {"op", "io_pool"});
         register_me_to_farm();
     }
 
