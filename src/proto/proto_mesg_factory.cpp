@@ -190,7 +190,6 @@ public:
 
     ~grpc_proto_client() override = default;
 
-    std::shared_ptr< messaging_client > realClient() { return _client; }
     void setClient(std::shared_ptr< messaging_client > new_client) { _client = new_client; }
     bool reinitRequired() const { return (!_client || 0 < _client->bad_service.load(std::memory_order_relaxed)); }
 
@@ -225,7 +224,7 @@ nuraft::cmd_result_code mesg_factory::create_client(peer_id_t const& client,
                                                     nuraft::ptr< nuraft::rpc_client >& raft_client) {
     // Re-direct this call to a global factory so we can re-use clients to the same endpoints
     LOGD("Creating client to {}", client);
-    auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_client(to_string(client)));
+    auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_or_reinit_client(client));
     if (!m_client) return nuraft::CANCELLED;
     raft_client = std::make_shared< grpc_proto_client >(m_client, client, _group_id, _group_type, _metrics);
     return (!raft_client) ? nuraft::BAD_REQUEST : nuraft::OK;
@@ -235,11 +234,12 @@ nuraft::cmd_result_code mesg_factory::reinit_client(peer_id_t const& client,
                                                     std::shared_ptr< nuraft::rpc_client >& raft_client) {
     LOGD("Re-init client to {}", client);
     auto g_client = std::dynamic_pointer_cast< grpc_proto_client >(raft_client);
-    auto new_raft_client = std::static_pointer_cast< nuraft::rpc_client >(g_client->realClient());
-    if (auto err = _group_factory->reinit_client(client, new_raft_client); err) {
-        return err;
-    }
-    g_client->setClient(std::dynamic_pointer_cast< messaging_client >(new_raft_client));
+    if (!g_client) return nuraft::BAD_REQUEST;
+
+    // Refresh the shared messaging_client through group_factory's cache, then update this wrapper in place.
+    auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_or_reinit_client(client));
+    if (!m_client) return nuraft::CANCELLED;
+    g_client->setClient(m_client);
     return nuraft::OK;
 }
 
@@ -261,7 +261,7 @@ NullAsyncResult mesg_factory::data_service_request_unidirectional(std::optional<
 
         // Client not found, create a new one
         LOGI("Client not found, attempting to create client for [{}], request name [{}]", dest->value(), request_name);
-        auto client = create_client(dest->value());
+        auto client = create_or_reinit_client(dest->value());
         auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(client);
         if (!g_client) {
             LOGE("Failed to create client for [{}], request name [{}]", dest->value(), request_name);
@@ -305,9 +305,9 @@ mesg_factory::data_service_request_bidirectional(std::optional< Result< peer_id_
         }
     }
 
-    // Client not found or needs reinit - use create_client to handle both cases
+    // Client not found or needs reinit - use create_or_reinit_client to handle both cases
     LOGI("Client not found, attempting to create client for [{}], request name [{}]", dest->value(), request_name);
-    auto client = create_client(dest->value());
+    auto client = create_or_reinit_client(dest->value());
     auto g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(client);
     if (!g_client) {
         LOGE("Failed to create/reinit client for [{}], request name [{}]", dest->value(), request_name);

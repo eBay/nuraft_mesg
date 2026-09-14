@@ -51,8 +51,19 @@ public:
     std::string const raftWorkerName() const;
     std::string const dataWorkerName() const;
 
+    // NuRaft rpc_client_factory entry point. Only NuRaft needs a new wrapper /
+    // rpc_client::get_id() so delayed callbacks can be treated as stale; that is
+    // why create_client(string) always force-recreates. All other internal paths
+    // use create_or_reinit_client(), which reuses the wrapper and only refreshes
+    // the underlying messaging_client when needed.
     nuraft::ptr< nuraft::rpc_client > create_client(const std::string& client) override;
-    nuraft::ptr< nuraft::rpc_client > create_client(peer_id_t const& client);
+
+    // Internal entry points for data-path and out-of-band RPCs.
+    // force_recreate defaults to false: keep the existing wrapper identity and
+    // let reinit_client() refresh messaging_client if required. Pass true only
+    // from the NuRaft create_client(string) path.
+    nuraft::ptr< nuraft::rpc_client > create_or_reinit_client(std::string const& client);
+    nuraft::ptr< nuraft::rpc_client > create_or_reinit_client(peer_id_t const& client, bool force_recreate = false);
 
     virtual nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 
@@ -83,6 +94,7 @@ public:
                   int const max_receive_message_size = 0, int const max_send_message_size = 0);
 
     using grpc_factory::create_client;
+    using grpc_factory::create_or_reinit_client;
     nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) override;
     nuraft::cmd_result_code reinit_client(peer_id_t const& client,
                                           std::shared_ptr< nuraft::rpc_client >& raft_client) override;
@@ -108,6 +120,7 @@ public:
     group_id_t group_id() const { return _group_id; }
 
     using grpc_factory::create_client;
+    using grpc_factory::create_or_reinit_client;
     nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >& rpc_ptr) override;
 
     nuraft::cmd_result_code reinit_client(peer_id_t const& client,

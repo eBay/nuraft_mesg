@@ -113,6 +113,23 @@ struct custom_factory : public nuraft_mesg::group_factory {
     custom_factory(int const raft_threads, int const data_threads, nuraft_mesg::group_id_t const& name) :
             nuraft_mesg::group_factory::group_factory(raft_threads, data_threads, name, nullptr) {}
 
+    // This fixture treats the cached messaging_client as healthy unless the
+    // test explicitly forces a reconnect. This avoids coupling cache-sharing
+    // tests to the asynchronous gRPC channel readiness state.
+    nuraft::cmd_result_code reinit_client(nuraft_mesg::peer_id_t const& client,
+                                          std::shared_ptr< nuraft::rpc_client >& raft_client) override {
+        if (force_recreate_) { return group_factory::create_client(client, raft_client); }
+        return nuraft::OK;
+    }
+
+    void force_recreate(bool value) { force_recreate_ = value; }
+
+    std::shared_ptr< nuraft::rpc_client > cached_transport(nuraft_mesg::peer_id_t const& peer) {
+        std::shared_lock< client_factory_lock_type > lock(_client_lock);
+        auto const it = _clients.find(peer);
+        return it == _clients.end() ? nullptr : it->second;
+    }
+
     std::string lookupEndpoint(nuraft_mesg::peer_id_t const& peer) override {
         auto lg = std::scoped_lock(lookup_lock_);
         return (lookup_map_.count(peer) > 0) ? lookup_map_[peer] : std::string();
@@ -124,6 +141,7 @@ struct custom_factory : public nuraft_mesg::group_factory {
     }
     std::mutex lookup_lock_;
     std::map< nuraft_mesg::peer_id_t, std::string > lookup_map_;
+    bool force_recreate_{false};
 };
 
 extern nuraft::ptr< nuraft::cluster_config > fromClusterConfig(nlohmann::json const& cluster_config);
