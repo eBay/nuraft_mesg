@@ -69,7 +69,9 @@ void grpc_base_client::send(std::shared_ptr< nuraft::req_msg >& req, nuraft::rpc
 
             if (status.ok()) {
                 resp = toResponse(response);
-                if (!resp) { err = std::make_shared< nuraft::rpc_exception >("missing response", req); }
+                if (!resp) {
+                    err = std::make_shared< nuraft::rpc_exception >("missing response", req);
+                }
             } else {
                 err = std::make_shared< nuraft::rpc_exception >(status.error_message(), req);
             }

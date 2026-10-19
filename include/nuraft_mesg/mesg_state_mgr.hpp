@@ -64,9 +64,8 @@ public:
     // VALUE on purpose: these return lazy coroutines that may be stored and started later (e.g. a fan-out
     // collected into a vector then when_all'd), so reference params would dangle once the caller's
     // argument full-expression ends. By-value copies live in the coroutine frame.
-    [[nodiscard]] virtual null_async_task data_service_request_unidirectional(destination_t dest,
-                                                                            std::string request_name,
-                                                                            io_blob_list_t cli_buf) = 0;
+    [[nodiscard]] virtual null_async_task
+    data_service_request_unidirectional(destination_t dest, std::string request_name, io_blob_list_t cli_buf) = 0;
     [[nodiscard]] virtual async_task< sisl::GenericClientResponse >
     data_service_request_bidirectional(destination_t dest, std::string request_name, io_blob_list_t cli_buf) = 0;
 

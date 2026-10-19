@@ -18,10 +18,9 @@ public:
     std::shared_ptr< mesg_factory > m_mesg_factory;
 
     null_async_task data_service_request_unidirectional(destination_t dest, std::string request_name,
-                                                      io_blob_list_t cli_buf) override;
+                                                        io_blob_list_t cli_buf) override;
     async_task< sisl::GenericClientResponse >
-    data_service_request_bidirectional(destination_t dest, std::string request_name,
-                                       io_blob_list_t cli_buf) override;
+    data_service_request_bidirectional(destination_t dest, std::string request_name, io_blob_list_t cli_buf) override;
     void send_data_service_response(io_blob_list_t const& outgoing_buf,
                                     boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) override;
 

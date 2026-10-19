@@ -32,7 +32,7 @@ private:
 struct example_app : public nuraft_mesg::messaging_application {
     std::string lookup_peer(nuraft_mesg::peer_id_t const&) override { return {}; }
     std::shared_ptr< nuraft_mesg::mesg_state_mgr > create_state_mgr(int32_t srv_id,
-                                                                     nuraft_mesg::group_id_t const& gid) override {
+                                                                    nuraft_mesg::group_id_t const& gid) override {
         return std::make_shared< example_state_mgr >(srv_id, nuraft_mesg::peer_id_t{}, gid);
     }
 };

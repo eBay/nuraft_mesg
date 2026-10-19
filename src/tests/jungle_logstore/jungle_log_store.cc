@@ -131,7 +131,9 @@ struct jungle_log_store::log_cache {
             cur_idx++;
             itr++;
 
-            if (!le->is_buf_null()) { cur_size += le->get_buf().container_size(); }
+            if (!le->is_buf_null()) {
+                cur_size += le->get_buf().container_size();
+            }
             if (size_hint > 0 && cur_size >= size_hint) {
                 vector_out->resize(cur_idx);
                 break;
@@ -228,7 +230,9 @@ ssize_t jungle_log_store::getCompMaxSize(jungle::DB* db, const jungle::Record& r
 }
 
 ssize_t jungle_log_store::compress(jungle::DB* db, const jungle::Record& src, jungle::SizedBuf& dst) {
-    if (!myOpt.compression || dst.size < 2) { return 0; }
+    if (!myOpt.compression || dst.size < 2) {
+        return 0;
+    }
 
     // NOTE: For future extension, we will make this format
     //       compatible with the one in `storage_engine_jungle`.
@@ -277,7 +281,9 @@ void jungle_log_store::flushLoop() {
             }
         }
 
-        if (flush_required) { flush(); }
+        if (flush_required) {
+            flush();
+        }
 
         for (auto& entry : reqs) {
             std::shared_ptr< FlushElem > cur = entry;
@@ -323,7 +329,9 @@ jungle_log_store::jungle_log_store(const std::string& log_dir, const jungle_log_
     s = jungle::DB::open(&dbInst, log_dir, db_config);
     assert(s.ok());
 
-    if (myOpt.strongDurability) { flushThread = new std::thread(&jungle_log_store::flushLoop, this); }
+    if (myOpt.strongDurability) {
+        flushThread = new std::thread(&jungle_log_store::flushLoop, this);
+    }
 }
 
 jungle_log_store::~jungle_log_store() {
@@ -442,7 +450,9 @@ void jungle_log_store::end_of_append_batch(ulong start, ulong cnt) {
         }
     }
 
-    if (myOpt.cbEndOfBatch) { myOpt.cbEndOfBatch(start, cnt); }
+    if (myOpt.cbEndOfBatch) {
+        myOpt.cbEndOfBatch(start, cnt);
+    }
 }
 
 void jungle_log_store::write_at_internal(ulong index, ptr< log_entry >& entry) {
@@ -517,7 +527,9 @@ ptr< std::vector< ptr< log_entry > > > jungle_log_store::log_entries_ext(ulong s
             (*ret)[idx++] = le;
             rec.free();
 
-            if (!le->is_buf_null()) { cur_size += le->get_buf().container_size(); }
+            if (!le->is_buf_null()) {
+                cur_size += le->get_buf().container_size();
+            }
             if (size_hint > 0 && cur_size >= size_hint) {
                 ret->resize(idx);
                 break;
@@ -705,7 +717,9 @@ bool jungle_log_store::compact(ulong last_log_index) {
     cpt_lat += tt.getElapsedUs();
 
     // Need to tolerate race condition.
-    if (!s && s != jungle::Status::OPERATION_IN_PROGRESS) { return false; }
+    if (!s && s != jungle::Status::OPERATION_IN_PROGRESS) {
+        return false;
+    }
     return true;
 }
 
@@ -716,7 +730,9 @@ bool jungle_log_store::flush() {
 
         uint64_t last_synced_idx = 0;
         s = dbInst->getLastSyncedSeqNum(last_synced_idx);
-        if (s && last_synced_idx) { lastDurableLogIdx = last_synced_idx; }
+        if (s && last_synced_idx) {
+            lastDurableLogIdx = last_synced_idx;
+        }
     }
     return true;
 }

@@ -54,14 +54,17 @@ TEST_F(DataServiceFixture, BasicTest1) {
     (void)app_4->instance_->create_group(data_group, "test_type");
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    auto add1 =
-        app_4->instance_->add_member(data_group, nuraft::srv_config(to_server_id(app_1_->id_), 0, to_string(app_1_->id_), "", false, follower_priority));
+    auto add1 = app_4->instance_->add_member(
+        data_group,
+        nuraft::srv_config(to_server_id(app_1_->id_), 0, to_string(app_1_->id_), "", false, follower_priority));
     EXPECT_TRUE(sync_get(std::move(add1)));
-    auto add2 =
-        app_4->instance_->add_member(data_group, nuraft::srv_config(to_server_id(app_2_->id_), 0, to_string(app_2_->id_), "", false, follower_priority));
+    auto add2 = app_4->instance_->add_member(
+        data_group,
+        nuraft::srv_config(to_server_id(app_2_->id_), 0, to_string(app_2_->id_), "", false, follower_priority));
     EXPECT_TRUE(sync_get(std::move(add2)));
-    auto add5_2 =
-        app_4->instance_->add_member(data_group, nuraft::srv_config(to_server_id(app_5->id_), 0, to_string(app_5->id_), "", true, follower_priority));
+    auto add5_2 = app_4->instance_->add_member(
+        data_group,
+        nuraft::srv_config(to_server_id(app_5->id_), 0, to_string(app_5->id_), "", true, follower_priority));
     EXPECT_TRUE(sync_get(std::move(add5_2)));
     // check priority
     auto repl_ctx = app_4->state_mgr_map_[data_group]->get_repl_context();
@@ -90,12 +93,16 @@ TEST_F(DataServiceFixture, BasicTest1) {
 
     EXPECT_TRUE(sync_get(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, cli_buf)));
 
-    EXPECT_TRUE(sync_get(sm5->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, cli_buf)));
+    EXPECT_TRUE(
+        sync_get(sm5->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, cli_buf)));
 
     {
-        auto r = sync_get(sm4_1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, cli_buf));
+        auto r =
+            sync_get(sm4_1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, cli_buf));
         EXPECT_TRUE(r);
-        if (r) { test_state_mgr::verify_data(r->response_blob()); }
+        if (r) {
+            test_state_mgr::verify_data(r->response_blob());
+        }
     }
 
     EXPECT_TRUE(sync_get(sm1->data_service_request_unidirectional(app_2_->id_, SEND_DATA, cli_buf)));
@@ -115,13 +122,16 @@ TEST_F(DataServiceFixture, BasicTest1) {
     LOGINFO("Starting large object write test")
     io_blob_list_t big_cli_buf;
     test_state_mgr::fill_data_vec_big(big_cli_buf, 4 * 1024 * 1024);
-    EXPECT_TRUE(sync_get(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, big_cli_buf)));
+    EXPECT_TRUE(
+        sync_get(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, SEND_DATA, big_cli_buf)));
     LOGINFO("End large object write test")
-    LOGINFO("Starting large object read test")
-    {
-        auto r = sync_get(sm4_1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, big_cli_buf));
+    LOGINFO("Starting large object read test") {
+        auto r = sync_get(
+            sm4_1->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, REQUEST_DATA, big_cli_buf));
         EXPECT_TRUE(r);
-        if (r) { test_state_mgr::verify_data(r->response_blob()); }
+        if (r) {
+            test_state_mgr::verify_data(r->response_blob());
+        }
     }
     LOGINFO("End large object read test")
     for (auto& buf : big_cli_buf) {
@@ -197,10 +207,12 @@ TEST_F(DataServiceFixture, NegativeTests) {
     auto sm2 = app_2_->state_mgr_map_[group_id_];
 
     // invalid request name — unidirectional to ALL is fire-and-forget, no error
-    EXPECT_TRUE(sync_get(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, "invalid_request", cli_buf)));
+    EXPECT_TRUE(
+        sync_get(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, "invalid_request", cli_buf)));
 
     {
-        auto r = sync_get(sm2->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, "invalid_request", cli_buf));
+        auto r = sync_get(
+            sm2->data_service_request_bidirectional(nuraft_mesg::role_regex::LEADER, "invalid_request", cli_buf));
         EXPECT_FALSE(r);
         EXPECT_EQ(std::error_condition{std::errc::invalid_argument}, r.error());
     }
@@ -213,20 +225,23 @@ TEST_F(DataServiceFixture, NegativeTests) {
     }
 
     {
-        auto r = sync_get(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::LEADER, SEND_DATA, cli_buf));
+        auto r =
+            sync_get(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::LEADER, SEND_DATA, cli_buf));
         EXPECT_FALSE(r);
         EXPECT_EQ(std::error_condition{std::errc::invalid_argument}, r.error());
     }
 
     // invalid peer id
     {
-        auto r = sync_get(sm1->data_service_request_unidirectional(boost::uuids::random_generator()(), REQUEST_DATA, cli_buf));
+        auto r = sync_get(
+            sm1->data_service_request_unidirectional(boost::uuids::random_generator()(), REQUEST_DATA, cli_buf));
         EXPECT_FALSE(r);
         EXPECT_EQ(nuraft_mesg::make_error_condition(nuraft_mesg::errc::failed), r.error());
     }
 
     {
-        auto r = sync_get(sm1->data_service_request_bidirectional(boost::uuids::random_generator()(), REQUEST_DATA, cli_buf));
+        auto r = sync_get(
+            sm1->data_service_request_bidirectional(boost::uuids::random_generator()(), REQUEST_DATA, cli_buf));
         EXPECT_FALSE(r);
         EXPECT_EQ(nuraft_mesg::make_error_condition(nuraft_mesg::errc::failed), r.error());
     }
@@ -246,7 +261,8 @@ TEST_F(DataServiceFixture, NegativeTests) {
     }
 
     {
-        auto r = sync_get(sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::FOLLOWER, REQUEST_DATA, cli_buf));
+        auto r = sync_get(
+            sm1->data_service_request_unidirectional(nuraft_mesg::role_regex::FOLLOWER, REQUEST_DATA, cli_buf));
         EXPECT_FALSE(r);
         EXPECT_EQ(std::error_condition{std::errc::invalid_argument}, r.error());
     }
@@ -254,9 +270,11 @@ TEST_F(DataServiceFixture, NegativeTests) {
     // This should be the last test, this exercises the null-server and null-factory failure paths.
     // Null raft server (factory still present): a make_repl_ctx with a null grpc_server leaves _server null,
     // which the resolve path reports as a failure (no raw _server poke needed -- it's encapsulated now).
-    sm2->set_repl_ctx(std::make_unique< nuraft_mesg::repl_service_ctx_grpc >(nullptr, std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type")));
+    sm2->set_repl_ctx(std::make_unique< nuraft_mesg::repl_service_ctx_grpc >(
+        nullptr, std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type")));
     {
-        auto r = sync_get(sm2->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf));
+        auto r =
+            sync_get(sm2->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf));
         EXPECT_FALSE(r);
         EXPECT_EQ(nuraft_mesg::make_error_condition(nuraft_mesg::errc::failed), r.error());
     }
@@ -264,7 +282,8 @@ TEST_F(DataServiceFixture, NegativeTests) {
     // mesg factory nullptr
     sm2->set_repl_ctx(std::make_unique< nuraft_mesg::repl_service_ctx_grpc >(nullptr, nullptr));
     {
-        auto r = sync_get(sm2->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf));
+        auto r =
+            sync_get(sm2->data_service_request_unidirectional(nuraft_mesg::role_regex::ALL, REQUEST_DATA, cli_buf));
         EXPECT_FALSE(r);
         EXPECT_EQ(nuraft_mesg::make_error_condition(nuraft_mesg::errc::failed), r.error());
     }
@@ -295,7 +314,8 @@ TEST_F(DataServiceFixture, AutoCreateClientTest) {
     app_4->start(true);
 
     // app_1 adds app_4 to the group -> app_1 will have client to app_4
-    auto add4 = app_1_->instance_->add_member(group_id_, nuraft::srv_config(to_server_id(app_4->id_), to_string(app_4->id_)));
+    auto add4 =
+        app_1_->instance_->add_member(group_id_, nuraft::srv_config(to_server_id(app_4->id_), to_string(app_4->id_)));
     std::this_thread::sleep_for(std::chrono::seconds(1));
     EXPECT_TRUE(sync_get(std::move(add4)));
 

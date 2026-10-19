@@ -63,7 +63,9 @@ void data_service_grpc::unbind(group_id_t const& group_id) {
     for (auto it = _request_map.begin(); it != _request_map.end();) {
         if (it->first.size() >= suffix.size() &&
             it->first.compare(it->first.size() - suffix.size(), suffix.size(), suffix) == 0) {
-            if (_grpc_server) { _grpc_server->deregister_generic_rpc(it->first); }
+            if (_grpc_server) {
+                _grpc_server->deregister_generic_rpc(it->first);
+            }
             it = _request_map.erase(it);
         } else {
             ++it;

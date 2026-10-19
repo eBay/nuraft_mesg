@@ -52,8 +52,19 @@ public:
     std::string const raft_worker_name() const;
     std::string const data_worker_name() const;
 
+    // NuRaft rpc_client_factory entry point. Only NuRaft needs a new wrapper /
+    // rpc_client::get_id() so delayed callbacks can be treated as stale; that is
+    // why create_client(string) always force-recreates. All other internal paths
+    // use create_or_reinit_client(), which reuses the wrapper and only refreshes
+    // the underlying messaging_client when needed.
     nuraft::ptr< nuraft::rpc_client > create_client(const std::string& client) override;
-    nuraft::ptr< nuraft::rpc_client > create_client(peer_id_t const& client);
+
+    // Internal entry points for data-path and out-of-band RPCs.
+    // force_recreate defaults to false: keep the existing wrapper identity and
+    // let reinit_client() refresh messaging_client if required. Pass true only
+    // from the NuRaft create_client(string) path.
+    nuraft::ptr< nuraft::rpc_client > create_or_reinit_client(std::string const& client);
+    nuraft::ptr< nuraft::rpc_client > create_or_reinit_client(peer_id_t const& client, bool force_recreate = false);
 
     virtual nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) = 0;
 
@@ -61,11 +72,11 @@ public:
 
     // Construct and send an AddServer message to the cluster
     [[nodiscard]] null_async_task add_server(uint32_t const srv_id, peer_id_t const& srv_addr,
-                                           nuraft::srv_config const& dest_cfg);
+                                             nuraft::srv_config const& dest_cfg);
 
     // Send a client request to the cluster
     [[nodiscard]] null_async_task append_entry(std::shared_ptr< nuraft::buffer > buf,
-                                             nuraft::srv_config const& dest_cfg);
+                                               nuraft::srv_config const& dest_cfg);
 
     // Construct and send a RemoveServer message to the cluster
     [[nodiscard]] null_async_task rem_server(uint32_t const srv_id, nuraft::srv_config const& dest_cfg);
@@ -86,6 +97,7 @@ public:
                   int const max_receive_message_size = 0, int const max_send_message_size = 0);
 
     using grpc_factory::create_client;
+    using grpc_factory::create_or_reinit_client;
     nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >&) override;
     nuraft::cmd_result_code reinit_client(peer_id_t const& client,
                                           std::shared_ptr< nuraft::rpc_client >& raft_client) override;
@@ -111,6 +123,7 @@ public:
     group_id_t group_id() const { return _group_id; }
 
     using grpc_factory::create_client;
+    using grpc_factory::create_or_reinit_client;
     nuraft::cmd_result_code create_client(peer_id_t const& client, nuraft::ptr< nuraft::rpc_client >& rpc_ptr) override;
 
     nuraft::cmd_result_code reinit_client(peer_id_t const& client,

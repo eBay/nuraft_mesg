@@ -32,7 +32,9 @@ struct SEBuf {
      */
     static SEBuf alloc(size_t _len) {
         if (!_len) return SEBuf();
-        if (auto alloc = malloc(_len); nullptr != alloc) { return SEBuf(_len, alloc); }
+        if (auto alloc = malloc(_len); nullptr != alloc) {
+            return SEBuf(_len, alloc);
+        }
         return SEBuf();
     }
 
@@ -105,7 +107,9 @@ struct SEBuf {
      */
     inline void copyTo(SEBuf& dst) const {
         dst = alloc(len);
-        if (len) { memcpy(dst.buf, buf, len); }
+        if (len) {
+            memcpy(dst.buf, buf, len);
+        }
     }
 
     size_t len;

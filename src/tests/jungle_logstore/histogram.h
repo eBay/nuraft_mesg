@@ -160,7 +160,9 @@ public:
     Histogram& operator+=(const Histogram& rhs) {
         count += rhs.getTotal();
         sum += rhs.getSum();
-        if (max < rhs.getMax()) { max = rhs.getMax(); }
+        if (max < rhs.getMax()) {
+            max = rhs.getMax();
+        }
 
         for (size_t i = 0; i < MAX_BINS; ++i) {
             bins[i] += rhs.bins[i];
@@ -173,7 +175,9 @@ public:
     friend Histogram operator+(Histogram lhs, const Histogram& rhs) {
         lhs.count += rhs.getTotal();
         lhs.sum += rhs.getSum();
-        if (lhs.max < rhs.getMax()) { lhs.max = rhs.getMax(); }
+        if (lhs.max < rhs.getMax()) {
+            lhs.max = rhs.getMax();
+        }
 
         for (size_t i = 0; i < MAX_BINS; ++i) {
             lhs.bins[i] += rhs.bins[i];
@@ -231,7 +235,9 @@ public:
     uint64_t getMax() const { return max; }
 
     iterator find(double percentile) {
-        if (percentile <= 0 || percentile >= 100) { return end(); }
+        if (percentile <= 0 || percentile >= 100) {
+            return end();
+        }
 
         double rev = 100 - percentile;
         size_t i;
@@ -241,13 +247,17 @@ public:
 
         for (i = 0; i < MAX_BINS; ++i) {
             sum += bins[i].load(std::memory_order_relaxed);
-            if (sum >= threshold) { return HistItr(i, MAX_BINS, this); }
+            if (sum >= threshold) {
+                return HistItr(i, MAX_BINS, this);
+            }
         }
         return end();
     }
 
     uint64_t estimate(double percentile) {
-        if (percentile <= 0 || percentile >= 100) { return 0; }
+        if (percentile <= 0 || percentile >= 100) {
+            return 0;
+        }
 
         double rev = 100 - percentile;
         size_t i;
@@ -269,7 +279,9 @@ public:
             uint64_t gap = sum - threshold;
             uint64_t u_bound = HistItr(i, MAX_BINS, this).getUpperBound();
             double base = EXP_BASE;
-            if (max < u_bound) { base = (double)max / (u_bound / 2.0); }
+            if (max < u_bound) {
+                base = (double)max / (u_bound / 2.0);
+            }
 
             return (uint64_t)(std::pow(base, (double)gap / n_entries) * u_bound / 2);
         }

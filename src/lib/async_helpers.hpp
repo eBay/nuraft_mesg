@@ -52,7 +52,9 @@ struct wakeup_event {
     std::atomic< bool > _fired{false};
 
     void signal(bool real) noexcept {
-        if (!_fired.exchange(true, std::memory_order_acq_rel)) { _av.complete(real); }
+        if (!_fired.exchange(true, std::memory_order_acq_rel)) {
+            _av.complete(real);
+        }
     }
 };
 

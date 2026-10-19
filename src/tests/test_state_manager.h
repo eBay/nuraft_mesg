@@ -50,8 +50,8 @@ public:
     data_service_request_bidirectional(nuraft_mesg::destination_t const& dest, std::string const& request_name,
                                        nuraft_mesg::io_blob_list_t const& cli_buf);
     nuraft_mesg::null_async_task data_service_request_unidirectional(nuraft_mesg::destination_t const& dest,
-                                                                   std::string const& request_name,
-                                                                   nuraft_mesg::io_blob_list_t const& cli_buf);
+                                                                     std::string const& request_name,
+                                                                     nuraft_mesg::io_blob_list_t const& cli_buf);
 
     bool register_data_service_apis(nuraft_mesg::manager* messaging);
     static void fill_data_vec(nuraft_mesg::io_blob_list_t& cli_buf, uint32_t size_bytes);
@@ -63,7 +63,7 @@ public:
     // Re-expose the (now protected) internal setup so the white-box tests can rebuild the ctx with null
     // server/factory to exercise failure paths.
     using nuraft_mesg::mesg_state_mgr::set_repl_ctx;
-    std::shared_ptr<test_state_machine> get_sm() { return _state_machine; }
+    std::shared_ptr< test_state_machine > get_sm() { return _state_machine; }
 
     nuraft::cb_func::ReturnCode raft_event(nuraft::cb_func::Type type, nuraft::cb_func::Param* param) override;
 

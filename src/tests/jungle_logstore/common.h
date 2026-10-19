@@ -187,7 +187,9 @@ public:
         while (dir_info && (dir_entry = readdir(dir_info))) {
             files_out.push_back(dir_entry->d_name);
         }
-        if (dir_info) { closedir(dir_info); }
+        if (dir_info) {
+            closedir(dir_info);
+        }
         return 0;
     }
     static uint64_t dirSize(const std::string& path, bool recursive = false) {
@@ -204,13 +206,17 @@ public:
 
             if (dir_entry->d_type == DT_REG) {
                 struct stat st;
-                if (stat(full_path.c_str(), &st) == 0) { ret += st.st_size; }
+                if (stat(full_path.c_str(), &st) == 0) {
+                    ret += st.st_size;
+                }
 
             } else if (recursive && dir_entry->d_type == DT_DIR) {
                 ret += dirSize(full_path, recursive);
             }
         }
-        if (dir_info) { closedir(dir_info); }
+        if (dir_info) {
+            closedir(dir_info);
+        }
         return ret;
     }
     static std::string getDirPart(const std::string& full_path) {
@@ -254,7 +260,9 @@ public:
         fs << ctx;
         if (fsync) {
             int fd = getFd(*fs.rdbuf());
-            if (fd) { ::fsync(fd); }
+            if (fd) {
+                ::fsync(fd);
+            }
         }
         fs.close();
     }
@@ -358,7 +366,9 @@ public:
             last = pos + before.size();
             pos = src_str.find(before, last);
         }
-        if (last < src_str.size()) { ret += src_str.substr(last); }
+        if (last < src_str.size()) {
+            ret += src_str.substr(last);
+        }
         return ret;
     }
 
@@ -374,7 +384,9 @@ public:
             last = pos + delim.size();
             pos = src.find(delim, last);
         }
-        if (last < src.size()) { ret.push_back(src.substr(last)); }
+        if (last < src.size()) {
+            ret.push_back(src.substr(last));
+        }
         return ret;
     }
 

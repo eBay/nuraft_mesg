@@ -13,6 +13,7 @@
  *
  *********************************************************************************/
 #include <future>
+#include <mutex>
 #include <string>
 
 #include <libnuraft/async.hxx>
@@ -107,18 +108,29 @@ public:
 
     std::atomic_uint bad_service{0};
 
+    // is_connection_ready() (GRPC_CHANNEL_READY only) is too strict to gate a reinit decision: IDLE and
+    // CONNECTING are normal transient states a fresh or momentarily-busy channel passes through on its own,
+    // not failures. Treating them as "broken" makes reinit_client() tear down and recreate the shared
+    // channel on every check during that window -- which, now that reinit_client() refreshes group_factory's
+    // cache (shared by every group/caller on this node), turns into concurrent churn that never lets the
+    // channel settle and stresses gRPC's own connection teardown/setup far more than necessary. Only treat
+    // the channel as actually broken once gRPC itself reports it that way.
+    bool is_unrecoverable() const {
+        auto const state = m_channel->GetState(true);
+        return state == grpc_connectivity_state::GRPC_CHANNEL_TRANSIENT_FAILURE ||
+            state == grpc_connectivity_state::GRPC_CHANNEL_SHUTDOWN;
+    }
+
     void send_grp(RaftGroupMsg const& message, handle_resp complete) {
-        auto weak_this = std::weak_ptr< messaging_client >(shared_from_this());
-        auto group_compl = [weak_this, complete](auto response, auto status) mutable {
+        // Hold a strong ref so this client (and its stub/channel) cannot be destroyed while the gRPC
+        // call is in flight; the completion runs on a gRPC worker thread, possibly after reinit_client()
+        // has already swapped this messaging_client out of group_factory's cache.
+        auto self = shared_from_this();
+        auto group_compl = [self, complete](auto response, auto status) mutable {
             if (::grpc::INVALID_ARGUMENT == status.error_code()) {
-                if (auto mc = weak_this.lock(); mc) {
-                    mc->bad_service.fetch_add(1, std::memory_order_relaxed);
-                    LOGE("Sent message to wrong service, need to disconnect! Error Message: [{}] Client IP: [{}]",
-                         status.error_message(), mc->_addr);
-                } else {
-                    LOGE("Sent message to wrong service, need to disconnect! Error Message: [{}]",
-                         status.error_message());
-                }
+                self->bad_service.fetch_add(1, std::memory_order_relaxed);
+                LOGE("Sent message to wrong service, need to disconnect! Error Message: [{}] Client IP: [{}]",
+                     status.error_message(), self->_addr);
             }
             complete(*response.mutable_msg(), status);
         };
@@ -146,7 +158,7 @@ public:
     }
 
     async_task< sisl::GenericClientResponse > data_service_request_bidirectional(std::string request_name,
-                                                                                io_blob_list_t cli_buf) {
+                                                                                 io_blob_list_t cli_buf) {
         auto self = shared_from_this();
         auto response = co_await _generic_stub->call_unary_co(
             cli_buf, request_name, NURAFT_MESG_CONFIG(mesg_factory_config->data_request_deadline_secs));
@@ -163,18 +175,28 @@ protected:
 };
 
 class grpc_proto_client : public grpc_base_client {
+    // Written by setClient() (reinit path) and read by send_raft()/data_service_request_*() from
+    // whichever thread NuRaft or a data-path caller happens to be running on, concurrently and
+    // without any other shared lock -- plain std::shared_ptr is not safe for that, so access is
+    // guarded by _client_mtx instead.
+    mutable std::mutex _client_mtx;
     std::shared_ptr< messaging_client > _client;
     group_id_t const _group_id;
     group_type_t const _group_type;
     std::shared_ptr< group_metrics > _metrics;
     std::string const _client_addr;
 
+    std::shared_ptr< messaging_client > client() const {
+        std::lock_guard< std::mutex > lk(_client_mtx);
+        return _client;
+    }
+
 public:
     grpc_proto_client(std::shared_ptr< messaging_client > client, peer_id_t const& client_addr,
                       group_id_t const& grp_name, group_type_t const& grp_type,
                       std::shared_ptr< sisl::MetricsGroup > metrics) :
             grpc_base_client(),
-            _client(client),
+            _client(std::move(client)),
             _group_id(grp_name),
             _group_type(grp_type),
             _metrics(std::static_pointer_cast< group_metrics >(metrics)),
@@ -182,9 +204,14 @@ public:
 
     ~grpc_proto_client() override = default;
 
-    std::shared_ptr< messaging_client > realClient() { return _client; }
-    void setClient(std::shared_ptr< messaging_client > new_client) { _client = new_client; }
-    bool reinitRequired() const { return (!_client || 0 < _client->bad_service.load(std::memory_order_relaxed)); }
+    void setClient(std::shared_ptr< messaging_client > new_client) {
+        std::lock_guard< std::mutex > lk(_client_mtx);
+        _client = std::move(new_client);
+    }
+    bool reinitRequired() const {
+        auto c = client();
+        return (!c || 0 < c->bad_service.load(std::memory_order_relaxed));
+    }
 
     void send_raft(RaftMessage const& message, handle_resp complete) {
         RaftGroupMsg group_msg;
@@ -199,19 +226,19 @@ public:
         group_msg.set_group_id(to_string(_group_id));
         group_msg.set_group_type(_group_type);
         group_msg.mutable_msg()->CopyFrom(message);
-        _client->send_grp(group_msg, complete);
+        client()->send_grp(group_msg, complete);
     }
 
     // Returns the messaging_client's lazy task directly; that coroutine holds its own strong self-ref,
     // so it is safe even if this grpc_proto_client is destroyed before the task completes.
     null_async_task data_service_request_unidirectional(std::string const& request_name,
-                                                      io_blob_list_t const& cli_buf) {
-        return _client->data_service_request_unidirectional(request_name, cli_buf);
+                                                        io_blob_list_t const& cli_buf) {
+        return client()->data_service_request_unidirectional(request_name, cli_buf);
     }
 
     async_task< sisl::GenericClientResponse > data_service_request_bidirectional(std::string const& request_name,
-                                                                                io_blob_list_t const& cli_buf) {
-        return _client->data_service_request_bidirectional(request_name, cli_buf);
+                                                                                 io_blob_list_t const& cli_buf) {
+        return client()->data_service_request_bidirectional(request_name, cli_buf);
     }
 };
 
@@ -219,7 +246,7 @@ nuraft::cmd_result_code mesg_factory::create_client(peer_id_t const& client,
                                                     nuraft::ptr< nuraft::rpc_client >& raft_client) {
     // Re-direct this call to a global factory so we can re-use clients to the same endpoints
     LOGD("Creating client to {}", client);
-    auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_client(to_string(client)));
+    auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_or_reinit_client(client));
     if (!m_client) return nuraft::CANCELLED;
     raft_client = std::make_shared< grpc_proto_client >(m_client, client, _group_id, _group_type, _metrics);
     return (!raft_client) ? nuraft::BAD_REQUEST : nuraft::OK;
@@ -229,20 +256,23 @@ nuraft::cmd_result_code mesg_factory::reinit_client(peer_id_t const& client,
                                                     std::shared_ptr< nuraft::rpc_client >& raft_client) {
     LOGD("Re-init client to {}", client);
     auto g_client = std::dynamic_pointer_cast< grpc_proto_client >(raft_client);
-    auto new_raft_client = std::static_pointer_cast< nuraft::rpc_client >(g_client->realClient());
-    if (auto err = _group_factory->reinit_client(client, new_raft_client); err) {
-        return err;
-    }
-    g_client->setClient(std::dynamic_pointer_cast< messaging_client >(new_raft_client));
+    if (!g_client) return nuraft::BAD_REQUEST;
+
+    // Refresh the shared messaging_client through group_factory's cache, then update this wrapper in place.
+    auto m_client = std::dynamic_pointer_cast< messaging_client >(_group_factory->create_or_reinit_client(client));
+    if (!m_client) return nuraft::CANCELLED;
+    g_client->setClient(m_client);
     return nuraft::OK;
 }
 
 null_async_task mesg_factory::data_service_request_unidirectional(resolved_dest dest, std::string request_name,
-                                                                 io_blob_list_t cli_buf) {
+                                                                  io_blob_list_t cli_buf) {
     // NOTE: all `this`-state (client map, create_client) is touched BEFORE the first co_await, so the
     // factory need not be kept alive past suspension; the per-client tasks own what they need.
-    if (!dest) { co_return std::unexpected(dest.error()); } // destination could not be resolved
-    if (dest->has_value()) {                                // a specific peer
+    if (!dest) {
+        co_return std::unexpected(dest.error());
+    } // destination could not be resolved
+    if (dest->has_value()) { // a specific peer
         auto const peer = dest->value();
 
         // Resolve (or create) the client under the read lock, then release it before suspending.
@@ -255,7 +285,7 @@ null_async_task mesg_factory::data_service_request_unidirectional(resolved_dest 
         }
         if (!g_client) {
             LOGI("Client not found, attempting to create client for [{}], request name [{}]", peer, request_name);
-            g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(create_client(peer));
+            g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(create_or_reinit_client(peer));
         }
         if (!g_client) {
             LOGE("Failed to create client for [{}], request name [{}]", peer, request_name);
@@ -280,10 +310,11 @@ null_async_task mesg_factory::data_service_request_unidirectional(resolved_dest 
 }
 
 async_task< sisl::GenericClientResponse >
-mesg_factory::data_service_request_bidirectional(resolved_dest dest, std::string request_name,
-                                                 io_blob_list_t cli_buf) {
-    if (!dest) { co_return std::unexpected(dest.error()); } // destination could not be resolved
-    if (!dest->has_value()) {                               // broadcast: not supported for a bidirectional request
+mesg_factory::data_service_request_bidirectional(resolved_dest dest, std::string request_name, io_blob_list_t cli_buf) {
+    if (!dest) {
+        co_return std::unexpected(dest.error());
+    } // destination could not be resolved
+    if (!dest->has_value()) { // broadcast: not supported for a bidirectional request
         LOGE("Cannot send request to all the peers, not implemented yet!. Request name [{}]", request_name);
         co_return std::unexpected(to_condition(nuraft::cmd_result_code::BAD_REQUEST));
     }
@@ -303,7 +334,7 @@ mesg_factory::data_service_request_bidirectional(resolved_dest dest, std::string
     if (!g_client) {
         // Client not found or needs reinit - use create_client to handle both cases
         LOGI("Client not found, attempting to create client for [{}], request name [{}]", peer, request_name);
-        g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(create_client(peer));
+        g_client = std::dynamic_pointer_cast< nuraft_mesg::grpc_proto_client >(create_or_reinit_client(peer));
     }
     if (!g_client) {
         LOGE("Failed to create/reinit client for [{}], request name [{}]", peer, request_name);
@@ -345,7 +376,7 @@ nuraft::cmd_result_code group_factory::reinit_client(peer_id_t const& client,
     LOGD("Re-init client to {}", client);
     assert(raft_client);
     auto mesg_client = std::dynamic_pointer_cast< messaging_client >(raft_client);
-    if (!mesg_client->is_connection_ready() || 0 < mesg_client->bad_service.load(std::memory_order_relaxed)) {
+    if (mesg_client->is_unrecoverable() || 0 < mesg_client->bad_service.load(std::memory_order_relaxed)) {
         return create_client(client, raft_client);
     }
     return nuraft::OK;

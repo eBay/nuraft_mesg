@@ -125,6 +125,25 @@ struct custom_factory : public nuraft_mesg::group_factory {
     custom_factory(int const raft_threads, int const data_threads, nuraft_mesg::group_id_t const& name) :
             nuraft_mesg::group_factory::group_factory(raft_threads, data_threads, name, nullptr) {}
 
+    // This fixture treats the cached messaging_client as healthy unless the
+    // test explicitly forces a reconnect. This avoids coupling cache-sharing
+    // tests to the asynchronous gRPC channel readiness state.
+    nuraft::cmd_result_code reinit_client(nuraft_mesg::peer_id_t const& client,
+                                          std::shared_ptr< nuraft::rpc_client >& raft_client) override {
+        if (force_recreate_) {
+            return group_factory::create_client(client, raft_client);
+        }
+        return nuraft::OK;
+    }
+
+    void force_recreate(bool value) { force_recreate_ = value; }
+
+    std::shared_ptr< nuraft::rpc_client > cached_transport(nuraft_mesg::peer_id_t const& peer) {
+        std::shared_lock< client_factory_lock_type > lock(_client_lock);
+        auto const it = _clients.find(peer);
+        return it == _clients.end() ? nullptr : it->second;
+    }
+
     std::string lookup_endpoint(nuraft_mesg::peer_id_t const& peer) override {
         auto lg = std::scoped_lock(lookup_lock_);
         return (lookup_map_.count(peer) > 0) ? lookup_map_[peer] : std::string();
@@ -136,6 +155,7 @@ struct custom_factory : public nuraft_mesg::group_factory {
     }
     std::mutex lookup_lock_;
     std::map< nuraft_mesg::peer_id_t, std::string > lookup_map_;
+    bool force_recreate_{false};
 };
 
 extern nuraft::ptr< nuraft::cluster_config > fromClusterConfig(nlohmann::json const& cluster_config);
@@ -163,7 +183,9 @@ protected:
         auto cur_size = ports.size();
         for (; ports.size() < cur_size + n;) {
             uint32_t r = test_state_mgr::get_random_num();
-            if (std::find(ports.begin(), ports.end(), r) == ports.end()) { ports.emplace_back(r); }
+            if (std::find(ports.begin(), ports.end(), r) == ports.end()) {
+                ports.emplace_back(r);
+            }
         }
     }
 
@@ -201,7 +223,8 @@ protected:
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
         // Use app1 to add Server 3
-        auto add2 = app_1_->instance_->add_member(group_id_, nuraft::srv_config(to_server_id(app_2_->id_), to_string(app_2_->id_)));
+        auto add2 = app_1_->instance_->add_member(
+            group_id_, nuraft::srv_config(to_server_id(app_2_->id_), to_string(app_2_->id_)));
         std::this_thread::sleep_for(std::chrono::seconds(1));
         EXPECT_TRUE(sync_get(std::move(add2)));
 
@@ -210,7 +233,7 @@ protected:
 
         // Use custom factory to add Server 3
         auto factory = std::make_shared< mesg_factory >(custom_factory_, group_id_, "test_type");
-        auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_),to_string(app_1_->id_));
+        auto const dest_cfg = nuraft::srv_config(to_server_id(app_1_->id_), to_string(app_1_->id_));
         EXPECT_TRUE(sync_get(factory->add_server(to_server_id(app_3_->id_), app_3_->id_, dest_cfg)));
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }

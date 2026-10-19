@@ -45,15 +45,13 @@ TEST_F(ThreadPoolFixture, NoHeadOfLineBlockingWithSlowAppendEntries) {
     // trigger leadership change (uses vote messages on Raft thread pool)
     auto vote_start = std::chrono::steady_clock::now();
     auto result = sync_get(app_3_->instance_->become_leader(group_id_));
-    auto vote_elapsed_ms = std::chrono::duration_cast< std::chrono::milliseconds >(
-                               std::chrono::steady_clock::now() - vote_start)
-                               .count();
+    auto vote_elapsed_ms =
+        std::chrono::duration_cast< std::chrono::milliseconds >(std::chrono::steady_clock::now() - vote_start).count();
 
     // Vote should complete quickly (< 5s) despite app_2's I/O pool being blocked
     // This proves fast messages (votes) don't wait behind slow messages (append_entries)
     EXPECT_TRUE(result) << "Leadership change should succeed";
-    EXPECT_LT(vote_elapsed_ms, 5000) << "Vote took " << vote_elapsed_ms
-                                      << "ms - I/O pool is blocking Raft thread!";
+    EXPECT_LT(vote_elapsed_ms, 5000) << "Vote took " << vote_elapsed_ms << "ms - I/O pool is blocking Raft thread!";
 
     LOGINFO("Leadership change completed in {}ms while app_2 had slow append_entries", vote_elapsed_ms);
 }
@@ -65,7 +63,9 @@ TEST_F(ThreadPoolFixture, AppendEntriesSucceedThroughPools) {
     // Send multiple append_entries - these route through I/O pool
     int success_count = 0;
     for (int i = 0; i < 20; ++i) {
-        if (sync_get(app_1_->impl_inst_->append_entries(group_id_, {buf}))) { ++success_count; }
+        if (sync_get(app_1_->impl_inst_->append_entries(group_id_, {buf}))) {
+            ++success_count;
+        }
     }
 
     EXPECT_EQ(success_count, 20) << "All append_entries should succeed through I/O pool";
@@ -76,9 +76,8 @@ TEST_F(ThreadPoolFixture, FastMessagesProcessedOnRaftThread) {
     // Trigger leadership change (uses pre_vote and vote - fast path on Raft thread)
     auto start_time = std::chrono::steady_clock::now();
     EXPECT_TRUE(sync_get(app_3_->instance_->become_leader(group_id_)));
-    auto elapsed_ms = std::chrono::duration_cast< std::chrono::milliseconds >(
-                          std::chrono::steady_clock::now() - start_time)
-                          .count();
+    auto elapsed_ms =
+        std::chrono::duration_cast< std::chrono::milliseconds >(std::chrono::steady_clock::now() - start_time).count();
 
     // Leadership change should complete within a reasonable time (< 5s)
     EXPECT_LT(elapsed_ms, 5000) << "Leadership change (fast path) took too long: " << elapsed_ms << "ms";

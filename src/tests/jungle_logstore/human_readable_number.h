@@ -13,7 +13,9 @@ public:
     HumanReadableNumber(const std::string& str_in) : str(str_in) {
         try {
             conv(str_in, size_in_bytes);
-        } catch (std::exception& e) { throw std::invalid_argument("Convert fails input : " + str_in + " " + e.what()); }
+        } catch (std::exception& e) {
+            throw std::invalid_argument("Convert fails input : " + str_in + " " + e.what());
+        }
     };
 
     HumanReadableNumber(const unsigned long long& size_in) : size_in_bytes(size_in) {
@@ -31,12 +33,16 @@ public:
 
         try {
             coeff = stod(in, &pos);
-        } catch (std::invalid_argument& einval) { throw einval; } catch (std::out_of_range& erange) {
+        } catch (std::invalid_argument& einval) {
+            throw einval;
+        } catch (std::out_of_range& erange) {
             throw erange;
         }
 
         // if coeff is less than zero, return
-        if (coeff <= 0.0) { throw std::invalid_argument("Numeric factor less than or equal to zero"); }
+        if (coeff <= 0.0) {
+            throw std::invalid_argument("Numeric factor less than or equal to zero");
+        }
 
         auto it = in.begin();
         std::advance(it, pos);
@@ -122,7 +128,9 @@ public:
     unsigned long long toBytes() const { return size_in_bytes; }
 
     HumanReadableNumber& operator=(const HumanReadableNumber& hh) {
-        if (this == &hh) { return *this; }
+        if (this == &hh) {
+            return *this;
+        }
 
         str = hh.str;
         size_in_bytes = hh.size_in_bytes;

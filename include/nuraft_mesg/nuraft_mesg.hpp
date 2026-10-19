@@ -78,7 +78,7 @@ public:
     std::shared_ptr< mesg_state_mgr > lookup_state_manager(group_id_t const& group_id) const;
     [[nodiscard]] null_async_task create_group(group_id_t const& group_id, group_type_t const& group_type);
     [[nodiscard]] null_result join_group(group_id_t const& group_id, group_type_t const& group_type,
-                                        std::shared_ptr< mesg_state_mgr >);
+                                         std::shared_ptr< mesg_state_mgr >);
 
     // Send a client request to the cluster
     [[nodiscard]] null_async_task add_member(group_id_t const& group_id, peer_id_t const& server_id);

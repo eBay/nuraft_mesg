@@ -70,7 +70,7 @@ public:
         return last_commit_idx_;
     }
 
-    std::atomic<int> append_delay_ms_;  // Made public for test_state_mgr access
+    std::atomic< int > append_delay_ms_; // Made public for test_state_mgr access
 
 private:
     std::mutex lock_;

@@ -56,8 +56,10 @@ resolved_dest repl_service_ctx_grpc::resolve_dest(destination_t const& dest) con
 }
 
 null_async_task repl_service_ctx_grpc::data_service_request_unidirectional(destination_t dest, std::string request_name,
-                                                                        io_blob_list_t cli_buf) {
-    if (!m_mesg_factory) { co_return std::unexpected(to_condition(nuraft::cmd_result_code::SERVER_NOT_FOUND)); }
+                                                                           io_blob_list_t cli_buf) {
+    if (!m_mesg_factory) {
+        co_return std::unexpected(to_condition(nuraft::cmd_result_code::SERVER_NOT_FOUND));
+    }
     co_return co_await m_mesg_factory->data_service_request_unidirectional(resolve_dest(dest), std::move(request_name),
                                                                            std::move(cli_buf));
 }
@@ -65,7 +67,9 @@ null_async_task repl_service_ctx_grpc::data_service_request_unidirectional(desti
 async_task< sisl::GenericClientResponse >
 repl_service_ctx_grpc::data_service_request_bidirectional(destination_t dest, std::string request_name,
                                                           io_blob_list_t cli_buf) {
-    if (!m_mesg_factory) { co_return std::unexpected(to_condition(nuraft::cmd_result_code::SERVER_NOT_FOUND)); }
+    if (!m_mesg_factory) {
+        co_return std::unexpected(to_condition(nuraft::cmd_result_code::SERVER_NOT_FOUND));
+    }
     co_return co_await m_mesg_factory->data_service_request_bidirectional(resolve_dest(dest), std::move(request_name),
                                                                           std::move(cli_buf));
 }

@@ -230,7 +230,9 @@ StatMgr::IoStat StatMgr::getIoStat(const std::string& path) {
 
     // Get device name from partition name.
     std::string dev_name;
-    if (!partition_name.empty()) { dev_name = partition_name.substr(0, partition_name.size() - 1); }
+    if (!partition_name.empty()) {
+        dev_name = partition_name.substr(0, partition_name.size() - 1);
+    }
 
     // Rewind.
     fs.seekg(0, fs.beg);

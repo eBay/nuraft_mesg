@@ -62,7 +62,9 @@ void msg_service::associate(::sisl::GrpcServer* server) {
 
 void msg_service::bind(::sisl::GrpcServer* server) {
     RELEASE_ASSERT(server, "NULL server!");
-    if (_data_service_enabled) { _data_service.bind(); }
+    if (_data_service_enabled) {
+        _data_service.bind();
+    }
 }
 
 bool msg_service::bind_data_service_request(std::string const& request_name, group_id_t const& group_id,
@@ -96,7 +98,9 @@ bool msg_service::become_leader(group_id_t const& group_id) {
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         try {
             return it->second.m_server->request_leadership();
-        } catch (std::runtime_error& rte) { LOGE("Caught exception during request_leadership(): {}", rte.what()) }
+        } catch (std::runtime_error& rte) {
+            LOGE("Caught exception during request_leadership(): {}", rte.what())
+        }
     }
     LOGW("Unknown [group={}] cannot get config.", group_id);
     return false;
@@ -108,14 +112,16 @@ void msg_service::get_srv_config_all(group_id_t const& group_id,
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         try {
             it->second.m_server->get_srv_config_all(configs_out);
-        } catch (std::runtime_error& rte) { LOGE("Caught exception during add_srv(): {}", rte.what()); }
+        } catch (std::runtime_error& rte) {
+            LOGE("Caught exception during add_srv(): {}", rte.what());
+        }
     } else {
         LOGW("Unknown [group={}] cannot get config.", group_id);
     }
 }
 
-sisl::async::task< nuraft::cmd_result_code > msg_service::append_entries(group_id_t const& group_id,
-                                                                         std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
+sisl::async::task< nuraft::cmd_result_code >
+msg_service::append_entries(group_id_t const& group_id, std::vector< nuraft::ptr< nuraft::buffer > > const& logs) {
     std::shared_lock lk(_raft_servers_mutex);
     if (auto it = _raft_servers.find(group_id); _raft_servers.end() != it) {
         return continue_resp(it->second.m_server->append_entries(logs), group_id);
@@ -167,7 +173,9 @@ nuraft::cmd_result_code msg_service::joinRaftGroup(int32_t const srv_id, group_i
     }
 
     auto metrics = std::shared_ptr< group_metrics >();
-    if (0 < SISL_OPTIONS.count("msg_metrics")) { metrics = std::make_shared< group_metrics >(group_id); }
+    if (0 < SISL_OPTIONS.count("msg_metrics")) {
+        metrics = std::make_shared< group_metrics >(group_id);
+    }
 
     nuraft::context* ctx{nullptr};
     if (auto err = mgr->group_init(srv_id, group_id, g_type, ctx, metrics); err) {
@@ -181,8 +189,7 @@ nuraft::cmd_result_code msg_service::joinRaftGroup(int32_t const srv_id, group_i
     auto server = std::make_shared< nuraft::raft_server >(ctx);
 
     std::unique_lock lk(_raft_servers_mutex);
-    if (auto [it, happened] =
-            _raft_servers.try_emplace(group_id, metrics, std::make_unique< grpc_server >(server));
+    if (auto [it, happened] = _raft_servers.try_emplace(group_id, metrics, std::make_unique< grpc_server >(server));
         happened) {
         if (_data_service_enabled) {
             auto smgr = std::dynamic_pointer_cast< mesg_state_mgr >(ctx->state_mgr_);
@@ -199,7 +206,9 @@ void msg_service::leave_group(group_id_t const& group_id) {
     // Stop dispatching data-service RPCs (push/fetch) to this group before tearing it down. The handlers capture
     // the consumer's raw repl-dev pointer; leaving them bound past the group's lifetime lets a late RPC dereference
     // freed memory (use-after-free). Done unconditionally (even if the raft server is already gone).
-    if (_data_service_enabled) { _data_service.unbind(group_id); }
+    if (_data_service_enabled) {
+        _data_service.unbind(group_id);
+    }
 
     std::shared_ptr< nuraft::raft_server > raft_srv;
     {

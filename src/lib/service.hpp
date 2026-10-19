@@ -19,9 +19,7 @@
 namespace std {
 template <>
 struct hash< boost::uuids::uuid > {
-    size_t operator()(const boost::uuids::uuid& uid) const {
-        return boost::hash< boost::uuids::uuid >()(uid);
-    }
+    size_t operator()(const boost::uuids::uuid& uid) const { return boost::hash< boost::uuids::uuid >()(uid); }
 };
 } // namespace std
 
@@ -29,8 +27,7 @@ namespace nuraft_mesg {
 
 class group_metrics : public sisl::MetricsGroup {
 public:
-    explicit group_metrics(group_id_t const& group_id) :
-            sisl::MetricsGroup("RAFTGroup", to_string(group_id)) {
+    explicit group_metrics(group_id_t const& group_id) : sisl::MetricsGroup("RAFTGroup", to_string(group_id)) {
         REGISTER_COUNTER(group_steps, "Total group messages received", "raft_group_cnt", {"op", "step_count"});
         REGISTER_COUNTER(group_sends, "Total group messages sent", "raft_group_cnt", {"op", "send_count"});
         REGISTER_HISTOGRAM(append_entries_latency_us, "Latency for processing raft step", "raft_group_latency",
@@ -85,8 +82,8 @@ public:
     sisl::async::task< nuraft::cmd_result_code > add_member(group_id_t const& group_id, nuraft::srv_config const& cfg);
     sisl::async::task< nuraft::cmd_result_code > rem_member(group_id_t const& group_id, int const member_id);
     bool become_leader(group_id_t const& group_id);
-    sisl::async::task< nuraft::cmd_result_code > append_entries(group_id_t const& group_id,
-                                                               std::vector< nuraft::ptr< nuraft::buffer > > const& logs);
+    sisl::async::task< nuraft::cmd_result_code >
+    append_entries(group_id_t const& group_id, std::vector< nuraft::ptr< nuraft::buffer > > const& logs);
 
     void get_srv_config_all(group_id_t const& group_id,
                             std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out);

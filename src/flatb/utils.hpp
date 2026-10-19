@@ -23,5 +23,4 @@
 
 #include "lib/common_lib.hpp"
 
-namespace nuraft_mesg {
-} // namespace nuraft_mesg
+namespace nuraft_mesg {} // namespace nuraft_mesg

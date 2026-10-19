@@ -125,7 +125,9 @@ public:
 
     std::string getActualFunction() const {
         size_t level = getNumStacks();
-        if (!level) { return statName; }
+        if (!level) {
+            return statName;
+        }
 
         size_t pos = statName.rfind(" ## ");
         return statName.substr(pos + 4);
@@ -138,7 +140,9 @@ public:
         for (auto& entry : hist) {
             HistItr& itr = entry;
             uint64_t cnt = itr.getCount();
-            if (cnt) { ret.insert(std::make_pair(itr.getUpperBound(), cnt)); }
+            if (cnt) {
+                ret.insert(std::make_pair(itr.getUpperBound(), cnt));
+            }
         }
         return ret;
     }
@@ -162,7 +166,9 @@ public:
     size_t getSize() const {
         size_t ret = 0;
         for (auto& entry : map) {
-            if (entry.second->getNumCalls()) { ret++; }
+            if (entry.second->getNumCalls()) {
+                ret++;
+            }
         }
         return ret;
     }
@@ -191,7 +197,9 @@ public:
     LatencyItem* get(const std::string& bin_name) {
         LatencyItem* item = nullptr;
         auto entry = map.find(bin_name);
-        if (entry != map.end()) { item = entry->second; }
+        if (entry != map.end()) {
+            item = entry->second;
+        }
         return item;
     }
 
@@ -232,7 +240,9 @@ public:
 
     void addStatName(const std::string& lat_name) {
         MapWrapperSP cur_map = latestMap;
-        if (!cur_map->get(lat_name)) { cur_map->addItem(lat_name); } // Otherwise: already exists.
+        if (!cur_map->get(lat_name)) {
+            cur_map->addItem(lat_name);
+        } // Otherwise: already exists.
     }
 
     void addLatency(const std::string& lat_name, uint64_t lat_value) {

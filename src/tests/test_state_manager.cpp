@@ -113,9 +113,12 @@ test_state_mgr::test_state_mgr(int32_t srv_id, nuraft_mesg::peer_id_t const& srv
 nuraft::ptr< nuraft::cluster_config > test_state_mgr::load_config() {
     LOGDEBUG("Loading config for [{}]", _group_id);
     json config_map;
-    if (auto err = loadConfigFile(config_map, _group_id, _srv_id); !err) { return fromClusterConfig(config_map); }
+    if (auto err = loadConfigFile(config_map, _group_id, _srv_id); !err) {
+        return fromClusterConfig(config_map);
+    }
     auto conf = nuraft::cs_new< nuraft::cluster_config >();
-    conf->get_servers().push_back(nuraft::cs_new< nuraft::srv_config >(_srv_id, 0, to_string(_srv_addr), "", false, 100));
+    conf->get_servers().push_back(
+        nuraft::cs_new< nuraft::srv_config >(_srv_id, 0, to_string(_srv_addr), "", false, 100));
     return conf;
 }
 
@@ -131,7 +134,9 @@ nuraft::ptr< nuraft::srv_state > test_state_mgr::read_state() {
         try {
             state->set_term(static_cast< uint64_t >(state_map["term"]));
             state->set_voted_for(static_cast< int >(state_map["voted_for"]));
-        } catch (std::out_of_range& e) { LOGWARN("State file was not in the expected format!"); }
+        } catch (std::out_of_range& e) {
+            LOGWARN("State file was not in the expected format!");
+        }
     }
     return state;
 }
@@ -145,8 +150,12 @@ void test_state_mgr::save_config(const nuraft::cluster_config& config) {
                          {"servers", toServers(const_cast< nuraft::cluster_config& >(config).get_servers())}};
     try {
         std::ofstream ostrm(config_file, std::ios::binary);
-        if (ostrm.is_open()) { ostrm << json_obj; }
-    } catch (std::exception& e) { LOGERROR("Failed to write config values: {}", e.what()); }
+        if (ostrm.is_open()) {
+            ostrm << json_obj;
+        }
+    } catch (std::exception& e) {
+        LOGERROR("Failed to write config values: {}", e.what());
+    }
 }
 
 void test_state_mgr::save_state(const nuraft::srv_state& state) {
@@ -155,8 +164,12 @@ void test_state_mgr::save_state(const nuraft::srv_state& state) {
 
     try {
         std::ofstream ostrm(state_file, std::ios::binary);
-        if (ostrm.is_open()) { ostrm << json_obj; }
-    } catch (std::exception& e) { LOGERROR("Failed to write config values: {}", e.what()); }
+        if (ostrm.is_open()) {
+            ostrm << json_obj;
+        }
+    } catch (std::exception& e) {
+        LOGERROR("Failed to write config values: {}", e.what());
+    }
 }
 
 uint32_t test_state_mgr::get_logstore_id() const { return 0; }
@@ -198,13 +211,12 @@ bool test_state_mgr::register_data_service_apis(nuraft_mesg::manager* messaging)
                    rpc_data->set_comp_cb([](boost::intrusive_ptr< sisl::GenericRpcData >&) { server_counter++; });
                    verify_data(rpc_data->request_blob());
                    repl_ctx()->send_data_service_response(nuraft_mesg::io_blob_list_t{rpc_data->request_blob()},
-                                                              rpc_data);
+                                                          rpc_data);
                }) &&
         messaging->bind_data_service_request(
             REQUEST_DATA, _group_id, [this](boost::intrusive_ptr< sisl::GenericRpcData >& rpc_data) {
                 rpc_data->set_comp_cb([](boost::intrusive_ptr< sisl::GenericRpcData >&) { server_counter++; });
-                repl_ctx()->send_data_service_response(nuraft_mesg::io_blob_list_t{rpc_data->request_blob()},
-                                                           rpc_data);
+                repl_ctx()->send_data_service_response(nuraft_mesg::io_blob_list_t{rpc_data->request_blob()}, rpc_data);
             });
 }
 
@@ -247,13 +259,14 @@ uint16_t test_state_mgr::get_random_num() {
 
 uint32_t test_state_mgr::get_server_counter() { return server_counter.load(); }
 
-nuraft::cb_func::ReturnCode test_state_mgr::raft_event(nuraft::cb_func::Type type, nuraft::cb_func::Param* /* param */) {
+nuraft::cb_func::ReturnCode test_state_mgr::raft_event(nuraft::cb_func::Type type,
+                                                       nuraft::cb_func::Param* /* param */) {
     // GotAppendEntryReqFromLeader = 14 (from libnuraft/callback.hxx)
     // This event fires when follower receives append_entries from leader
     constexpr int GOT_APPEND_ENTRY_REQ_FROM_LEADER = 14;
 
     if (_state_machine && _state_machine->append_delay_ms_.load() > 0 &&
-        static_cast<int>(type) == GOT_APPEND_ENTRY_REQ_FROM_LEADER) {
+        static_cast< int >(type) == GOT_APPEND_ENTRY_REQ_FROM_LEADER) {
         auto delay_ms = _state_machine->append_delay_ms_.load();
         LOGINFO("Injecting append_entries delay: {}ms (simulating slow I/O)", delay_ms);
         std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));

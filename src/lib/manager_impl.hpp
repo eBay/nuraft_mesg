@@ -74,8 +74,8 @@ class ManagerImpl : public std::enable_shared_from_this< ManagerImpl > {
     // Suspend until pred() holds or the deadline passes, woken by signal_waiters or a deadline timer.
     // Returns {} on success, std::unexpected(timeout_code) if the deadline is reached first.
     null_async_task wait_for_condition(group_id_t group_id, std::function< bool() > pred,
-                                     std::chrono::steady_clock::time_point deadline,
-                                     nuraft::cmd_result_code timeout_code);
+                                       std::chrono::steady_clock::time_point deadline,
+                                       nuraft::cmd_result_code timeout_code);
     // Re-dispatch `dispatch` (a thunk producing a fresh attempt) while it returns CONFIG_CHANGING /
     // SERVER_IS_JOINING, backing off, until the deadline; returns the final raw code. Replaces the
     // CONFIG_CHANGING retry that the consumer (homestore) used to wrap around these calls.
@@ -98,14 +98,13 @@ public:
     std::shared_ptr< mesg_state_mgr > lookup_state_manager(group_id_t const& group_id) const;
     null_async_task create_group(group_id_t const& group_id, group_type_t const& group_type);
     null_result join_group(group_id_t const& group_id, group_type_t const& group_type,
-                          std::shared_ptr< mesg_state_mgr > smgr);
+                           std::shared_ptr< mesg_state_mgr > smgr);
 
     null_async_task add_member(group_id_t const& group_id, peer_id_t const& server_id);
     null_async_task add_member(group_id_t const& group_id, nuraft::srv_config const& srv_config);
     null_async_task rem_member(group_id_t const& group_id, peer_id_t const& server_id);
     null_async_task become_leader(group_id_t const& group_id);
-    null_async_task append_entries(group_id_t const& group_id,
-                                 std::vector< std::shared_ptr< nuraft::buffer > > const&);
+    null_async_task append_entries(group_id_t const& group_id, std::vector< std::shared_ptr< nuraft::buffer > > const&);
 
     void get_srv_config_all(group_id_t const& group_id,
                             std::vector< std::shared_ptr< nuraft::srv_config > >& configs_out);

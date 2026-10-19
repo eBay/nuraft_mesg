@@ -113,8 +113,8 @@ static void _print_white_space(FILE* stream, size_t len) {
     }
 }
 
-static void __attribute__((unused))
-print_hex_stream(FILE* stream, const void* buf, size_t buflen, struct print_hex_options options) {
+static void __attribute__((unused)) print_hex_stream(FILE* stream, const void* buf, size_t buflen,
+                                                     struct print_hex_options options) {
     size_t i, j;
     size_t max_addr_len;
     char str_buffer[256];
@@ -149,7 +149,9 @@ print_hex_stream(FILE* stream, const void* buf, size_t buflen, struct print_hex_
             fprintf(stream, (options.enable_colors) ? _CL_CYAN("%02x ") : "%02x ", (int)i);
         }
 
-        if ((i + 1) % 8 == 0) { fprintf(stream, " "); }
+        if ((i + 1) % 8 == 0) {
+            fprintf(stream, " ");
+        }
     }
     fprintf(stream, "\n");
 
@@ -186,7 +188,9 @@ print_hex_stream(FILE* stream, const void* buf, size_t buflen, struct print_hex_
                 fprintf(stream, "   ");
             }
 
-            if ((j + 1) % 8 == 0) { fprintf(stream, " "); }
+            if ((j + 1) % 8 == 0) {
+                fprintf(stream, " ");
+            }
         }
 
         // Ascii character part
