@@ -6,9 +6,11 @@
 #include <future>
 #include <thread>
 #include <vector>
+#include <grpcpp/grpcpp.h>
 #include <libnuraft/nuraft.hxx>
 #include <sisl/grpc/rpc_call.hpp>
 
+#include "lib/nuraft_mesg_config.hpp"
 #include "proto/messaging_service.grpc.pb.h"
 
 static nuraft::ptr< nuraft::buffer > create_test_message(nlohmann::json const& j_obj) {
@@ -113,31 +115,67 @@ TEST_F(ThreadPoolFixture, MetricsCountersConsistency) {
     LOGINFO("All operations completed - atomic counters balanced correctly");
 }
 
-// RaftStep calls alive in this process: sisl counts the RpcData of every call it serves.
+// RaftStep calls alive in this process: sisl counts the RpcData of every call a server serves, and of the next call
+// each server waits for.
 static int64_t raft_step_calls_alive() {
     return sisl::ObjLifeCounter< sisl::RpcData< nuraft_mesg::Messaging, nuraft_mesg::RaftGroupMsg,
                                                 nuraft_mesg::RaftGroupMsg, false > >::s_alive.load();
 }
 
-// Members shut down one at a time while their peers may still send them RAFT messages.
+// Polls cond for up to 10 seconds; whether it became true.
+template < typename Cond >
+static bool wait_until(Cond cond) {
+    auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (!cond()) {
+        if (std::chrono::steady_clock::now() > deadline) {
+            return false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return true;
+}
+
+// Whether a member refused a RaftStep as it is shutting down.
+static bool refused(grpc::Status const& status) {
+    return status.error_code() == grpc::StatusCode::UNAVAILABLE && status.error_message() == "shutting down";
+}
+
+// app_2 alone, leading a group of its own: no peer sends it RAFT messages, the test sends them over gRPC.
 class ShutdownFixture : public MessagingFixtureBase {
 protected:
     int64_t calls_alive_before_{0};
+    std::unique_ptr< Messaging::Stub > stub_;
 
     void SetUp() override {
         calls_alive_before_ = raft_step_calls_alive();
         MessagingFixtureBase::SetUp();
-        start(true);
-        // Wait for stable leadership
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+        app_2_->start();
+        group_id_ = boost::uuids::random_generator()();
+        EXPECT_TRUE(sync_get(app_2_->instance_->create_group(group_id_, "test_type")));
+        stub_ = Messaging::NewStub(
+            grpc::CreateChannel(fmt::format("127.0.0.1:{}", app_2_->port_), grpc::InsecureChannelCredentials()));
     }
 
     void TearDown() override {
-        for (auto const& app : {app_3_, app_2_, app_1_}) {
-            if (app->instance_) {
-                app->instance_->leave_group(group_id_);
-            }
+        if (auto it = app_2_->state_mgr_map_.find(group_id_); app_2_->state_mgr_map_.end() != it) {
+            it->second->release_requests(); // held if the test failed
         }
+        if (app_2_->instance_) {
+            app_2_->instance_->leave_group(group_id_);
+        }
+    }
+
+    // A RaftStep of this type for app_2's group, at term 0, which RAFT declines; to: the member it is for.
+    grpc::Status raft_step(nuraft::msg_type type, std::string const& to) {
+        RaftGroupMsg request;
+        request.set_group_id(to_string(group_id_));
+        request.set_intended_addr(to);
+        request.mutable_msg()->mutable_base()->set_type(type);
+        request.mutable_msg()->mutable_rc_request();
+        RaftGroupMsg reply;
+        grpc::ClientContext context;
+        context.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(20));
+        return stub_->RaftStep(&context, request, &reply);
     }
 
     // Drops the member's owners of its ManagerImpl, whose destructor shuts its messaging service down, then its gRPC
@@ -148,30 +186,56 @@ protected:
     }
 };
 
-// A member that shuts down answers every RaftStep it received, also those arriving while its shutdown waits for the
-// work in flight: here an election's vote requests, while a slow append_entries holds app_2's shutdown in its I/O
-// pool. sisl keeps the call of a RaftStep that is never answered for the life of the process.
+// A member that shuts down answers every RaftStep it took: those its thread pools run, those queued behind them, and,
+// while it waits for these, those still arriving, which it refuses (UNAVAILABLE) rather than queue to a pool it no
+// longer runs. sisl keeps the call of a RaftStep that is never answered for the life of the process.
 TEST_F(ShutdownFixture, ShutdownAnswersEveryRaftStep) {
-    app_2_->state_mgr_map_[group_id_]->get_sm()->set_append_delay(3000);
-    auto buf = create_test_message(nlohmann::json{{"op_type", 1}});
-    // Committed by app_1 and app_3; app_2 is still in its slow append after that.
-    EXPECT_TRUE(sync_get(app_1_->impl_inst_->append_entries(group_id_, {buf})));
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    auto const app_2 = to_string(app_2_->id_);
+    auto& smgr = *app_2_->state_mgr_map_[group_id_];
+    // A pre-vote request runs in app_2's RAFT pool, an install-snapshot request in its I/O pool, sized as proto_service
+    // sizes them.
+    auto const raft_workers = int{NURAFT_MESG_CONFIG(raft_append_entries_thread_cnt)};
+    auto const io_workers =
+        NURAFT_MESG_CONFIG(io_thread_pool_size) > 0 ? static_cast< int >(NURAFT_MESG_CONFIG(io_thread_pool_size)) : 4;
+    auto const listening = raft_step_calls_alive();
+
+    // Every worker of both pools holds a request, and two more requests wait behind them in each pool.
+    smgr.hold_requests({nuraft::msg_type::pre_vote_request, nuraft::msg_type::install_snapshot_request});
+    std::vector< std::future< grpc::Status > > calls;
+    auto const send = [&](nuraft::msg_type type, int count) {
+        for (int i = 0; i < count; ++i) {
+            calls.push_back(std::async(std::launch::async, [this, type, &app_2] { return raft_step(type, app_2); }));
+        }
+    };
+    send(nuraft::msg_type::pre_vote_request, raft_workers + 2);
+    send(nuraft::msg_type::install_snapshot_request, io_workers + 2);
+    // sisl counts the next call a server waits for once raftStep() has returned for the last one: by then that one is
+    // in its pool.
+    ASSERT_TRUE(wait_until([&] {
+        return smgr.requests_held() == raft_workers + io_workers &&
+            raft_step_calls_alive() == listening + static_cast< int64_t >(calls.size());
+    }));
 
     auto stopped = std::async(std::launch::async, [this] { shut_down(app_2_); });
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));        // app_2's shutdown waits for its slow append
-    EXPECT_TRUE(sync_get(app_3_->instance_->become_leader(group_id_))); // the election asks app_2 for its vote
-    stopped.get();
+    // A request for another member is rejected for its address until the shutdown starts, and refused from then on.
+    auto const other = to_string(boost::uuids::random_generator()());
+    EXPECT_TRUE(wait_until([&] { return refused(raft_step(nuraft::msg_type::pre_vote_request, other)); }));
+    // The shutdown waits for the requests in its pools, and refuses new ones.
+    EXPECT_TRUE(refused(raft_step(nuraft::msg_type::pre_vote_request, app_2)));
+    EXPECT_TRUE(refused(raft_step(nuraft::msg_type::install_snapshot_request, app_2)));
+    EXPECT_EQ(stopped.wait_for(std::chrono::seconds(0)), std::future_status::timeout);
 
-    for (auto const& app : {app_3_, app_1_}) {
-        app->instance_->leave_group(group_id_);
-        shut_down(app);
+    smgr.release_requests();
+    stopped.get();
+    for (auto& call : calls) {
+        // Each ran: RAFT answered it or, once app_2's manager was gone, rejected it.
+        auto const status = call.get();
+        EXPECT_TRUE(status.ok() || status.error_message() == "Server rejected request")
+            << status.error_code() << ": " << status.error_message();
     }
-    auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    while (raft_step_calls_alive() != calls_alive_before_ && std::chrono::steady_clock::now() < deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    }
-    EXPECT_EQ(raft_step_calls_alive(), calls_alive_before_) << "a RaftStep call was never answered";
+    smgr.permanent_destroy(); // app_2's RAFT state is removed with the fixture
+    EXPECT_TRUE(wait_until([this] { return raft_step_calls_alive() == calls_alive_before_; }))
+        << "a RaftStep call was never answered";
 }
 
 // Unit test for message type classification
