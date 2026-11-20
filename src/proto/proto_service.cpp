@@ -111,9 +111,9 @@ private:
 
     boost::asio::thread_pool _raft_thread_pool;
     boost::asio::thread_pool _io_thread_pool;
-    // Set by shutdown() under the exclusive lock; raftStep() checks it and posts under the shared lock. So nothing is
-    // posted once shutdown() joins the pools: a request no pool runs is never answered, and sisl then keeps its RpcData
-    // and gRPC call for the life of the process.
+    // Set by shutdown(), which then takes the exclusive lock once, to wait for the posts in progress; raftStep() checks
+    // it and posts under the shared lock. So nothing is posted once shutdown() joins the pools: a request no pool runs
+    // is never answered, and sisl then keeps its RpcData and gRPC call for the life of the process.
     std::shared_mutex _stopping_mutex;
     std::atomic< bool > _stopping{false};
     std::atomic< int > _raft_pool_active_threads{0};
@@ -142,10 +142,12 @@ void proto_service::bind(::sisl::GrpcServer* server) {
 void proto_service::shutdown() {
     // From here on raftStep() answers new requests at once (UNAVAILABLE) rather than post them: the gRPC server keeps
     // serving until msg_service::shutdown() below returns, and a request posted to a pool after the joins never runs.
-    {
-        std::unique_lock lk(_stopping_mutex);
-        _stopping.store(true, std::memory_order_release);
-    }
+    // The flag is set first, so new requests stop taking the lock: the exclusive lock then waits only for the posts in
+    // progress, which may have read the flag before it was set, where a reader-preferring lock could keep it waiting
+    // for as long as requests keep coming.
+    _stopping.store(true, std::memory_order_release);
+    _stopping_mutex.lock();
+    _stopping_mutex.unlock();
     // Drain in-flight lambdas while RAFT groups are still reachable so they take the
     // success path (Finish). This also avoids FinishWithError→StatusCreate touching
     // gRPC-poisoned stack frames on shutdown (the primary ASan guard is allow_user_poisoning=0).
@@ -234,8 +236,8 @@ int64_t proto_service::execute_step(std::shared_ptr< nuraft::raft_server > const
 }
 
 bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data) {
-    // Once shutdown() has started, answered at once, not even joined. The check that guarantees an answer is the
-    // one under the lock in post_unless_stopping() below.
+    // Once shutdown() has started, answered at once, without taking the lock it waits for. The check that guarantees
+    // an answer is the one under the lock in post_unless_stopping() below.
     if (_stopping.load(std::memory_order_acquire)) {
         return refuse_stopping(rpc_data);
     }
