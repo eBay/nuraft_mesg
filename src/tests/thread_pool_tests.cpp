@@ -7,6 +7,9 @@
 #include <thread>
 #include <vector>
 #include <libnuraft/nuraft.hxx>
+#include <sisl/grpc/rpc_call.hpp>
+
+#include "proto/messaging_service.grpc.pb.h"
 
 static nuraft::ptr< nuraft::buffer > create_test_message(nlohmann::json const& j_obj) {
     auto v_msgpack = nlohmann::json::to_msgpack(j_obj);
@@ -109,6 +112,67 @@ TEST_F(ThreadPoolFixture, MetricsCountersConsistency) {
 
     // If atomic counters leaked (never decremented), operations would eventually hang
     LOGINFO("All operations completed - atomic counters balanced correctly");
+}
+
+// RaftStep calls alive in this process: sisl counts the RpcData of every call it serves.
+static int64_t raft_step_calls_alive() {
+    return sisl::ObjLifeCounter< sisl::RpcData< nuraft_mesg::Messaging, nuraft_mesg::RaftGroupMsg,
+                                                nuraft_mesg::RaftGroupMsg, false > >::s_alive.load();
+}
+
+// Members shut down one at a time while their peers may still send them RAFT messages.
+class ShutdownFixture : public MessagingFixtureBase {
+protected:
+    int64_t calls_alive_before_{0};
+
+    void SetUp() override {
+        calls_alive_before_ = raft_step_calls_alive();
+        MessagingFixtureBase::SetUp();
+        start(true);
+        // Wait for stable leadership
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+    }
+
+    void TearDown() override {
+        for (auto const& app : {app_3_, app_2_, app_1_}) {
+            if (app->instance_) {
+                app->instance_->leave_group(group_id_);
+            }
+        }
+    }
+
+    // Drops the member's owners of its ManagerImpl, whose destructor shuts its messaging service down, then its gRPC
+    // server.
+    static void shut_down(std::shared_ptr< TestApplication > const& app) {
+        app->instance_.reset();
+        app->impl_inst_.reset();
+    }
+};
+
+// A member that shuts down answers every RaftStep it received, also those arriving while its shutdown waits for the
+// work in flight: here an election's vote requests, while a slow append_entries holds app_2's shutdown in its I/O
+// pool. sisl keeps the call of a RaftStep that is never answered for the life of the process.
+TEST_F(ShutdownFixture, ShutdownAnswersEveryRaftStep) {
+    app_2_->state_mgr_map_[group_id_]->get_sm()->set_append_delay(3000);
+    auto buf = create_test_message(nlohmann::json{{"op_type", 1}});
+    // Committed by app_1 and app_3; app_2 is still in its slow append after that.
+    EXPECT_TRUE(sync_get(app_1_->impl_inst_->append_entries(group_id_, {buf})));
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    auto stopped = std::async(std::launch::async, [this] { shut_down(app_2_); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));        // app_2's shutdown waits for its slow append
+    EXPECT_TRUE(sync_get(app_3_->instance_->become_leader(group_id_))); // the election asks app_2 for its vote
+    stopped.get();
+
+    for (auto const& app : {app_3_, app_1_}) {
+        app->instance_->leave_group(group_id_);
+        shut_down(app);
+    }
+    auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (raft_step_calls_alive() != calls_alive_before_ && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    EXPECT_EQ(raft_step_calls_alive(), calls_alive_before_) << "a RaftStep call was never answered";
 }
 
 // Unit test for message type classification
