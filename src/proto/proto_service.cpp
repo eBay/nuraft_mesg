@@ -1,3 +1,5 @@
+#include <shared_mutex>
+
 #include <boost/uuid/string_generator.hpp>
 #include <grpcpp/impl/codegen/status_code_enum.h>
 #include <boost/asio.hpp>
@@ -101,9 +103,19 @@ private:
     int64_t execute_step(std::shared_ptr< nuraft::raft_server > const& server,
                          const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data,
                          std::shared_ptr< group_metrics > const& metrics);
+    // Posts fn to pool unless shutdown() has started; false if it has (fn is dropped without running).
+    template < typename Fn >
+    bool post_unless_stopping(boost::asio::thread_pool& pool, Fn&& fn);
+    // Answers a request the service no longer takes, as it is shutting down. Returns true: sisl sends the response.
+    static bool refuse_stopping(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
 
     boost::asio::thread_pool _raft_thread_pool;
     boost::asio::thread_pool _io_thread_pool;
+    // Set by shutdown(), which then takes the exclusive lock once, to wait for the posts in progress; raftStep() checks
+    // it and posts under the shared lock. So nothing is posted once shutdown() joins the pools: a request no pool runs
+    // is never answered, and sisl then keeps its RpcData and gRPC call for the life of the process.
+    std::shared_mutex _stopping_mutex;
+    std::atomic< bool > _stopping{false};
     std::atomic< int > _raft_pool_active_threads{0};
     std::atomic< int > _io_pool_active_threads{0};
     service_metrics _service_metrics;
@@ -128,14 +140,39 @@ void proto_service::bind(::sisl::GrpcServer* server) {
 }
 
 void proto_service::shutdown() {
+    // From here on raftStep() answers new requests at once (UNAVAILABLE) rather than post them: the gRPC server keeps
+    // serving until msg_service::shutdown() below returns, and a request posted to a pool after the joins never runs.
+    // The flag is set first, so new requests stop taking the lock: the exclusive lock then waits only for the posts in
+    // progress, which may have read the flag before it was set, where a reader-preferring lock could keep it waiting
+    // for as long as requests keep coming.
+    _stopping.store(true, std::memory_order_release);
+    _stopping_mutex.lock();
+    _stopping_mutex.unlock();
     // Drain in-flight lambdas while RAFT groups are still reachable so they take the
     // success path (Finish). This also avoids FinishWithError→StatusCreate touching
     // gRPC-poisoned stack frames on shutdown (the primary ASan guard is allow_user_poisoning=0).
-    _raft_thread_pool.stop();
+    // join() without stop(): every queued lambda runs, and answers, first. stop() would drop them unanswered.
     _raft_thread_pool.join();
-    _io_thread_pool.stop();
     _io_thread_pool.join();
     msg_service::shutdown();
+}
+
+template < typename Fn >
+bool proto_service::post_unless_stopping(boost::asio::thread_pool& pool, Fn&& fn) {
+    std::shared_lock lk(_stopping_mutex);
+    if (_stopping.load(std::memory_order_relaxed)) {
+        return false;
+    }
+    boost::asio::post(pool, std::forward< Fn >(fn));
+    return true;
+}
+
+bool proto_service::refuse_stopping(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data) {
+    auto const& group_id = rpc_data->request().group_id();
+    LOGD("Refusing a message for [group={}]: shutting down", group_id);
+    rpc_data->response().set_group_id(group_id);
+    rpc_data->set_status(::grpc::Status(::grpc::UNAVAILABLE, "shutting down"));
+    return true;
 }
 
 size_t proto_service::calculate_io_pool_size() {
@@ -199,6 +236,11 @@ int64_t proto_service::execute_step(std::shared_ptr< nuraft::raft_server > const
 }
 
 bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data) {
+    // Once shutdown() has started, answered at once, without taking the lock it waits for. The check that guarantees
+    // an answer is the one under the lock in post_unless_stopping() below.
+    if (_stopping.load(std::memory_order_acquire)) {
+        return refuse_stopping(rpc_data);
+    }
     auto& request = rpc_data->request();
     auto const& group_id = request.group_id();
     auto const& intended_addr = request.intended_addr();
@@ -244,7 +286,7 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
     if (is_slow_message(msg_type)) {
         COUNTER_INCREMENT(_service_metrics, io_pool_msg_count, 1);
         auto io_post_time = std::chrono::steady_clock::now();
-        boost::asio::post(_io_thread_pool, [this, gid, rpc_data, io_post_time, msg_type]() {
+        bool const posted = post_unless_stopping(_io_thread_pool, [this, gid, rpc_data, io_post_time, msg_type]() {
             auto io_wait_time_us = get_elapsed_time_us(io_post_time);
             auto io_guard = atomic_counter_guard(_io_pool_active_threads);
             HISTOGRAM_OBSERVE(_service_metrics, io_pool_wait_time_us, io_wait_time_us);
@@ -271,10 +313,13 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
             LOGT("I/O pool executed [type={}] wait={}us exec={}us", nuraft::msg_type_to_string(msg_type),
                  io_wait_time_us, exec_time_us);
         });
+        if (!posted) {
+            return refuse_stopping(rpc_data);
+        }
     } else {
         COUNTER_INCREMENT(_service_metrics, raft_pool_msg_count, 1);
         auto raft_post_time = std::chrono::steady_clock::now();
-        boost::asio::post(_raft_thread_pool, [this, gid, rpc_data, raft_post_time]() {
+        bool const posted = post_unless_stopping(_raft_thread_pool, [this, gid, rpc_data, raft_post_time]() {
             auto raft_wait_time_us = get_elapsed_time_us(raft_post_time);
             auto raft_guard = atomic_counter_guard(_raft_pool_active_threads);
             HISTOGRAM_OBSERVE(_service_metrics, raft_pool_wait_time_us, raft_wait_time_us);
@@ -299,6 +344,9 @@ bool proto_service::raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMs
             }
             execute_step(raft_srv, rpc_data, metrics);
         });
+        if (!posted) {
+            return refuse_stopping(rpc_data);
+        }
     }
     return false;
 }
