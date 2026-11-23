@@ -186,9 +186,10 @@ protected:
     }
 };
 
-// A member that shuts down answers every RaftStep it took: those its thread pools run, those queued behind them, and,
-// while it waits for these, those still arriving, which it refuses (UNAVAILABLE) rather than queue to a pool it no
-// longer runs. sisl keeps the call of a RaftStep that is never answered for the life of the process.
+// A member that shuts down answers every RaftStep it took. RAFT answers those its thread pools run; the member refuses
+// (UNAVAILABLE) those queued behind them, once they start, without decoding them, and, while it waits for these, those
+// still arriving, rather than queue them to a pool it no longer runs. sisl keeps the call of a RaftStep that is never
+// answered for the life of the process.
 TEST_F(ShutdownFixture, ShutdownAnswersEveryRaftStep) {
     auto const app_2 = to_string(app_2_->id_);
     auto& smgr = *app_2_->state_mgr_map_[group_id_];
@@ -227,12 +228,17 @@ TEST_F(ShutdownFixture, ShutdownAnswersEveryRaftStep) {
 
     smgr.release_requests();
     stopped.get();
+    // RAFT answers the requests it held; those queued behind them start after the shutdown began, and are refused.
+    auto answered = 0;
     for (auto& call : calls) {
-        // Each ran: RAFT answered it or, once app_2's manager was gone, rejected it.
         auto const status = call.get();
-        EXPECT_TRUE(status.ok() || status.error_message() == "Server rejected request")
-            << status.error_code() << ": " << status.error_message();
+        if (status.ok()) {
+            ++answered;
+        } else {
+            EXPECT_TRUE(refused(status)) << status.error_code() << ": " << status.error_message();
+        }
     }
+    EXPECT_EQ(answered, raft_workers + io_workers);
     smgr.permanent_destroy(); // app_2's RAFT state is removed with the fixture
     EXPECT_TRUE(wait_until([this] { return raft_step_calls_alive() == calls_alive_before_; }))
         << "a RaftStep call was never answered";

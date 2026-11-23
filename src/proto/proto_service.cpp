@@ -151,7 +151,8 @@ void proto_service::shutdown() {
     // Drain in-flight lambdas while RAFT groups are still reachable so they take the
     // success path (Finish). This also avoids FinishWithError→StatusCreate touching
     // gRPC-poisoned stack frames on shutdown (the primary ASan guard is allow_user_poisoning=0).
-    // join() without stop(): every queued lambda runs, and answers, first. stop() would drop them unanswered.
+    // join() without stop(): every queued lambda runs, and answers, first (refusing its request, see execute_step()).
+    // stop() would drop them unanswered.
     _raft_thread_pool.join();
     _io_thread_pool.join();
     msg_service::shutdown();
@@ -192,6 +193,14 @@ int64_t proto_service::execute_step(std::shared_ptr< nuraft::raft_server > const
     auto const& group_id = request.group_id();
 
     auto exec_start = std::chrono::steady_clock::now();
+
+    // Work that starts once shutdown() has begun is refused before its request is decoded: its manager is being
+    // destroyed, and RAFT would reject the request anyway. Work already in step() finishes.
+    if (_stopping.load(std::memory_order_acquire)) {
+        refuse_stopping(rpc_data);
+        rpc_data->send_response();
+        return get_elapsed_time_us(exec_start);
+    }
 
     if (metrics) {
         COUNTER_INCREMENT(*metrics, group_steps, 1);
