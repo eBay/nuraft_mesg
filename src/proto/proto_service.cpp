@@ -112,8 +112,9 @@ private:
     boost::asio::thread_pool _raft_thread_pool;
     boost::asio::thread_pool _io_thread_pool;
     // Set by shutdown(), which then takes the exclusive lock once, to wait for the posts in progress; raftStep() checks
-    // it and posts under the shared lock. So nothing is posted once shutdown() joins the pools: a request no pool runs
-    // is never answered, and sisl then keeps its RpcData and gRPC call for the life of the process.
+    // it and posts under the shared lock. The flag alone is not enough: a request that read it as false could then
+    // post after shutdown() joined the pools. No pool would run it, so it would never be answered, and sisl keeps the
+    // RpcData and gRPC call of an unanswered request for the life of the process.
     std::shared_mutex _stopping_mutex;
     std::atomic< bool > _stopping{false};
     std::atomic< int > _raft_pool_active_threads{0};
@@ -142,10 +143,12 @@ void proto_service::bind(::sisl::GrpcServer* server) {
 void proto_service::shutdown() {
     // From here on raftStep() answers new requests at once (UNAVAILABLE) rather than post them: the gRPC server keeps
     // serving until msg_service::shutdown() below returns, and a request posted to a pool after the joins never runs.
-    // The flag is set first, so new requests stop taking the lock: the exclusive lock then waits only for the posts in
-    // progress, which may have read the flag before it was set, where a reader-preferring lock could keep it waiting
-    // for as long as requests keep coming.
     _stopping.store(true, std::memory_order_release);
+    // A barrier for the requests between their check of the flag and their post (they hold the shared lock): they may
+    // have read the flag before it was set. Once the lock is taken, their posts are in the pools, and any later check
+    // reads the flag as set; nothing else needs the lock. The flag is set before, not under, the lock so that new
+    // requests skip the lock: a reader-preferring lock (glibc's) could otherwise keep this waiting for as long as they
+    // keep coming.
     _stopping_mutex.lock();
     _stopping_mutex.unlock();
     // Drain in-flight lambdas while RAFT groups are still reachable so they take the
@@ -160,6 +163,8 @@ void proto_service::shutdown() {
 
 template < typename Fn >
 bool proto_service::post_unless_stopping(boost::asio::thread_pool& pool, Fn&& fn) {
+    // The lock is for the post, not the flag: shutdown() takes the exclusive lock before it joins the pools, so it
+    // cannot join them between this check and this post.
     std::shared_lock lk(_stopping_mutex);
     if (_stopping.load(std::memory_order_relaxed)) {
         return false;
