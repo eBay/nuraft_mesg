@@ -196,8 +196,7 @@ TEST_F(ShutdownFixture, ShutdownAnswersEveryRaftStep) {
     // A pre-vote request runs in app_2's RAFT pool, an install-snapshot request in its I/O pool, sized as proto_service
     // sizes them.
     auto const raft_workers = int{NURAFT_MESG_CONFIG(raft_append_entries_thread_cnt)};
-    auto const io_workers =
-        NURAFT_MESG_CONFIG(io_thread_pool_size) > 0 ? static_cast< int >(NURAFT_MESG_CONFIG(io_thread_pool_size)) : 4;
+    auto const io_workers = static_cast< int >(nuraft_mesg::io_pool_size());
     auto const listening = raft_step_calls_alive();
 
     // Every worker of both pools holds a request, and two more requests wait behind them in each pool.

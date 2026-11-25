@@ -88,7 +88,7 @@ public:
     proto_service(Args&&... args) :
             msg_service(std::forward< Args >(args)...),
             _raft_thread_pool{NURAFT_MESG_CONFIG(raft_append_entries_thread_cnt)},
-            _io_thread_pool{calculate_io_pool_size()} {}
+            _io_thread_pool{io_pool_size()} {}
 
     void associate(sisl::GrpcServer* server) override;
     void bind(sisl::GrpcServer* server) override;
@@ -98,7 +98,6 @@ public:
     bool raftStep(const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data);
 
 private:
-    size_t calculate_io_pool_size();
     bool is_slow_message(nuraft::msg_type type) const;
     int64_t execute_step(std::shared_ptr< nuraft::raft_server > const& server,
                          const sisl::AsyncRpcDataPtr< Messaging, RaftGroupMsg, RaftGroupMsg >& rpc_data,
@@ -179,11 +178,6 @@ bool proto_service::refuse_stopping(const sisl::AsyncRpcDataPtr< Messaging, Raft
     rpc_data->response().set_group_id(group_id);
     rpc_data->set_status(::grpc::Status(::grpc::UNAVAILABLE, "shutting down"));
     return true;
-}
-
-size_t proto_service::calculate_io_pool_size() {
-    auto config_size = NURAFT_MESG_CONFIG(io_thread_pool_size);
-    return (config_size > 0) ? config_size : 4; // Default to 4 threads
 }
 
 bool proto_service::is_slow_message(nuraft::msg_type type) const {
